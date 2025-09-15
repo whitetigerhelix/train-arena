@@ -7,7 +7,7 @@ public class DomainRandomizationUI : MonoBehaviour
 
     void Start()
     {
-        if (!randomizer) randomizer = FindObjectOfType<DomainRandomizer>();
+        if (!randomizer) randomizer = FindFirstObjectByType<DomainRandomizer>(); //TODO: FindAnyObjectByType?  Have a smarter way to select lights
         BuildUI();
     }
 

@@ -29,7 +29,7 @@ public class RagdollAgent : Agent
         pelvis.rotation = startRot;
         foreach (var rb in GetComponentsInChildren<Rigidbody>())
         {
-            rb.velocity = Vector3.zero;
+            rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
     }
@@ -63,7 +63,12 @@ public class RagdollAgent : Agent
         float forward = Vector3.Dot(pelvis.GetComponent<Rigidbody>().linearVelocity, transform.forward);
         AddReward(Mathf.Clamp(forward, -targetSpeed, targetSpeed) / targetSpeed * 0.02f);
         AddReward((Vector3.Dot(pelvis.up, Vector3.up) - 0.8f) * 0.01f); // bonus if upright
-        AddReward(-0.001f * ca.SqrMagnitude()); // energy
+
+        // Calculate energy penalty (sum of squares of actions)
+        float energy = 0f;
+        for (int i = 0; i < ca.Length; i++)
+            energy += ca[i] * ca[i];
+        AddReward(-0.001f * energy); // energy
 
         // Fail on fall
         if (Vector3.Dot(pelvis.up, Vector3.up) < 0.4f || pelvis.position.y < 0.2f)
