@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEditor.Recorder;
 using UnityEditor.Recorder.Input;
+using UnityEditor.Recorder.Encoder;
 
 public class RecorderUtility : MonoBehaviour
 {
@@ -13,8 +14,15 @@ public class RecorderUtility : MonoBehaviour
         var videoRecorder = ScriptableObject.CreateInstance<MovieRecorderSettings>();
         videoRecorder.name = "HackVideo";
         videoRecorder.Enabled = true;
-        videoRecorder.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
-        videoRecorder.VideoBitRateMode = VideoBitrateMode.High;
+        
+        // Use the new EncoderSettings API instead of deprecated properties
+        var coreEncoderSettings = new CoreEncoderSettings
+        {
+            Codec = CoreEncoderSettings.OutputCodec.MP4,
+            EncodingQuality = CoreEncoderSettings.VideoEncodingQuality.High
+        };
+        videoRecorder.EncoderSettings = coreEncoderSettings;
+        
         videoRecorder.ImageInputSettings = new GameViewInputSettings
         {
             OutputWidth = 1920,
@@ -22,6 +30,7 @@ public class RecorderUtility : MonoBehaviour
         };
         videoRecorder.AudioInputSettings.PreserveAudio = true;
         videoRecorder.OutputFile = "Recordings/Hackathon_" + System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        
         recorderController.Settings.AddRecorderSettings(videoRecorder);
         recorderController.Settings.SetRecordModeToManual();
         recorderController.PrepareRecording();
