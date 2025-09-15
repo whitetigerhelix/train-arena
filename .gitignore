@@ -26,3 +26,9 @@ Builds/
 
 # Asset store tools
 Assets/AssetStoreTools*
+
+# ML-Agents generated files
+Assets/ML-Agents/Timers/
+**/Timers/
+**/*_timers.json
+results/

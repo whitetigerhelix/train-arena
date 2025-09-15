@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using UnityEditorInternal;
 using System.Linq;
 
 public static class SceneBuilder
@@ -9,13 +10,18 @@ public static class SceneBuilder
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
 
-        // Camera
+        // Camera with controller for navigation
         var cam = new GameObject("Main Camera");
         var camera = cam.AddComponent<Camera>();
         cam.tag = "MainCamera";
-        cam.transform.position = new Vector3(20, 12, -10);
-        cam.transform.rotation = Quaternion.Euler(40, 0, 0);
+        // Position camera to view 4x4 grid: arenas at (0,0), (20,0), (40,0), (60,0), etc.
+        // Center of grid is at (30, 0, 30) - halfway between (0,0) and (60,60)
+        cam.transform.position = new Vector3(30, 40, -20); 
+        cam.transform.LookAt(new Vector3(30, 0, 30)); // Look at center of 4x4 arena grid
         camera.clearFlags = CameraClearFlags.Skybox;
+        
+        // Add camera controller for WASD navigation
+        cam.AddComponent<EditorCameraController>();
 
         // Light
         var lightGO = new GameObject("Directional Light");
@@ -94,9 +100,15 @@ public static class SceneBuilder
         // Add ML-Agents Behavior Parameters for proper agent behavior
         var behaviorParams = agent.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
         behaviorParams.BehaviorName = "CubeAgent";
-        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for sanity check
+        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default; // Autonomous learning behavior
         behaviorParams.TeamId = 0;
         behaviorParams.UseChildSensors = true;
+        
+        // Add simple face to show agent orientation
+        AddAgentFace(agent);
+        
+        // Add blinking animation for visual polish
+        agent.AddComponent<EyeBlinker>();
 
         return agent;
     }
@@ -169,5 +181,37 @@ public static class SceneBuilder
             
         // Add the tag using Unity's built-in method
         UnityEditorInternal.InternalEditorUtility.AddTag(tagName);
+    }
+    
+    /// <summary>
+    /// Adds simple "eyes" to show agent forward direction
+    /// </summary>
+    static void AddAgentFace(GameObject agent)
+    {
+        // Create left eye - positioned ON the cube surface, not inside
+        var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        leftEye.name = "LeftEye";
+        leftEye.transform.parent = agent.transform;
+        leftEye.transform.localPosition = new Vector3(-0.2f, 0.2f, 0.51f); // Outside cube surface (0.5 + 0.01 margin)
+        leftEye.transform.localScale = Vector3.one * 0.15f; // Slightly larger for visibility
+        
+        // Create right eye  
+        var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        rightEye.name = "RightEye";
+        rightEye.transform.parent = agent.transform;
+        rightEye.transform.localPosition = new Vector3(0.2f, 0.2f, 0.51f); // Outside cube surface
+        rightEye.transform.localScale = Vector3.one * 0.15f;
+        
+        // Make eyes white/black for visibility
+        var eyeMaterial = CreateCompatibleMaterial();
+        eyeMaterial.color = Color.white;
+        eyeMaterial.name = "EyeMaterial";
+        
+        leftEye.GetComponent<Renderer>().material = eyeMaterial;
+        rightEye.GetComponent<Renderer>().material = eyeMaterial;
+        
+        // Remove colliders from eyes so they don't interfere with physics
+        Object.DestroyImmediate(leftEye.GetComponent<Collider>());
+        Object.DestroyImmediate(rightEye.GetComponent<Collider>());
     }
 }

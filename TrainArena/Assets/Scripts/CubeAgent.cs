@@ -31,12 +31,19 @@ public class CubeAgent : Agent
         var arena = transform.parent;
         Vector3 center = arena ? arena.position : Vector3.zero;
         float radius = 4f; // Reduced to match ground size (14x14 ground = 7 radius, use 4 for safety margin)
-        transform.position = center + new Vector3(Random.Range(-radius, radius), 0.5f, Random.Range(-radius, radius));
+        
+        // Position agent ON TOP of ground (Y = 1.0f, not 0.5f)
+        Vector3 newAgentPos = center + new Vector3(Random.Range(-radius, radius), 1.0f, Random.Range(-radius, radius));
+        transform.position = newAgentPos;
         transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
 
         if (goal != null)
         {
-            goal.position = center + new Vector3(Random.Range(-radius, radius), 0.5f, Random.Range(-radius, radius));
+            Vector3 newGoalPos = center + new Vector3(Random.Range(-radius, radius), 1.0f, Random.Range(-radius, radius));
+            goal.position = newGoalPos;
+            
+            // Debug logging for episode resets
+            Debug.Log($"Episode Reset: Agent {gameObject.name} moved to {newAgentPos}, Goal to {newGoalPos}");
         }
 
         prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
