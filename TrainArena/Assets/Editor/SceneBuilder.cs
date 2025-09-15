@@ -22,6 +22,10 @@ public static class SceneBuilder
         
         // Add camera controller for WASD navigation
         cam.AddComponent<EditorCameraController>();
+        
+        // Add debug manager to scene
+        var debugManager = new GameObject("TrainArenaDebugManager");
+        debugManager.AddComponent<TrainArenaDebugManager>();
 
         // Light
         var lightGO = new GameObject("Directional Light");
@@ -34,12 +38,17 @@ public static class SceneBuilder
         var manager = new GameObject("EnvManager");
         var init = manager.AddComponent<EnvInitializer>();
 
-        // Prefabs (create basic ones procedurally)
+        // Prefabs (create basic ones procedurally, then disable them so they don't interfere)
         init.cubeAgentPrefab = CreateCubeAgentPrefab();
         init.goalPrefab = CreateGoalPrefab();
         init.obstaclePrefab = CreateObstaclePrefab();
+        
+        // Disable the prefab instances so they don't appear in the scene
+        init.cubeAgentPrefab.SetActive(false);
+        init.goalPrefab.SetActive(false);
+        init.obstaclePrefab.SetActive(false);
 
-        Debug.Log("Cube training scene created. Press Play to simulate, or start training via mlagents-learn.");
+        TrainArenaDebugManager.Log("Cube training scene created.  Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn.", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     [MenuItem("Tools/ML Hack/Build Ragdoll Test Scene")]
@@ -85,10 +94,10 @@ public static class SceneBuilder
         mat.name = "AgentMaterial";
         mr.material = mat;
         
-        var col = agent.AddComponent<CapsuleCollider>();
-        col.center = new Vector3(0, 0.5f, 0);
-        col.height = 1f;
-        col.radius = 0.4f;
+        // Use BoxCollider to match cube shape perfectly
+        var col = agent.AddComponent<BoxCollider>();
+        col.center = Vector3.zero; // Centered on the cube
+        col.size = Vector3.one; // 1x1x1 cube
 
         var rb = agent.AddComponent<Rigidbody>();
         rb.mass = 1f;
@@ -109,6 +118,9 @@ public static class SceneBuilder
         
         // Add blinking animation for visual polish
         agent.AddComponent<EyeBlinker>();
+        
+        // Add debug info component for development
+        agent.AddComponent<AgentDebugInfo>();
 
         return agent;
     }

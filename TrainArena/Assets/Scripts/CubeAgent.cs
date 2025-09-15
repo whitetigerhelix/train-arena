@@ -42,8 +42,9 @@ public class CubeAgent : Agent
             Vector3 newGoalPos = center + new Vector3(Random.Range(-radius, radius), 1.0f, Random.Range(-radius, radius));
             goal.position = newGoalPos;
             
-            // Debug logging for episode resets
-            Debug.Log($"Episode Reset: Agent {gameObject.name} moved to {newAgentPos}, Goal to {newGoalPos}");
+            // Debug logging for episode resets (verbose level only)
+            TrainArenaDebugManager.Log($"Episode Reset: Agent {gameObject.name} moved to {newAgentPos}, Goal to {newGoalPos}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
 
         prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
@@ -120,15 +121,80 @@ public class CubeAgent : Agent
             AddReward(-0.1f);
     }
 
+    private void OnDrawGizmos()
+    {
+        // Show raycast visualization if global toggle is ON, during play mode
+        if (Application.isPlaying && TrainArenaDebugManager.ShowRaycastVisualization)
+        {
+            DrawRaycastVisualization();
+        }
+    }
+
     private void OnDrawGizmosSelected()
     {
-        // visualize rays
-        Gizmos.color = Color.cyan;
+        // Show raycast visualization when selected (even if global toggle is OFF)
+        if (Application.isPlaying && !TrainArenaDebugManager.ShowRaycastVisualization)
+        {
+            DrawRaycastVisualization();
+        }
+        
+        // Additional info when selected
+        Gizmos.color = Color.white;
+        
+        // Draw arena bounds
+        var arena = transform.parent;
+        if (arena != null)
+        {
+            Vector3 center = arena.position;
+            Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f)); // Arena boundaries
+        }
+        
+        // Draw movement force vector
+        if (Application.isPlaying && rb != null)
+        {
+            Gizmos.color = Color.blue;
+            Vector3 velocity = rb.linearVelocity;
+            Gizmos.DrawLine(transform.position, transform.position + velocity);
+        }
+    }
+    
+    private void DrawRaycastVisualization()
+    {
+        Vector3 rayStart = transform.position + Vector3.up * 0.2f;
+        
         for (int i = 0; i < 8; i++)
         {
             float angle = i * 45f;
             Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
-            Gizmos.DrawLine(transform.position + Vector3.up * 0.2f, transform.position + Vector3.up * 0.2f + dir * rayLength);
+            
+            // Perform the same raycast as in CollectObservations
+            if (Physics.Raycast(rayStart, dir, out RaycastHit hit, rayLength, obstacleMask))
+            {
+                // Red line to hit point, then green line for remaining distance
+                Gizmos.color = Color.red;
+                Gizmos.DrawLine(rayStart, hit.point);
+                Gizmos.color = Color.green;
+                Gizmos.DrawLine(hit.point, rayStart + dir * rayLength);
+                
+                // Draw small sphere at hit point
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(hit.point, 0.1f);
+            }
+            else
+            {
+                // Cyan line for clear path
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawLine(rayStart, rayStart + dir * rayLength);
+            }
+        }
+        
+        // Draw goal direction vector
+        if (goal != null)
+        {
+            Gizmos.color = Color.magenta;
+            Vector3 toGoal = (goal.position - transform.position).normalized * 2f;
+            Gizmos.DrawLine(transform.position, transform.position + toGoal);
+            Gizmos.DrawSphere(transform.position + toGoal, 0.15f);
         }
     }
 }

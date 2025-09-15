@@ -23,7 +23,6 @@ public class EnvInitializer : MonoBehaviour
             {
                 Vector3 center = transform.position + new Vector3(x * arenaSize, 0f, z * arenaSize);
                 SpawnArena(center);
-                Debug.Log($"Spawned Arena {x},{z} at position {center} (EnvManager at {transform.position})");
             }
         }
     }
@@ -36,9 +35,9 @@ public class EnvInitializer : MonoBehaviour
         arenaContainer.transform.parent = transform;
         arenaContainer.transform.position = center;
         
-        Debug.Log($"=== SPAWNING ARENA {arenaIndex} ===");
-        Debug.Log($"Arena Center: {center}");
-        Debug.Log($"Arena Bounds: X[{center.x-7f} to {center.x+7f}], Z[{center.z-7f} to {center.z+7f}]");
+        // Verbose logging for arena setup
+        TrainArenaDebugManager.Log($"Spawning Arena {arenaIndex} at {center}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x-7f} to {center.x+7f}], Z[{center.z-7f} to {center.z+7f}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
 
         // Ground - make it big enough for the 12x12 agent spawn area
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
@@ -53,7 +52,7 @@ public class EnvInitializer : MonoBehaviour
         agentGO.name = $"CubeAgent_Arena_{transform.childCount}";
         var agent = agentGO.GetComponent<CubeAgent>();
         
-        Debug.Log($"Spawned Agent at {agentPosition} in Arena container {arenaContainer.name}");
+        TrainArenaDebugManager.Log($"Spawned Agent at {agentPosition} in {arenaContainer.name}", TrainArenaDebugManager.DebugLogLevel.Verbose);
 
         // Goal - place in a distributed pattern within THIS arena
         // Use the arenaIndex we calculated at the start, not childCount which is now off by 1
@@ -71,7 +70,7 @@ public class EnvInitializer : MonoBehaviour
         if (agent != null) 
         {
             agent.goal = goalGO.transform;
-            Debug.Log($"Arena {arenaIndex}: Agent at {agentPosition} -> Goal at {goalPosition} (distance: {Vector3.Distance(agentPosition, goalPosition):F2})");
+            TrainArenaDebugManager.Log($"Arena {arenaIndex}: Agent -> Goal distance: {Vector3.Distance(agentPosition, goalPosition):F2}", TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
         // Obstacles - distribute around the arena, avoiding goal area, parented to arena container
@@ -104,20 +103,20 @@ public class EnvInitializer : MonoBehaviour
                     obs.name = $"Obstacle_{i}_Arena_{transform.childCount}";
                     obs.tag = "Obstacle";
                     successfulObstacles++;
-                    Debug.Log($"Arena {arenaIndex}: Placed Obstacle {i} at {obsPosition}");
+                    TrainArenaDebugManager.Log($"Arena {arenaIndex}: Placed Obstacle {i} at {obsPosition}", TrainArenaDebugManager.DebugLogLevel.Verbose);
                 }
                 else
                 {
-                    Debug.LogWarning($"Arena {arenaIndex}: Failed to place Obstacle {i} after {attempts} attempts");
+                    TrainArenaDebugManager.LogWarning($"Arena {arenaIndex}: Failed to place Obstacle {i} after {attempts} attempts");
                 }
             }
-            Debug.Log($"Arena {arenaIndex}: Successfully placed {successfulObstacles}/{obstaclesPerArena} obstacles");
+            TrainArenaDebugManager.Log($"Arena {arenaIndex}: Placed {successfulObstacles}/{obstaclesPerArena} obstacles", TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
         // Validation: Ensure all objects are within arena bounds
         ValidateArenaObjects(arenaContainer, center, arenaIndex);
         
-        Debug.Log($"=== ARENA {arenaIndex} COMPLETE ===\n");
+        TrainArenaDebugManager.Log($"Arena {arenaIndex} setup complete", TrainArenaDebugManager.DebugLogLevel.Important);
     }
     
     void ValidateArenaObjects(GameObject arenaContainer, Vector3 center, int arenaIndex)
@@ -132,14 +131,14 @@ public class EnvInitializer : MonoBehaviour
             
             if (Mathf.Abs(localPos.x) > arenaBounds || Mathf.Abs(localPos.z) > arenaBounds)
             {
-                Debug.LogError($"Arena {arenaIndex}: {child.name} is OUTSIDE arena bounds at {pos}! Local offset: {localPos}");
+                TrainArenaDebugManager.LogError($"Arena {arenaIndex}: {child.name} is OUTSIDE arena bounds at {pos}! Local offset: {localPos}");
                 allValid = false;
             }
         }
         
         if (allValid)
         {
-            Debug.Log($"Arena {arenaIndex}: All objects within bounds ✓");
+            TrainArenaDebugManager.Log($"Arena {arenaIndex}: All objects within bounds ✓", TrainArenaDebugManager.DebugLogLevel.Important);
         }
     }
 }
