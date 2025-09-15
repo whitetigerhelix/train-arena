@@ -29,28 +29,29 @@ public class EnvInitializer : MonoBehaviour
 
     void SpawnArena(Vector3 center)
     {
-        // Ground
+        // Ground - make it big enough for the 12x12 agent spawn area
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.position = center;
-        ground.transform.localScale = Vector3.one * 0.5f; // 10x10 plane -> 5x5 world by default
+        ground.transform.localScale = Vector3.one * 1.4f; // 10x10 plane -> 14x14 world (matches arenaSize)
         ground.name = "Ground";
 
-        // Agent
+        // Agent - spawn closer to center, within reasonable bounds
         var agentGO = Instantiate(cubeAgentPrefab, center + Vector3.up * 0.5f, Quaternion.identity, transform);
         agentGO.name = "CubeAgent";
         var agent = agentGO.GetComponent<CubeAgent>();
 
-        // Goal
-        var goalGO = Instantiate(goalPrefab, center + new Vector3(2f, 0.5f, 2f), Quaternion.identity, transform);
+        // Goal - place within smaller radius so it's always on ground
+        var goalOffset = new Vector3(Random.Range(-4f, 4f), 0.5f, Random.Range(-4f, 4f));
+        var goalGO = Instantiate(goalPrefab, center + goalOffset, Quaternion.identity, transform);
         goalGO.name = "Goal";
         if (agent != null) agent.goal = goalGO.transform;
 
-        // Obstacles
+        // Obstacles - keep within ground bounds
         if (obstaclePrefab != null)
         {
             for (int i = 0; i < obstaclesPerArena; i++)
             {
-                Vector3 offset = new Vector3(Random.Range(-5f, 5f), 0.5f, Random.Range(-5f, 5f));
+                Vector3 offset = new Vector3(Random.Range(-4f, 4f), 0.5f, Random.Range(-4f, 4f));
                 var obs = Instantiate(obstaclePrefab, center + offset, Quaternion.identity, transform);
                 obs.tag = "Obstacle";
             }

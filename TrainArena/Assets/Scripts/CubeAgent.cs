@@ -30,7 +30,7 @@ public class CubeAgent : Agent
         // Randomize start & goal within arena bounds (assumes parent positions origin of arena)
         var arena = transform.parent;
         Vector3 center = arena ? arena.position : Vector3.zero;
-        float radius = 6f;
+        float radius = 4f; // Reduced to match ground size (14x14 ground = 7 radius, use 4 for safety margin)
         transform.position = center + new Vector3(Random.Range(-radius, radius), 0.5f, Random.Range(-radius, radius));
         transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
 
