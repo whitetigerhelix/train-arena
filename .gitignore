@@ -1,0 +1,27 @@
+# This is a GitHub .gitignore file for Unity projects.
+
+# Ignore Unity generated files and folders
+Library/
+Temp/
+Obj/
+
+# Build outputs
+Build/
+Builds/
+
+# Visual Studio files
+.vscode/
+*.csproj
+*.sln
+
+# Rider files
+.idea/
+
+# Mac OS files
+.DS_Store
+
+# Log files
+*.log
+
+# Asset store tools
+Assets/AssetStoreTools*
