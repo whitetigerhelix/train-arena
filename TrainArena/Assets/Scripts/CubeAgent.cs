@@ -24,7 +24,7 @@ public class CubeAgent : Agent
     public override void OnEpisodeBegin()
     {
         // Reset physics
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
         // Randomize start & goal within arena bounds (assumes parent positions origin of arena)
@@ -45,7 +45,7 @@ public class CubeAgent : Agent
     public override void CollectObservations(VectorSensor sensor)
     {
         // Local velocity
-        sensor.AddObservation(transform.InverseTransformDirection(rb.velocity)); // 3
+        sensor.AddObservation(transform.InverseTransformDirection(rb.linearVelocity)); // 3
 
         // Vector to goal in local space
         if (goal != null)

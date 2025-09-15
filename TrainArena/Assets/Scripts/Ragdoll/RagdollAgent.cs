@@ -39,7 +39,7 @@ public class RagdollAgent : Agent
         // Pelvis orientation (up dir) and velocity
         sensor.AddObservation(Vector3.Dot(pelvis.up, Vector3.up)); // uprightness scalar
         var rbPelvis = pelvis.GetComponent<Rigidbody>();
-        sensor.AddObservation(pelvis.InverseTransformDirection(rbPelvis.velocity)); // 3
+        sensor.AddObservation(pelvis.InverseTransformDirection(rbPelvis.linearVelocity)); // 3
 
         // Each joint: current local angle + ang vel (very approximate w/ PDJointController assumptions)
         foreach (var j in joints)
@@ -60,7 +60,7 @@ public class RagdollAgent : Agent
             joints[i].SetTarget01(Mathf.Clamp(ca[i], -1f, 1f));
 
         // Rewards
-        float forward = Vector3.Dot(pelvis.GetComponent<Rigidbody>().velocity, transform.forward);
+        float forward = Vector3.Dot(pelvis.GetComponent<Rigidbody>().linearVelocity, transform.forward);
         AddReward(Mathf.Clamp(forward, -targetSpeed, targetSpeed) / targetSpeed * 0.02f);
         AddReward((Vector3.Dot(pelvis.up, Vector3.up) - 0.8f) * 0.01f); // bonus if upright
         AddReward(-0.001f * ca.SqrMagnitude()); // energy

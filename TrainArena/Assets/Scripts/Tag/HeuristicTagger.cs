@@ -15,6 +15,6 @@ public class HeuristicTagger : MonoBehaviour
         if (!target) return;
         Vector3 dir = (target.position - transform.position).normalized;
         Vector3 desiredVel = new Vector3(dir.x, 0f, dir.z) * speed;
-        rb.velocity = Vector3.MoveTowards(rb.velocity, desiredVel, accel * Time.fixedDeltaTime);
+        rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, desiredVel, accel * Time.fixedDeltaTime);
     }
 }

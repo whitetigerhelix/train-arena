@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.MLAgents.Policies;
+using Unity.Barracuda;
 
 public class ModelSwitcher : MonoBehaviour
 {

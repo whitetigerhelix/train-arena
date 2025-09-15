@@ -30,7 +30,7 @@ public class DomainRandomizer : MonoBehaviour
         {
             foreach (var col in GetComponentsInChildren<Collider>())
             {
-                var mat = new PhysicMaterial("DomRand");
+                var mat = new PhysicsMaterial("DomRand");
                 float f = Random.Range(frictionRange.x, frictionRange.y);
                 mat.dynamicFriction = mat.staticFriction = f;
                 col.material = mat;

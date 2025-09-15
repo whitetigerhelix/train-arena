@@ -8,16 +8,16 @@ public class DomainRandomizer : MonoBehaviour
     public Color[] lightColors;
 
     Rigidbody[] rbs;
-    PhysicMaterial[] physicsMats;
+    PhysicsMaterial[] physicsMats;
 
     void Awake()
     {
         rbs = GetComponentsInChildren<Rigidbody>();
         var colliders = GetComponentsInChildren<Collider>();
-        physicsMats = new PhysicMaterial[colliders.Length];
+        physicsMats = new PhysicsMaterial[colliders.Length];
         for (int i = 0; i < colliders.Length; i++)
         {
-            physicsMats[i] = new PhysicMaterial("dynMat" + i);
+            physicsMats[i] = new PhysicsMaterial("dynMat" + i);
             colliders[i].material = physicsMats[i];
         }
     }

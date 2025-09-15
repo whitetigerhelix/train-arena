@@ -24,7 +24,7 @@ public class RunnerAgent : Agent
 
     public override void OnEpisodeBegin()
     {
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
         // randomize positions
@@ -36,7 +36,7 @@ public class RunnerAgent : Agent
     public override void CollectObservations(VectorSensor sensor)
     {
         // Local velocity of runner
-        sensor.AddObservation(transform.InverseTransformDirection(rb.velocity)); // 3
+        sensor.AddObservation(transform.InverseTransformDirection(rb.linearVelocity)); // 3
 
         // Relative position/velocity of tagger
         if (tagger != null)
@@ -44,7 +44,7 @@ public class RunnerAgent : Agent
             var tagRB = tagger.GetComponent<Rigidbody>();
             Vector3 toTagger = tagger.position - transform.position;
             sensor.AddObservation(transform.InverseTransformDirection(toTagger)); // 3
-            sensor.AddObservation(transform.InverseTransformDirection(tagRB ? tagRB.velocity : Vector3.zero)); // 3
+            sensor.AddObservation(transform.InverseTransformDirection(tagRB ? tagRB.linearVelocity : Vector3.zero)); // 3
         }
         else
         {

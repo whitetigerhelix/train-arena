@@ -23,7 +23,7 @@ public class TaggerAgentTrainable : Agent
 
     public override void OnEpisodeBegin()
     {
-        rb.velocity = Vector3.zero;
+        rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
         // positions randomized by arena spawner typically
@@ -31,14 +31,14 @@ public class TaggerAgentTrainable : Agent
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        sensor.AddObservation(transform.InverseTransformDirection(rb.velocity)); // 3
+        sensor.AddObservation(transform.InverseTransformDirection(rb.linearVelocity)); // 3
 
         if (runner != null)
         {
             var rrb = runner.GetComponent<Rigidbody>();
             Vector3 toRunner = runner.position - transform.position;
             sensor.AddObservation(transform.InverseTransformDirection(toRunner)); // 3
-            sensor.AddObservation(transform.InverseTransformDirection(rrb ? rrb.velocity : Vector3.zero)); // 3
+            sensor.AddObservation(transform.InverseTransformDirection(rrb ? rrb.linearVelocity : Vector3.zero)); // 3
         }
         else { sensor.AddObservation(Vector3.zero); sensor.AddObservation(Vector3.zero); }
 
