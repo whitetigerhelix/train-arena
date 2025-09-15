@@ -106,7 +106,7 @@ public class TagArenaBuilder : MonoBehaviour
 
         // Wire dropdown after runners spawn (simple runtime binding)
         dd.onValueChanged.AddListener(i => {
-            var runner = FindFirstObjectByType<RunnerAgent>(); //TODO: FindAnyObjectByType?  Have a smarter way to select lights
+            var runner = FindAnyObjectByType<RunnerAgent>(); // Assume only one
             if (runner)
             {
                 var ms = runner.GetComponent<ModelSwitcher>();

@@ -61,7 +61,7 @@ public class ModelHotReloadWindow : EditorWindow
             EditorUtility.DisplayDialog("Model Hot-Reload", $"No NNModel at:\n{destAssetPath}", "OK");
             return;
         }
-        var switchers = FindObjectsOfType<ModelSwitcher>(true);
+        var switchers = FindObjectsByType<ModelSwitcher>(FindObjectsSortMode.None);
         foreach (var s in switchers)
         {
             s.trainedModel = model;
