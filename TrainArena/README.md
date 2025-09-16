@@ -93,6 +93,8 @@ This project is a **minimal Unity 6** starter to learn PPO-based Reinforcement L
 # Then open Unity and press PLAY
 ```
 
+> 💡 **Optimized Configuration**: The included `cube_ppo.yaml` uses input normalization and balanced hyperparameters for fast, stable learning. Expect visible progress within 10-20 minutes!
+
 **Manual Training**:
 
 ```powershell
@@ -134,10 +136,11 @@ The starter includes minimal components for ragdoll control:
 3. Add `RagdollAgent` to the pelvis/root with references to joints.
 4. Use the provided menu **Tools ▸ ML Hack ▸ Build Ragdoll Test Scene** for a minimal flat world.
 5. Train with:
+
    ```powershell
    # Automated (when available)
    .\Scripts\train_ragdoll.ps1
-   
+
    # Or manual
    mlagents-learn Assets/ML-Agents/Configs/ragdoll_ppo.yaml --run-id=ragdoll_run_01 --train
    ```
@@ -193,16 +196,19 @@ See `RESET_GUIDE.md` for detailed reset options.
 ### **Troubleshooting**
 
 **Environment issues?**
+
 ```powershell
 .\Scripts\check_environment.ps1  # Diagnose problems
 ```
 
 **Training connection issues?**
+
 - Ensure Unity ML-Agents package is installed
 - Check that BehaviorType is set to "Default" in Unity
 - Verify the scene has CubeAgent objects
 
 **Performance issues?**
+
 - Use `--no-graphics` flag for headless training
 - Increase `--time-scale` for faster training
 - Monitor GPU usage during training
@@ -232,3 +238,28 @@ This project uses the latest compatible versions as of September 2025:
 - **TensorBoard**: 2.20.0 (latest)
 
 All compatibility issues with newer Python versions have been resolved.
+
+---
+
+## ⚙️ **Optimized Training Configuration**
+
+The included `cube_ppo.yaml` configuration has been optimized for fast, stable learning:
+
+### **Key Optimizations**
+
+- ✅ **Input normalization enabled** - Faster convergence and smoother learning curves
+- ✅ **Balanced hyperparameters** - Stable learning without overfitting
+- ✅ **Appropriate network size** - 128 hidden units, 2 layers for cube navigation
+- ✅ **Conservative training steps** - 500K steps for quick initial results
+
+### **Expected Performance**
+
+- **Learning visible** within 50K-100K steps (10-20 minutes)
+- **Smooth training curves** with normalization enabled
+- **Stable convergence** to good performance
+- **Ready for inference** after full 500K step training
+
+### **Configuration Details**
+
+For complete parameter explanations and tuning guidance, see:
+📚 **[Assets/ML-Agents/Configs/README.md](./Assets/ML-Agents/Configs/README.md)**

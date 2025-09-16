@@ -25,9 +25,10 @@ if ($env:VIRTUAL_ENV) {
     }
 } else {
     Write-Host "❌ No virtual environment detected" -ForegroundColor Red
-    Write-Host "   Setup and activate environment first:" -ForegroundColor White
+    Write-Host "   Setup (if needed):" -ForegroundColor White
     Write-Host "   .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
-    Write-Host "   .\activate_mlagents_py310.ps1" -ForegroundColor Cyan
+    Write-Host "   Important! Activate environment before running this script:" -ForegroundColor White
+    Write-Host "   .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor Cyan
     exit 1
 }
 
@@ -79,14 +80,47 @@ Write-Host "4. Press Ctrl+C here to stop training" -ForegroundColor White
 Write-Host "`n⏳ Starting training in 5 seconds..." -ForegroundColor Yellow
 Start-Sleep 5
 
+# Execute the training command and capture the exit code
+Write-Host "`n🚀 Launching ML-Agents training..." -ForegroundColor Green
 try {
-    # Execute the training command
-    Invoke-Expression $TrainCmd
+    # Use Start-Process to properly capture exit codes
+    $process = Start-Process -FilePath "mlagents-learn" -ArgumentList "`"$ConfigPath`"", "--run-id=`"$RunId`"", "--train" -NoNewWindow -Wait -PassThru
+    
+    if ($process.ExitCode -eq 0) {
+        Write-Host "`n✅ Training completed successfully!" -ForegroundColor Green
+        Write-Host "Results saved to: Results/$RunId" -ForegroundColor Cyan
+        Write-Host "TensorBoard logs available at: Results/$RunId" -ForegroundColor Cyan
+        
+        # Check if .onnx model was created
+        $onnxFiles = Get-ChildItem "Results/$RunId" -Filter "*.onnx" -Recurse
+        if ($onnxFiles) {
+            Write-Host "`n🧠 Trained models:" -ForegroundColor Yellow
+            foreach ($file in $onnxFiles) {
+                Write-Host "   📄 $($file.FullName)" -ForegroundColor White
+            }
+        }
+        
+        Write-Host "`n🎯 Next steps:" -ForegroundColor Yellow
+        Write-Host "   1. In Unity, set CubeAgent Behavior Type to 'Inference Only'" -ForegroundColor White
+        Write-Host "   2. Drag the .onnx file to the Model field" -ForegroundColor White
+        Write-Host "   3. Press Play to test your trained agent!" -ForegroundColor White
+    } else {
+        Write-Host "`n❌ Training failed with exit code: $($process.ExitCode)" -ForegroundColor Red
+        Write-Host "Check the error messages above for details." -ForegroundColor Yellow
+        
+        # Common troubleshooting tips
+        Write-Host "`n🔧 Troubleshooting:" -ForegroundColor Cyan
+        Write-Host "   • Make sure Unity is running and in Play mode" -ForegroundColor White
+        Write-Host "   • Check that the scene has CubeAgent behaviors" -ForegroundColor White
+        Write-Host "   • Verify the config file: $ConfigPath" -ForegroundColor White
+        Write-Host "   • Try: .\Scripts\check_environment.ps1" -ForegroundColor White
+        
+        exit $process.ExitCode
+    }
 } catch {
-    Write-Error "Training failed: $_"
+    Write-Host "`n❌ Failed to start training: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`n🔧 Troubleshooting:" -ForegroundColor Cyan
+    Write-Host "   • Make sure environment is activated: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
+    Write-Host "   • Check mlagents-learn is available: mlagents-learn --help" -ForegroundColor White
     exit 1
 }
-
-Write-Host "`n✅ Training completed successfully!" -ForegroundColor Green
-Write-Host "Results saved to: $ResultsDir" -ForegroundColor Cyan
-Write-Host "TensorBoard logs available at: Results/$RunId" -ForegroundColor Cyan
