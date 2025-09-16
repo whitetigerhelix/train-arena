@@ -2,6 +2,7 @@ using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
 public class CubeAgent : Agent
@@ -14,6 +15,7 @@ public class CubeAgent : Agent
 
     Rigidbody rb;
     float prevDist;
+    Vector3 lastAppliedForce;
 
     public override void Initialize()
     {
@@ -86,6 +88,16 @@ public class CubeAgent : Agent
         Vector3 localMove = new Vector3(moveX, 0f, moveZ);
         Vector3 worldForce = transform.TransformDirection(localMove) * moveAccel;
         rb.AddForce(worldForce, ForceMode.Acceleration);
+        
+        // Store for debug visualization
+        lastAppliedForce = worldForce;
+        
+        // Debug logging to check if actions are being received
+        if (TrainArenaDebugManager.LogLevel >= TrainArenaDebugManager.DebugLogLevel.Verbose)
+        {
+            TrainArenaDebugManager.Log($"Agent {gameObject.name}: Actions({moveX:F2},{moveZ:F2}) Force({worldForce.magnitude:F2})", 
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
 
         // Time penalty + tiny energy penalty
         AddReward(-0.001f);
@@ -111,8 +123,25 @@ public class CubeAgent : Agent
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var ca = actionsOut.ContinuousActions;
-        ca[0] = Input.GetAxis("Horizontal");
-        ca[1] = Input.GetAxis("Vertical");
+        
+        // Use new Input System for Unity 6.2 compatibility
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        if (keyboard != null)
+        {
+            ca[0] = 0f;
+            ca[1] = 0f;
+            
+            if (keyboard.aKey.isPressed) ca[0] -= 1f; // Left
+            if (keyboard.dKey.isPressed) ca[0] += 1f; // Right
+            if (keyboard.sKey.isPressed) ca[1] -= 1f; // Back
+            if (keyboard.wKey.isPressed) ca[1] += 1f; // Forward
+        }
+        else
+        {
+            // Fallback to old Input system if new one isn't available
+            ca[0] = Input.GetAxis("Horizontal");
+            ca[1] = Input.GetAxis("Vertical");
+        }
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -155,6 +184,18 @@ public class CubeAgent : Agent
             Gizmos.color = Color.blue;
             Vector3 velocity = rb.linearVelocity;
             Gizmos.DrawLine(transform.position, transform.position + velocity);
+            
+            // Draw force vector if TrainArenaDebugManager.ShowObservations is enabled
+            if (TrainArenaDebugManager.ShowObservations)
+            {
+                // Show last applied force (we'll store this)
+                Gizmos.color = Color.red;
+                if (lastAppliedForce.magnitude > 0.1f)
+                {
+                    Gizmos.DrawLine(transform.position, transform.position + lastAppliedForce * 0.5f);
+                    Gizmos.DrawSphere(transform.position + lastAppliedForce * 0.5f, 0.1f);
+                }
+            }
         }
     }
     

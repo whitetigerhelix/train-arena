@@ -48,6 +48,41 @@ public class AgentDebugInfo : MonoBehaviour
                 GUILayout.Label($"Goal Dist: {distance:F1}");
             }
             
+            // Show observations if enabled
+            if (TrainArenaDebugManager.ShowObservations)
+            {
+                GUILayout.Label("--- Observations ---");
+                
+                // Velocity observation (first 3 values)
+                Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
+                GUILayout.Label($"Local Vel: ({localVel.x:F2},{localVel.y:F2},{localVel.z:F2})");
+                
+                // Goal direction observation (next 3 values)
+                if (cubeAgent.goal != null)
+                {
+                    Vector3 toGoal = cubeAgent.goal.position - transform.position;
+                    Vector3 localGoal = transform.InverseTransformDirection(toGoal);
+                    GUILayout.Label($"Local Goal: ({localGoal.x:F2},{localGoal.y:F2},{localGoal.z:F2})");
+                }
+                
+                // Raycast distances (8 values)
+                GUILayout.Label("Raycast distances:");
+                for (int i = 0; i < 8; i++)
+                {
+                    float angle = i * 45f;
+                    Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
+                    if (Physics.Raycast(transform.position + Vector3.up * 0.2f, dir, out RaycastHit hit, cubeAgent.rayLength, cubeAgent.obstacleMask))
+                    {
+                        float normalizedDist = hit.distance / cubeAgent.rayLength;
+                        GUILayout.Label($"  {angle:F0}°: {normalizedDist:F2}");
+                    }
+                    else
+                    {
+                        GUILayout.Label($"  {angle:F0}°: 1.00");
+                    }
+                }
+            }
+            
             GUILayout.Label($"Episode: {cubeAgent.CompletedEpisodes}");
             GUILayout.Label($"Reward: {cubeAgent.GetCumulativeReward():F2}");
             

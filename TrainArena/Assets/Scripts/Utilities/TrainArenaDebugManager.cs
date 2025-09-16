@@ -11,6 +11,7 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowRaycastVisualization = false;
     public static bool ShowAgentDebugInfo = false;
     public static bool ShowArenaDebugInfo = false;
+    public static bool ShowObservations = false;
     
     [Header("Logging Controls")]
     public static DebugLogLevel LogLevel = DebugLogLevel.Warnings;
@@ -64,6 +65,13 @@ public class TrainArenaDebugManager : MonoBehaviour
             Debug.Log($"Agent Debug Info: {(ShowAgentDebugInfo ? "ON" : "OFF")}");
         }
         
+        // Toggle observations with 'O' key
+        if (keyboard.oKey.wasPressedThisFrame)
+        {
+            ShowObservations = !ShowObservations;
+            Debug.Log($"Observations Display: {(ShowObservations ? "ON" : "OFF")}");
+        }
+        
         // Cycle through log levels with 'L' key
         if (keyboard.lKey.wasPressedThisFrame)
         {
@@ -82,7 +90,8 @@ public class TrainArenaDebugManager : MonoBehaviour
     {
         Debug.Log("=== TrainArena Debug Controls ===\n" +
                   "R - Toggle Raycast Visualization\n" +
-                  "I - Toggle Agent Debug Info\n" + 
+                  "I - Toggle Agent Debug Info\n" +
+                  "O - Toggle Observations Display\n" +
                   "L - Cycle Log Level\n" +
                   "H - Show this help\n" +
                   "================================");
@@ -93,6 +102,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         // Show current debug status in top-right corner
         string debugStatus = $"Debug: R:{(ShowRaycastVisualization ? "ON" : "OFF")} " +
                            $"I:{(ShowAgentDebugInfo ? "ON" : "OFF")} " +
+                           $"O:{(ShowObservations ? "ON" : "OFF")} " +
                            $"Log:{LogLevel}";
         
         GUI.color = Color.white;

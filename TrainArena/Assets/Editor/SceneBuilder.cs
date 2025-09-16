@@ -106,12 +106,15 @@ public static class SceneBuilder
         // Set obstacle mask to everything for tag-based detection
         cubeAgent.obstacleMask = -1;
         
-        // Add ML-Agents Behavior Parameters for proper agent behavior
-        var behaviorParams = agent.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
-        behaviorParams.BehaviorName = "CubeAgent";
-        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default; // Autonomous learning behavior
-        behaviorParams.TeamId = 0;
-        behaviorParams.UseChildSensors = true;
+        // ML-Agents Agent class automatically adds BehaviorParameters - configure it
+        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        if (behaviorParams != null)
+        {
+            behaviorParams.BehaviorName = "CubeAgent";
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for manual testing
+            behaviorParams.TeamId = 0;
+            behaviorParams.UseChildSensors = true;
+        }
         
         // Add simple face to show agent orientation
         AddAgentFace(agent);
