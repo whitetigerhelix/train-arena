@@ -1,5 +1,6 @@
-# ML-Agents Setup with Python 3.11 (Recommended)
-# Creates a reliable ML-Agents environment using Python 3.11
+# ML-Agents Setup with Python 3.11 (Primary Setup Script)
+# Creates a clean, working ML-Agents environment with all compatibility fixes
+# This replaces the older setup_venv.ps1 script
 
 param(
     [string]$Python311Path = "",
@@ -123,12 +124,22 @@ try {
     & $python311 -m pip install tensorboard
     
     Write-Host "   Verifying ML-Agents installation..." -ForegroundColor White
-    & $python311 -c "import mlagents_envs; print('ML-Agents verified')"
+    & $python311 -c "import mlagents_envs; print('ML-Agents packages verified')"
+    
+    # Verify specific commands exist
+    $mlagentsLearnPath = "$VenvPath\Scripts\mlagents-learn.exe"
+    if (Test-Path $mlagentsLearnPath) {
+        Write-Host "   mlagents-learn executable found" -ForegroundColor White
+    } else {
+        Write-Host "⚠️  mlagents-learn executable missing" -ForegroundColor Yellow
+    }
     
     Write-Host "✅ ML-Agents installed with compatible protobuf" -ForegroundColor Green
 } catch {
     Write-Host "❌ Failed to install ML-Agents: $_" -ForegroundColor Red
-    exit 1
+    Write-Host "   This may be due to network issues or package conflicts" -ForegroundColor White
+    Write-Host "   You can manually install later with:" -ForegroundColor White
+    Write-Host "   pip install protobuf==3.20.3 mlagents" -ForegroundColor Cyan
 }
 
 # Set compatibility environment variable

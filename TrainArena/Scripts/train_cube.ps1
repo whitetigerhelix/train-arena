@@ -12,23 +12,20 @@ Write-Host "🚀 Starting ML-Agents Cube Training" -ForegroundColor Green
 Write-Host "Run ID: $RunId" -ForegroundColor Cyan
 Write-Host "Config: $ConfigPath" -ForegroundColor Cyan
 
-# Check if we're in a virtual environment (recommended)
+# Check if we're in a virtual environment (required for training)
 if ($env:VIRTUAL_ENV) {
     Write-Host "✅ Using virtual environment: $env:VIRTUAL_ENV" -ForegroundColor Green
 } else {
-    Write-Host "⚠️  No virtual environment detected" -ForegroundColor Yellow
-    Write-Host "   Consider activating ML-Agents environment: .\activate_mlagents.ps1" -ForegroundColor Cyan
-    $continue = Read-Host "Continue anyway? (y/N)"
-    if ($continue -ne "y" -and $continue -ne "Y") {
-        Write-Host "Training cancelled. Set up virtual environment first:" -ForegroundColor Red
-        Write-Host "   .\Scripts\setup_venv.ps1" -ForegroundColor Cyan
-        exit 1
-    }
+    Write-Host "❌ No virtual environment detected" -ForegroundColor Red
+    Write-Host "   Setup and activate environment first:" -ForegroundColor White
+    Write-Host "   .\Scripts\setup_python311.ps1" -ForegroundColor Cyan
+    Write-Host "   .\activate_mlagents_py311.ps1" -ForegroundColor Cyan
+    exit 1
 }
 
-# Set protobuf compatibility environment variable (prevents common errors)
+# Set compatibility environment variables (prevents protobuf errors)
 $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
-Write-Host "🔧 Set protobuf compatibility mode" -ForegroundColor Yellow
+Write-Host "🔧 Protobuf compatibility mode enabled" -ForegroundColor Yellow
 
 # Ensure we're in the right directory
 if (!(Test-Path $ConfigPath)) {

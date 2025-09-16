@@ -1,5 +1,5 @@
 # ML-Agents Environment Verification Script
-# Use this to check if your Python environment is properly set up for ML-Agents training
+# Verifies your Python environment is ready for ML-Agents training
 
 Write-Host "🔍 ML-Agents Environment Check" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
@@ -8,10 +8,16 @@ Write-Host "================================" -ForegroundColor Green
 Write-Host "`n0. Checking virtual environment..." -ForegroundColor Yellow
 if ($env:VIRTUAL_ENV) {
     Write-Host "✅ Virtual environment active: $env:VIRTUAL_ENV" -ForegroundColor Green
+    
+    # Set compatibility mode if not already set
+    if (!$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION) {
+        $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+        Write-Host "   Set protobuf compatibility mode" -ForegroundColor White
+    }
 } else {
     Write-Host "⚠️  No virtual environment detected" -ForegroundColor Yellow
-    Write-Host "   Consider running: .\Scripts\setup_venv.ps1" -ForegroundColor Cyan
-    Write-Host "   Or activate existing: .\activate_mlagents.ps1" -ForegroundColor Cyan
+    Write-Host "   Run setup first: .\Scripts\setup_python311.ps1" -ForegroundColor Cyan
+    Write-Host "   Then activate: .\activate_mlagents_py311.ps1" -ForegroundColor Cyan
 }
 
 # Check Python installation and version compatibility
@@ -90,10 +96,10 @@ try {
             Write-Host "   Output: $($stdout.Trim())" -ForegroundColor White
         }
         
-        Write-Host "`n🔧 Troubleshooting steps:" -ForegroundColor Cyan
-        Write-Host "   1. Ensure virtual environment is activated" -ForegroundColor White
-        Write-Host "   2. Try: pip install --upgrade mlagents" -ForegroundColor White
-        Write-Host "   3. Check: python -m pip list | findstr mlagents" -ForegroundColor White
+        Write-Host "`n🔧 Fix this by:" -ForegroundColor Cyan
+        Write-Host "   1. Ensure environment is activated: .\activate_mlagents_py311.ps1" -ForegroundColor White
+        Write-Host "   2. Install ML-Agents: pip install protobuf==3.20.3 mlagents" -ForegroundColor White
+        Write-Host "   3. Or clean setup: .\Scripts\setup_python311.ps1 -Force" -ForegroundColor White
         exit 1
     }
 } catch {
