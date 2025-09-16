@@ -14,12 +14,12 @@ public class CameraControlsUI : MonoBehaviour
     [Tooltip("Show camera controls help UI")]
     public bool showControlsUI = true;
     
-    [Tooltip("Position UI in top-right corner instead of top-left")]
+    [Tooltip("Position UI in top-right corner below existing help")]
     public bool topRightPosition = true;
     
     [Tooltip("Auto-hide after this many seconds (0 = never hide)")]
-    [Range(0, 30)]
-    public float autoHideAfter = 10f;
+    [Range(0, 60)]
+    public float autoHideAfter = 0f;  // Disabled by default - too annoying
     
     [Space]
     [Header("Controls")]
@@ -74,19 +74,22 @@ public class CameraControlsUI : MonoBehaviour
     {
         if (!Application.isPlaying || !ShouldShowUI()) return;
         
-        // Calculate position (top-right corner)
-        float panelWidth = 220f;
-        float panelHeight = 140f;
-        float xPos = topRightPosition ? Screen.width - panelWidth - 10 : 300; // Offset from TimeScaleManager
-        float yPos = 10f;
+        // Calculate position (top-right corner, below existing help UI)
+        const float PANEL_WIDTH = 220f;
+        const float PANEL_HEIGHT = 140f;
+        const float RIGHT_MARGIN = 40f;
+        const float BELOW_HELP_OFFSET = 300f;  // Position below existing help UI
+        
+        float xPos = topRightPosition ? Screen.width - PANEL_WIDTH - RIGHT_MARGIN : 300; // Offset from TimeScaleManager
+        float yPos = topRightPosition ? BELOW_HELP_OFFSET : 10f;  // Position below existing help UI
         
         // Semi-transparent background
-        GUI.Box(new Rect(xPos, yPos, panelWidth, panelHeight), "", 
+        GUI.Box(new Rect(xPos, yPos, PANEL_WIDTH, PANEL_HEIGHT), "", 
                new GUIStyle(GUI.skin.box) { 
                    normal = { background = MakeTex(2, 2, new Color(0, 0, 0, 0.6f)) }
                });
         
-        GUILayout.BeginArea(new Rect(xPos + 5, yPos + 5, panelWidth - 10, panelHeight - 10));
+        GUILayout.BeginArea(new Rect(xPos + 5, yPos + 5, PANEL_WIDTH - 10, PANEL_HEIGHT - 10));
         
         // Title
         var titleStyle = new GUIStyle(GUI.skin.label) { 

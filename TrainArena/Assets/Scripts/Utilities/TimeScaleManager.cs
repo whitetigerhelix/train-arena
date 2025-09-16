@@ -22,8 +22,16 @@ public class TimeScaleManager : MonoBehaviour
     private float normalTimeScale = 1f;
     
     [Space]
+    [Header("Auto-Management")]
+    [Tooltip("Automatically manage time scale based on training status")]
+    public bool autoManageTimeScale = true;
+    
+    // Precision constants
+    private const float TIMESCALE_PRECISION = 0.01f;        // Precision threshold for time scale comparisons
+    
+    [Space]
     [Header("Manual Controls")]
-    [Tooltip("Override ML-Agents time scale management (for debugging)")]
+    [Tooltip("Override automatic time scale management (for debugging)")]
     public bool manualTimeScaleControl = false;
     
     [Tooltip("Manual time scale value (only used if manual control enabled)")]
@@ -65,16 +73,29 @@ public class TimeScaleManager : MonoBehaviour
         // Apply manual control if enabled
         if (manualTimeScaleControl)
         {
-            if (Mathf.Abs(Time.timeScale - manualTimeScale) > 0.01f)
+            if (Mathf.Abs(Time.timeScale - manualTimeScale) > TIMESCALE_PRECISION)
             {
                 Time.timeScale = manualTimeScale;
                 TrainArenaDebugManager.Log($"⏱️ Manual time scale applied: {manualTimeScale}x", 
                                          TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
         }
+        // Apply auto-management if enabled and not in manual mode
+        else if (autoManageTimeScale)
+        {
+            float targetTimeScale = isTrainingActive ? trainingTimeScale : normalTimeScale;
+            
+            if (Mathf.Abs(Time.timeScale - targetTimeScale) > TIMESCALE_PRECISION)
+            {
+                Time.timeScale = targetTimeScale;
+                string mode = isTrainingActive ? "Training" : "Normal";
+                TrainArenaDebugManager.Log($"⏱️ Auto-adjusted time scale to {targetTimeScale}x ({mode} mode)", 
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+        }
         
         // Log time scale changes (helpful for debugging)
-        if (Mathf.Abs(Time.timeScale - lastTimeScale) > 0.01f)
+        if (Mathf.Abs(Time.timeScale - lastTimeScale) > TIMESCALE_PRECISION)
         {
             timeScaleChanges++;
             
@@ -133,16 +154,17 @@ public class TimeScaleManager : MonoBehaviour
         if (!Application.isPlaying) return;
         
         // Prominent UI in top-left corner
-        float panelWidth = 280f;
-        float panelHeight = 120f;
+        const float PANEL_WIDTH = 280f;
+        const float PANEL_HEIGHT = 120f;
+        const float PANEL_MARGIN = 10f;
         
         // Background box with more prominent styling
-        GUI.Box(new Rect(10, 10, panelWidth, panelHeight), "", 
+        GUI.Box(new Rect(PANEL_MARGIN, PANEL_MARGIN, PANEL_WIDTH, PANEL_HEIGHT), "", 
                new GUIStyle(GUI.skin.box) { 
                    normal = { background = MakeTex(2, 2, new Color(0, 0, 0, 0.8f)) }
                });
         
-        GUILayout.BeginArea(new Rect(15, 15, panelWidth - 10, panelHeight - 10));
+        GUILayout.BeginArea(new Rect(PANEL_MARGIN + 5, PANEL_MARGIN + 5, PANEL_WIDTH - 10, PANEL_HEIGHT - 10));
         
         // Title with larger, bold text
         var titleStyle = new GUIStyle(GUI.skin.label) { 

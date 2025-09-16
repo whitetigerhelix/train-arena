@@ -17,10 +17,14 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowHelp = true; // Show by default
     
     [Header("Logging Controls")]
-    public static DebugLogLevel LogLevel = DebugLogLevel.Important;  // Changed from Warnings to Important
+    public static DebugLogLevel LogLevel = DebugLogLevel.Important;  // Show important info by default
     
     [Header("Auto-Adjust Log Level")]
-    public static bool autoAdjustLogLevel = true;  // Automatically increase logging during training
+    public static bool autoAdjustLogLevel = false;  // Don't auto-spam with verbose logs
+    
+    [Header("Timing Constants")]
+    private const float LOG_LEVEL_CHECK_INTERVAL = 10f;     // Check log level every 10 seconds  
+    private const float STATUS_REPORT_INTERVAL = 60f;       // Report training status every 60 seconds (less spam)
     
     public enum DebugLogLevel
     {
@@ -52,13 +56,13 @@ public class TrainArenaDebugManager : MonoBehaviour
         HandleInput();
         
         // Auto-adjust log level for training mode
-        if (autoAdjustLogLevel && Time.fixedTime % 5f < Time.fixedDeltaTime) // Check every 5 seconds
+        if (autoAdjustLogLevel && Time.fixedTime % LOG_LEVEL_CHECK_INTERVAL < Time.fixedDeltaTime)
         {
             CheckAndAdjustLogLevel();
         }
         
-        // Log training status periodically
-        if (Time.fixedTime % 10f < Time.fixedDeltaTime) // Every 10 seconds
+        // Log training status periodically (less frequent, more useful)
+        if (Time.fixedTime % STATUS_REPORT_INTERVAL < Time.fixedDeltaTime)
         {
             LogTrainingStatus();
         }
@@ -69,16 +73,16 @@ public class TrainArenaDebugManager : MonoBehaviour
         var academy = Unity.MLAgents.Academy.Instance;
         if (academy != null)
         {
-            var agents = FindObjectsOfType<Unity.MLAgents.Agent>();
-            var behaviorSwitchers = FindObjectsOfType<AutoBehaviorSwitcher>();
-            
+            var agents = FindObjectsByType<Unity.MLAgents.Agent>(FindObjectsSortMode.None);
+            var behaviorSwitchers = FindObjectsByType<AutoBehaviorSwitcher>(FindObjectsSortMode.None);
+
             Log($"🎯 Training Status Report:", DebugLogLevel.Important);
             Log($"   📊 Academy Connected: {academy.IsCommunicatorOn}", DebugLogLevel.Important);
             Log($"   🎮 Agents in Scene: {agents.Length}", DebugLogLevel.Important);
             Log($"   ⏱️ Time Scale: {Time.timeScale:F1}x", DebugLogLevel.Important);
             Log($"   🔄 Auto Switchers: {behaviorSwitchers.Length}", DebugLogLevel.Important);
             Log($"   📈 Academy Steps: {academy.TotalStepCount}", DebugLogLevel.Important);
-            
+
             // Count agents by behavior type
             int defaultBehavior = 0, heuristicBehavior = 0, inferenceBehavior = 0;
             foreach (var agent in agents)
@@ -100,8 +104,20 @@ public class TrainArenaDebugManager : MonoBehaviour
                     }
                 }
             }
-            
+
             Log($"   🤖 Behavior Types - Default: {defaultBehavior}, Heuristic: {heuristicBehavior}, Inference: {inferenceBehavior}", DebugLogLevel.Important);
+            
+            // Check if any agents are moving
+            int movingAgents = 0;
+            foreach (var agent in agents)
+            {
+                var rb = agent.GetComponent<Rigidbody>();
+                if (rb != null && rb.linearVelocity.magnitude > 0.1f)
+                {
+                    movingAgents++;
+                }
+            }
+            Log($"   🏃 Moving Agents: {movingAgents}/{agents.Length}", DebugLogLevel.Important);
         }
     }
     
@@ -251,7 +267,11 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUI.color = Color.white;
             GUI.backgroundColor = new Color(0, 0, 0, 0.5f);
             string helpHint = "Press H for help";
-            Rect hintRect = new Rect(Screen.width - 120, 35, 110, 18);
+            const float hintWidth = 110f;
+            const float hintHeight = 18f;
+            const float rightMargin = 10f;
+            const float topOffset = 35f;
+            Rect hintRect = new Rect(Screen.width - hintWidth - rightMargin, topOffset, hintWidth, hintHeight);
             GUI.Label(hintRect, helpHint);
         }
     }

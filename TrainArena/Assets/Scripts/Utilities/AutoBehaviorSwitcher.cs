@@ -23,6 +23,10 @@ public class AutoBehaviorSwitcher : MonoBehaviour
     [Tooltip("Show debug messages when switching behavior types")]
     public bool showDebugMessages = true;
     
+    // Timing and threshold constants
+    private const float CONNECTION_CHECK_INTERVAL = 5f;     // Check connection every 5 seconds
+    private const float FAST_TIMESCALE_THRESHOLD = 1.5f;    // Consider >1.5x as "fast" time scale
+    
     [Space]
     [Header("Status (Runtime - Read Only)")]
     [SerializeField, Tooltip("Current Academy communication status")]
@@ -79,7 +83,7 @@ public class AutoBehaviorSwitcher : MonoBehaviour
         CheckAndUpdateBehaviorType();
         
         // Additional debugging - log connection status periodically
-        if (Time.fixedTime % 5f < Time.fixedDeltaTime) // Every 5 seconds
+        if (Time.fixedTime % CONNECTION_CHECK_INTERVAL < Time.fixedDeltaTime)
         {
             LogConnectionDebugInfo();
         }
@@ -147,7 +151,7 @@ public class AutoBehaviorSwitcher : MonoBehaviour
         bool hasSteps = academy.TotalStepCount > 0;
         
         // Method 4: Check if time scale is elevated (training usually runs faster)
-        bool fastTimeScale = Time.timeScale > 1.5f;
+        bool fastTimeScale = Time.timeScale > FAST_TIMESCALE_THRESHOLD;
         
         // Log detailed debug info when connection status might be changing
         if (showDebugMessages && (communicatorOn != wasConnectedLastFrame))

@@ -96,7 +96,7 @@ Write-Host "   4. Check Behavior Name = 'CubeAgent', Type = 'Default'" -Foregrou
 Write-Host "`n🚀 Training Workflow:" -ForegroundColor Yellow
 Write-Host "   1. Run: .\Scripts\train_cube.ps1" -ForegroundColor White
 Write-Host "   2. Wait for: 'Listening on port 5004'" -ForegroundColor White
-Write-Host "   3. THEN press Play in Unity (you have 120 seconds)" -ForegroundColor White
+Write-Host "   3. THEN press Play in Unity (you have 30 seconds by default)" -ForegroundColor White
 Write-Host "   4. Watch for: 'Connected to Unity environment'" -ForegroundColor White
 Write-Host "   5. If timeout issues: .\Scripts\train_cube.ps1 -TimeoutWait 300" -ForegroundColor White
 

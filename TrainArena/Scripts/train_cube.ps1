@@ -72,7 +72,6 @@ Write-Host "✅ Unity project structure verified" -ForegroundColor Green
 Write-Host "✅ Config file found: $ConfigPath" -ForegroundColor Green
 
 # Create results directory
-$ResultsDir = "Results/$RunId"
 if (!(Test-Path "Results")) {
     New-Item -ItemType Directory -Path "Results" | Out-Null
 }

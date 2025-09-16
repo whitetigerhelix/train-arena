@@ -20,6 +20,14 @@ public class CubeAgent : Agent
     public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
     public const int GOAL_OBSERVATIONS = 3;         // Local goal direction (x, y, z)
     // raycast observations = raycastDirections (configurable)
+    
+    // Timing and threshold constants
+    private const float PHYSICS_DEBUG_INTERVAL = 10f;       // Physics debugging every 10 seconds
+    private const float AGENT_LOG_INTERVAL = 5f;            // Agent status logging every 5 seconds
+    private const float RANDOM_ACTION_CHANGE_TIME = 2f;     // Change random actions every 2 seconds
+    private const float MOVEMENT_THRESHOLD = 0.1f;          // Minimum velocity to consider "moving"
+    private const float HIGH_VELOCITY_THRESHOLD = 2f;       // High velocity worth logging
+    private const float FORCE_DISPLAY_THRESHOLD = 0.1f;     // Minimum force to display in gizmos
 
     Rigidbody rb;
     float prevDist;
@@ -47,6 +55,18 @@ public class CubeAgent : Agent
         rb = GetComponent<Rigidbody>();
         rb.maxAngularVelocity = 20f;
         
+        // Debug Rigidbody setup (only at verbose level - not needed during normal operation)
+        TrainArenaDebugManager.Log($"🔧 {gameObject.name} INITIALIZED: Mass={rb.mass:F1} | Drag={rb.linearDamping:F1} | AngDrag={rb.angularDamping:F1} | isKinematic={rb.isKinematic} | Constraints={rb.constraints}", 
+                                 TrainArenaDebugManager.DebugLogLevel.Verbose);
+        
+        // Check for potential physics blockers (verbose level only)
+        var colliders = GetComponents<Collider>();
+        foreach (var col in colliders)
+        {
+            TrainArenaDebugManager.Log($"🔧 {gameObject.name} Collider: {col.GetType().Name} | isTrigger={col.isTrigger} | enabled={col.enabled}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
         // Initialize random action for testing
         randomActionTimer = 0f;
         GenerateRandomAction();
@@ -60,16 +80,15 @@ public class CubeAgent : Agent
     
     void LateUpdate()
     {
-        // Physics debugging every 3 seconds
-        if (Time.time - lastPhysicsDebugTime > 3f)
+        // Physics debugging only for truly stuck agents (much less frequent)
+        if (Time.time - lastPhysicsDebugTime > (PHYSICS_DEBUG_INTERVAL * 3f)) // Every 30 seconds
         {
-            if (forceApplicationCount > 0)
+            // Only log if agent is really stuck with consistent force application
+            if (forceApplicationCount > 10 && rb.linearVelocity.magnitude < MOVEMENT_THRESHOLD)
             {
                 Vector3 avgForce = totalForceThisFrame / forceApplicationCount;
-                string physicsStatus = rb.linearVelocity.magnitude > 0.1f ? "MOVING" : "STUCK";
-                
-                TrainArenaDebugManager.Log($"🔧 {gameObject.name} PHYSICS: {physicsStatus} | AvgForce={avgForce.magnitude:F1} | Velocity={rb.linearVelocity.magnitude:F1} | Mass={rb.mass:F1} | Forces/3s={forceApplicationCount}", 
-                                         TrainArenaDebugManager.DebugLogLevel.Verbose);
+                TrainArenaDebugManager.Log($"⚠️ {gameObject.name} PERSISTENTLY STUCK: AvgForce={avgForce.magnitude:F1} | Vel={rb.linearVelocity.magnitude:F3} | Actions=({forceApplicationCount})", 
+                                         TrainArenaDebugManager.DebugLogLevel.Warnings);
             }
             
             // Reset counters
@@ -143,6 +162,14 @@ public class CubeAgent : Agent
 
         Vector3 localMove = new Vector3(moveX, 0f, moveZ);
         Vector3 worldForce = transform.TransformDirection(localMove) * moveAccel;
+        
+        // Verbose debug: Log action details (only when verbose level enabled)
+        if ((Mathf.Abs(moveX) > 0.01f || Mathf.Abs(moveZ) > 0.01f) && Time.fixedTime % (AGENT_LOG_INTERVAL * 4f) < Time.fixedDeltaTime)
+        {
+            TrainArenaDebugManager.Log($"🎮 {gameObject.name} ACTION: ({moveX:F3},{moveZ:F3}) → Force={worldForce.magnitude:F1}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
         rb.AddForce(worldForce, ForceMode.Acceleration);
         
         // Store for debug visualization
@@ -152,17 +179,21 @@ public class CubeAgent : Agent
         totalForceThisFrame += worldForce;
         forceApplicationCount++;
         
-        // Debug logging to check if actions are being received (throttled to avoid spam)
-        if (Time.fixedTime % 2f < Time.fixedDeltaTime) // Every 2 seconds
+        // Minimal agent status logging (much less frequent)
+        if (Time.fixedTime % (AGENT_LOG_INTERVAL * 4f) < Time.fixedDeltaTime) // Every 20 seconds
         {
             var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
             string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
             
             Vector3 velocity = rb.linearVelocity;
-            string status = velocity.magnitude > 0.1f ? "MOVING" : "STATIONARY";
+            string status = velocity.magnitude > MOVEMENT_THRESHOLD ? "MOVING" : "STUCK";
             
-            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | Behavior={behaviorType} | Actions=({moveX:F2},{moveZ:F2}) | Force={worldForce.magnitude:F1} | Velocity={velocity.magnitude:F1}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+            // Only log if something noteworthy (stuck agents or behavior changes)
+            if (status == "STUCK" || behaviorType != "HeuristicOnly")
+            {
+                TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F1}", 
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
         }
 
         // Time penalty + tiny energy penalty
@@ -202,10 +233,10 @@ public class CubeAgent : Agent
             if (keyboard.sKey.isPressed) ca[1] -= 1f; // Back
             if (keyboard.wKey.isPressed) ca[1] += 1f; // Forward
             
-            // Debug log when any input is detected
-            if (ca[0] != 0f || ca[1] != 0f)
+            // Debug log when manual input is detected (verbose only)
+            if ((ca[0] != 0f || ca[1] != 0f) && Time.fixedTime % 2f < Time.fixedDeltaTime)
             {
-                TrainArenaDebugManager.Log($"Heuristic input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                TrainArenaDebugManager.Log($"Manual input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
         }
         else
@@ -224,19 +255,16 @@ public class CubeAgent : Agent
         if (ca[0] == 0f && ca[1] == 0f)
         {
             randomActionTimer += Time.deltaTime;
-            if (randomActionTimer > 2f) // Change direction every 2 seconds
+            if (randomActionTimer > RANDOM_ACTION_CHANGE_TIME)
             {
                 GenerateRandomAction();
                 randomActionTimer = 0f;
+                TrainArenaDebugManager.Log($"🎲 {gameObject.name} Generated new random action: ({currentRandomAction.x:F2}, {currentRandomAction.y:F2})", 
+                                         TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
             
             ca[0] = currentRandomAction.x;
             ca[1] = currentRandomAction.y;
-            
-            if (ca[0] != 0f || ca[1] != 0f)
-            {
-                TrainArenaDebugManager.Log($"Random action: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
-            }
         }
     }
     
@@ -270,7 +298,7 @@ public class CubeAgent : Agent
         {
             Gizmos.color = Color.blue;
             Vector3 velocity = rb.linearVelocity;
-            if (velocity.magnitude > 0.1f)
+            if (velocity.magnitude > MOVEMENT_THRESHOLD)
             {
                 Gizmos.DrawLine(transform.position, transform.position + velocity);
                 Gizmos.DrawSphere(transform.position + velocity, 0.1f);
@@ -278,7 +306,7 @@ public class CubeAgent : Agent
         }
         
         // Show force vectors if observations enabled
-        if (TrainArenaDebugManager.ShowObservations && lastAppliedForce.magnitude > 0.1f)
+        if (TrainArenaDebugManager.ShowObservations && lastAppliedForce.magnitude > FORCE_DISPLAY_THRESHOLD)
         {
             Gizmos.color = Color.red;
             Gizmos.DrawLine(transform.position, transform.position + lastAppliedForce * 0.5f);
