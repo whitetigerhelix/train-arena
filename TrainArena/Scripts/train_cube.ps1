@@ -5,12 +5,14 @@ param(
     [string]$RunId = "cube_run_$(Get-Date -Format 'yyyyMMdd_HHmmss')",
     [string]$ConfigPath = "Assets/ML-Agents/Configs/cube_ppo.yaml",
     [switch]$Resume,
-    [switch]$SkipTensorBoard
+    [switch]$SkipTensorBoard,
+    [int]$TimeoutWait = 120
 )
 
 Write-Host "🚀 Starting ML-Agents Cube Training" -ForegroundColor Green
 Write-Host "Run ID: $RunId" -ForegroundColor Cyan
 Write-Host "Config: $ConfigPath" -ForegroundColor Cyan
+Write-Host "Unity Timeout: $TimeoutWait seconds" -ForegroundColor Cyan
 
 # Check if we're in a virtual environment (required for training)
 if ($env:VIRTUAL_ENV) {
@@ -58,35 +60,58 @@ if (!$SkipTensorBoard) {
     Start-Sleep 3  # Give TensorBoard time to start
 }
 
-# Build the training command
-$TrainCmd = "mlagents-learn `"$ConfigPath`" --run-id=`"$RunId`""
+# Build the training command (--train is deprecated, now default)
+$TrainArgs = @("`"$ConfigPath`"", "--run-id=`"$RunId`"")
+
+# Configure Unity connection timeout (default is 30 seconds)
+$TrainArgs += "--timeout-wait=$TimeoutWait"
 
 if ($Resume) {
-    $TrainCmd += " --resume"
+    $TrainArgs += "--resume"
     Write-Host "⚡ Resuming training from checkpoint" -ForegroundColor Yellow
 }
 
-$TrainCmd += " --train"
+$TrainCmd = "mlagents-learn " + ($TrainArgs -join " ")
 
 Write-Host "📝 Training Command:" -ForegroundColor Magenta
 Write-Host $TrainCmd -ForegroundColor White
 
 Write-Host "`n🎯 Instructions:" -ForegroundColor Yellow
 Write-Host "1. Open Unity and load your Cube Training Scene" -ForegroundColor White
-Write-Host "2. Press PLAY in Unity when training starts" -ForegroundColor White
-Write-Host "3. Watch TensorBoard at http://localhost:6006" -ForegroundColor White
-Write-Host "4. Press Ctrl+C here to stop training" -ForegroundColor White
+Write-Host "2. Press PLAY in Unity when you see 'Listening on port 5004'" -ForegroundColor White
+Write-Host "3. You have $TimeoutWait seconds after the message appears to press Play and the scene to start" -ForegroundColor White
+Write-Host "4. Watch TensorBoard at http://localhost:6006" -ForegroundColor White
+Write-Host "5. Press Ctrl+C here to stop training" -ForegroundColor White
 
-Write-Host "`n⏳ Starting training in 5 seconds..." -ForegroundColor Yellow
+Write-Host "`n⏳ Starting training with $TimeoutWait-second Unity timeout..." -ForegroundColor Yellow
 Start-Sleep 5
 
-# Execute the training command and capture the exit code
+# Execute the training command and capture both exit code and output
 Write-Host "`n🚀 Launching ML-Agents training..." -ForegroundColor Green
 try {
-    # Use Start-Process to properly capture exit codes
-    $process = Start-Process -FilePath "mlagents-learn" -ArgumentList "`"$ConfigPath`"", "--run-id=`"$RunId`"", "--train" -NoNewWindow -Wait -PassThru
+    # Use Start-Process to capture output and exit codes
+    $outputFile = "temp_training_output.txt"
+    $errorFile = "temp_training_error.txt"
     
-    if ($process.ExitCode -eq 0) {
+    $process = Start-Process -FilePath "mlagents-learn" -ArgumentList $TrainArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile
+    
+    # Read the output to check for issues
+    $output = ""
+    $errorOutput = ""
+    if (Test-Path $outputFile) {
+        $output = Get-Content $outputFile -Raw
+        Remove-Item $outputFile
+    }
+    if (Test-Path $errorFile) {
+        $errorOutput = Get-Content $errorFile -Raw  
+        Remove-Item $errorFile
+    }
+    
+    # Check for "Learning was interrupted" or other failure indicators
+    $wasInterrupted = $output -match "Learning was interrupted" -or $errorOutput -match "Learning was interrupted"
+    $hasErrors = $output -match "Error|Exception|Failed" -or $errorOutput -match "Error|Exception|Failed"
+    
+    if ($process.ExitCode -eq 0 -and -not $wasInterrupted -and -not $hasErrors) {
         Write-Host "`n✅ Training completed successfully!" -ForegroundColor Green
         Write-Host "Results saved to: Results/$RunId" -ForegroundColor Cyan
         Write-Host "TensorBoard logs available at: Results/$RunId" -ForegroundColor Cyan
@@ -104,6 +129,30 @@ try {
         Write-Host "   1. In Unity, set CubeAgent Behavior Type to 'Inference Only'" -ForegroundColor White
         Write-Host "   2. Drag the .onnx file to the Model field" -ForegroundColor White
         Write-Host "   3. Press Play to test your trained agent!" -ForegroundColor White
+    } elseif ($wasInterrupted) {
+        Write-Host "`n❌ Training was interrupted!" -ForegroundColor Red
+        Write-Host "This usually means Unity wasn't running or wasn't in Play mode." -ForegroundColor Yellow
+        
+        Write-Host "`n🔧 Common causes:" -ForegroundColor Cyan
+        Write-Host "   • Unity Editor not running" -ForegroundColor White
+        Write-Host "   • Unity scene not in Play mode when training started" -ForegroundColor White
+        Write-Host "   • No CubeAgent behaviors in the scene" -ForegroundColor White
+        Write-Host "   • Unity crashed or was closed during training" -ForegroundColor White
+        
+        Write-Host "`n🎯 Next steps:" -ForegroundColor Yellow
+        Write-Host "   1. Open Unity and load your Cube Training Scene" -ForegroundColor White
+        Write-Host "   2. Make sure the scene has CubeAgent objects" -ForegroundColor White
+        Write-Host "   3. Run training script first, THEN press Play in Unity" -ForegroundColor White
+        Write-Host "   4. Look for 'Listening on port 5004' message before pressing Play" -ForegroundColor White
+        
+        exit 1
+    } elseif ($hasErrors) {
+        Write-Host "`n❌ Training failed with errors detected in output" -ForegroundColor Red
+        Write-Host "Error details:" -ForegroundColor Yellow
+        if ($errorOutput) {
+            Write-Host $errorOutput -ForegroundColor Red
+        }
+        exit 1
     } else {
         Write-Host "`n❌ Training failed with exit code: $($process.ExitCode)" -ForegroundColor Red
         Write-Host "Check the error messages above for details." -ForegroundColor Yellow
