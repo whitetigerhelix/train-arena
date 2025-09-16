@@ -5,6 +5,22 @@ using System.Linq;
 
 public static class SceneBuilder
 {
+    /// <summary>
+    /// Detects if ML-Agents training is active by checking for Academy communication port
+    /// This allows automatic switching between training and testing modes
+    /// </summary>
+    private static bool IsMLAgentsTrainingActive()
+    {
+        // Check if Academy is connected to external trainer
+        var academy = Unity.MLAgents.Academy.Instance;
+        if (academy != null)
+        {
+            // In training mode, Academy.IsCommunicatorOn returns true when connected to mlagents-learn
+            return academy.IsCommunicatorOn;
+        }
+        return false;
+    }
+
     [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
     public static void BuildCubeScene()
     {
@@ -106,7 +122,9 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorName = "CubeAgent";
-            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for testing without trainer
+            behaviorParams.BehaviorType = IsMLAgentsTrainingActive() ? 
+                Unity.MLAgents.Policies.BehaviorType.Default : 
+                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
@@ -127,8 +145,9 @@ public static class SceneBuilder
                 behaviorParams.BrainParameters.VectorObservationSize = totalObservations;
             }
             
+            string behaviorMode = behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.Default ? "ML Training" : "Editor Testing";
             TrainArenaDebugManager.Log($"Configured agent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
-                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts)", 
+                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts), Mode: {behaviorMode}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
