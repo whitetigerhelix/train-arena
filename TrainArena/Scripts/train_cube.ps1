@@ -26,6 +26,10 @@ if ($env:VIRTUAL_ENV) {
     }
 }
 
+# Set protobuf compatibility environment variable (prevents common errors)
+$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+Write-Host "🔧 Set protobuf compatibility mode" -ForegroundColor Yellow
+
 # Ensure we're in the right directory
 if (!(Test-Path $ConfigPath)) {
     Write-Error "Config file not found: $ConfigPath"

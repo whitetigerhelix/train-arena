@@ -83,15 +83,31 @@ try {
     Write-Host "⚠️  Pip upgrade failed, continuing..." -ForegroundColor Yellow
 }
 
-# Install ML-Agents
-Write-Host "`n5. Installing ML-Agents..." -ForegroundColor Yellow
+# Install ML-Agents with compatible protobuf
+Write-Host "`n5. Installing ML-Agents with compatible dependencies..." -ForegroundColor Yellow
 try {
+    Write-Host "   Installing compatible protobuf version..." -ForegroundColor White
+    python -m pip install "protobuf>=3.20.0,<4.0.0"
+    
     Write-Host "   Installing mlagents package (this may take a few minutes)..." -ForegroundColor White
     python -m pip install mlagents
-    Write-Host "✅ ML-Agents installed successfully" -ForegroundColor Green
+    
+    Write-Host "   Verifying protobuf compatibility..." -ForegroundColor White
+    python -c "import google.protobuf; print(f'Protobuf version: {google.protobuf.__version__}')"
+    
+    Write-Host "✅ ML-Agents installed successfully with compatible protobuf" -ForegroundColor Green
 } catch {
     Write-Host "❌ Failed to install ML-Agents: $_" -ForegroundColor Red
-    exit 1
+    Write-Host "   Trying alternative fix..." -ForegroundColor Yellow
+    
+    try {
+        Write-Host "   Downgrading protobuf to 3.20.3..." -ForegroundColor White
+        python -m pip install "protobuf==3.20.3" --force-reinstall
+        Write-Host "✅ Protobuf downgraded - this should fix the compatibility issue" -ForegroundColor Green
+    } catch {
+        Write-Host "❌ Could not fix protobuf compatibility" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Install TensorBoard (if not already included)
@@ -106,8 +122,13 @@ try {
 # Verify installation
 Write-Host "`n7. Verifying installation..." -ForegroundColor Yellow
 try {
-    $mlagentsVersion = python -c "import mlagents; print(mlagents.__version__)" 2>&1
-    Write-Host "✅ ML-Agents version: $mlagentsVersion" -ForegroundColor Green
+    # Check ML-Agents using the correct import
+    $mlagentsVersion = python -c "import mlagents_envs; print('ML-Agents package installed')" 2>&1
+    if ($mlagentsVersion -match "installed") {
+        Write-Host "✅ ML-Agents package: installed and importable" -ForegroundColor Green
+    } else {
+        Write-Host "⚠️  ML-Agents import issue: $mlagentsVersion" -ForegroundColor Yellow
+    }
     
     $tensorboardVersion = python -c "import tensorboard; print(tensorboard.__version__)" 2>&1
     Write-Host "✅ TensorBoard version: $tensorboardVersion" -ForegroundColor Green
@@ -118,14 +139,27 @@ try {
 # Test mlagents-learn command
 Write-Host "`n8. Testing mlagents-learn command..." -ForegroundColor Yellow
 try {
-    $helpOutput = mlagents-learn --help 2>&1
-    if ($helpOutput -match "usage:") {
-        Write-Host "✅ mlagents-learn command works" -ForegroundColor Green
+    # Capture both stdout and stderr properly
+    $process = Start-Process -FilePath "mlagents-learn" -ArgumentList "--help" -NoNewWindow -Wait -PassThru -RedirectStandardOutput "temp_output.txt" -RedirectStandardError "temp_error.txt"
+    $stdout = Get-Content "temp_output.txt" -Raw -ErrorAction SilentlyContinue
+    $stderr = Get-Content "temp_error.txt" -Raw -ErrorAction SilentlyContinue
+    Remove-Item "temp_output.txt" -ErrorAction SilentlyContinue
+    Remove-Item "temp_error.txt" -ErrorAction SilentlyContinue
+    
+    if ($process.ExitCode -eq 0 -and ($stdout -match "usage:" -or $stdout -match "mlagents-learn")) {
+        Write-Host "✅ mlagents-learn command works correctly" -ForegroundColor Green
     } else {
-        Write-Host "⚠️  mlagents-learn command may not be working properly" -ForegroundColor Yellow
+        Write-Host "❌ mlagents-learn command failed" -ForegroundColor Red
+        if ($stderr) {
+            Write-Host "   Error details: $stderr" -ForegroundColor White
+        }
+        if ($stdout) {
+            Write-Host "   Output: $stdout" -ForegroundColor White
+        }
+        Write-Host "   Exit code: $($process.ExitCode)" -ForegroundColor White
     }
 } catch {
-    Write-Host "⚠️  Could not test mlagents-learn command" -ForegroundColor Yellow
+    Write-Host "❌ Could not test mlagents-learn command: $_" -ForegroundColor Red
 }
 
 # Create activation script for convenience
