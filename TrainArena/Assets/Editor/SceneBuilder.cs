@@ -42,6 +42,10 @@ public static class SceneBuilder
         // Add debug manager to scene
         var debugManager = new GameObject("TrainArenaDebugManager");
         debugManager.AddComponent<TrainArenaDebugManager>();
+        
+        // Add time scale manager for training speed monitoring
+        var timeManager = new GameObject("TimeScaleManager");
+        timeManager.AddComponent<TimeScaleManager>();
 
         // Light
         var lightGO = new GameObject("Directional Light");
@@ -59,7 +63,10 @@ public static class SceneBuilder
         init.goalPrefab = CreateGoalPrefab();
         init.obstaclePrefab = CreateObstaclePrefab();
 
-        TrainArenaDebugManager.Log("Cube training scene created. Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn.", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🎯 Cube training scene created with auto behavior switching and time scale monitoring!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     [MenuItem("Tools/ML Hack/Build Ragdoll Test Scene")]
@@ -122,9 +129,8 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorName = "CubeAgent";
-            behaviorParams.BehaviorType = IsMLAgentsTrainingActive() ? 
-                Unity.MLAgents.Policies.BehaviorType.Default : 
-                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+            // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
@@ -159,6 +165,14 @@ public static class SceneBuilder
         
         // Add debug info component for development
         agent.AddComponent<AgentDebugInfo>();
+        
+        // Add automatic behavior switching for seamless training/testing
+        var autoSwitcher = agent.AddComponent<AutoBehaviorSwitcher>();
+        autoSwitcher.enableAutoSwitching = true;
+        autoSwitcher.showDebugMessages = true;
+        
+        TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless training/testing mode switching", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
 
         return agent;
     }

@@ -38,14 +38,38 @@ if ($env:VIRTUAL_ENV) {
 $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
 Write-Host "🔧 Protobuf compatibility mode enabled" -ForegroundColor Yellow
 
-# Ensure we're in the right directory
-if (!(Test-Path $ConfigPath)) {
-    Write-Error "Config file not found: $ConfigPath"
-    Write-Host "Current directory: $(Get-Location)"
-    Write-Host "Available configs:"
-    Get-ChildItem "Assets/ML-Agents/Configs" -Filter "*.yaml" | Format-Table Name
+# Ensure we're in the Unity project root directory
+$currentDir = Get-Location
+Write-Host "📁 Current directory: $currentDir" -ForegroundColor Cyan
+
+# Check for Unity project indicators
+$unityProjectFiles = @("Assets", "ProjectSettings", "Packages")
+$missingFiles = $unityProjectFiles | Where-Object { !(Test-Path $_) }
+
+if ($missingFiles.Count -gt 0) {
+    Write-Host "❌ Not in Unity project root directory!" -ForegroundColor Red
+    Write-Host "Missing required directories: $($missingFiles -join ', ')" -ForegroundColor Yellow
+    Write-Host "Please run this script from the Unity project root (TrainArena folder)" -ForegroundColor White
+    Write-Host "Current location: $currentDir" -ForegroundColor White
     exit 1
 }
+
+# Ensure config file exists
+if (!(Test-Path $ConfigPath)) {
+    Write-Error "Config file not found: $ConfigPath"
+    Write-Host "Current directory: $currentDir"
+    
+    if (Test-Path "Assets/ML-Agents/Configs") {
+        Write-Host "Available configs:"
+        Get-ChildItem "Assets/ML-Agents/Configs" -Filter "*.yaml" | Format-Table Name
+    } else {
+        Write-Host "Assets/ML-Agents/Configs directory not found!" -ForegroundColor Red
+    }
+    exit 1
+}
+
+Write-Host "✅ Unity project structure verified" -ForegroundColor Green
+Write-Host "✅ Config file found: $ConfigPath" -ForegroundColor Green
 
 # Create results directory
 $ResultsDir = "Results/$RunId"
@@ -77,11 +101,12 @@ Write-Host "📝 Training Command:" -ForegroundColor Magenta
 Write-Host $TrainCmd -ForegroundColor White
 
 Write-Host "`n🎯 Instructions:" -ForegroundColor Yellow
-Write-Host "1. Open Unity and load your Cube Training Scene" -ForegroundColor White
-Write-Host "2. Press PLAY in Unity when you see 'Listening on port 5004'" -ForegroundColor White
-Write-Host "3. You have $TimeoutWait seconds after the message appears to press Play and the scene to start" -ForegroundColor White
-Write-Host "4. Watch TensorBoard at http://localhost:6006" -ForegroundColor White
-Write-Host "5. Press Ctrl+C here to stop training" -ForegroundColor White
+Write-Host "1. Open Unity and load your Cube Training Scene (if not already open)" -ForegroundColor White
+Write-Host "2. When you see 'Listening on port 5004' below, switch to Unity" -ForegroundColor White
+Write-Host "3. Press PLAY in Unity within $TimeoutWait seconds" -ForegroundColor White
+Write-Host "4. Watch the agents switch to Default behavior and start training!" -ForegroundColor White
+Write-Host "5. Monitor progress at http://localhost:6006 (TensorBoard)" -ForegroundColor White
+Write-Host "6. Press Ctrl+C here to stop training when satisfied" -ForegroundColor White
 
 Write-Host "`n⏳ Starting training with $TimeoutWait-second Unity timeout..." -ForegroundColor Yellow
 Start-Sleep 5
@@ -89,29 +114,46 @@ Start-Sleep 5
 # Execute the training command and capture both exit code and output
 Write-Host "`n🚀 Launching ML-Agents training..." -ForegroundColor Green
 try {
-    # Use Start-Process to capture output and exit codes
-    $outputFile = "temp_training_output.txt"
-    $errorFile = "temp_training_error.txt"
+    # Execute mlagents-learn directly to see real-time output (including "Listening on port 5004")
+    Write-Host "🔗 Executing: $TrainCmd" -ForegroundColor Cyan
+    Write-Host "� Working Directory: $(Get-Location)" -ForegroundColor Cyan
+    Write-Host "📄 Config Path: $ConfigPath" -ForegroundColor Cyan
+    Write-Host "�👀 Watch for 'Listening on port 5004' message, then press PLAY in Unity!" -ForegroundColor Green
     
-    $process = Start-Process -FilePath "mlagents-learn" -ArgumentList $TrainArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile
-    
-    # Read the output to check for issues
+    # Use Invoke-Expression to see real-time output
     $output = ""
     $errorOutput = ""
-    if (Test-Path $outputFile) {
-        $output = Get-Content $outputFile -Raw
-        Remove-Item $outputFile
-    }
-    if (Test-Path $errorFile) {
-        $errorOutput = Get-Content $errorFile -Raw  
-        Remove-Item $errorFile
+    $process = $null
+    
+    try {
+        # Execute the command and capture the process info
+        $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $processInfo.FileName = "mlagents-learn"
+        $processInfo.Arguments = $TrainArgs -join " "
+        $processInfo.UseShellExecute = $false
+        $processInfo.CreateNoWindow = $false
+        $processInfo.WorkingDirectory = (Get-Location).Path  # Set working directory to current location
+        
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $processInfo
+        $process.Start()
+        
+        Write-Host "📡 ML-Agents process started (PID: $($process.Id))" -ForegroundColor Green
+        Write-Host "🎮 Switch to Unity and press PLAY when you see 'Listening on port 5004'!" -ForegroundColor Yellow
+        
+        # Wait for process to complete
+        $process.WaitForExit()
+        
+        $exitCode = $process.ExitCode
+    } catch {
+        Write-Host "❌ Failed to start mlagents-learn: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
     }
     
-    # Check for "Learning was interrupted" or other failure indicators
-    $wasInterrupted = $output -match "Learning was interrupted" -or $errorOutput -match "Learning was interrupted"
-    $hasErrors = $output -match "Error|Exception|Failed" -or $errorOutput -match "Error|Exception|Failed"
+    # Since we're not capturing output, determine success by exit code
+    $wasInterrupted = $exitCode -eq 130 -or $exitCode -eq 2  # Common interruption exit codes
     
-    if ($process.ExitCode -eq 0 -and -not $wasInterrupted -and -not $hasErrors) {
+    if ($exitCode -eq 0) {
         Write-Host "`n✅ Training completed successfully!" -ForegroundColor Green
         Write-Host "Results saved to: Results/$RunId" -ForegroundColor Cyan
         Write-Host "TensorBoard logs available at: Results/$RunId" -ForegroundColor Cyan
@@ -147,14 +189,11 @@ try {
         
         exit 1
     } elseif ($hasErrors) {
-        Write-Host "`n❌ Training failed with errors detected in output" -ForegroundColor Red
-        Write-Host "Error details:" -ForegroundColor Yellow
-        if ($errorOutput) {
-            Write-Host $errorOutput -ForegroundColor Red
-        }
+        Write-Host "`n❌ Training process ended unexpectedly" -ForegroundColor Red
+        Write-Host "Check the console output above for error details." -ForegroundColor Yellow
         exit 1
     } else {
-        Write-Host "`n❌ Training failed with exit code: $($process.ExitCode)" -ForegroundColor Red
+        Write-Host "`n❌ Training failed with exit code: $exitCode" -ForegroundColor Red
         Write-Host "Check the error messages above for details." -ForegroundColor Yellow
         
         # Common troubleshooting tips
@@ -164,7 +203,7 @@ try {
         Write-Host "   • Verify the config file: $ConfigPath" -ForegroundColor White
         Write-Host "   • Try: .\Scripts\check_environment.ps1" -ForegroundColor White
         
-        exit $process.ExitCode
+        exit $exitCode
     }
 } catch {
     Write-Host "`n❌ Failed to start training: $($_.Exception.Message)" -ForegroundColor Red
