@@ -1,11 +1,11 @@
-# ML-Agents Setup with Python 3.10.12 (Official Unity Specification)
-# Based on Unity ML-Agents Official Documentation: Python 3.10.12 or Higher required
+# ML-Agents Setup with Python 3.10.11 (Unity Official Specification)
+# Based on Unity ML-Agents Release 23: Python 3.10+ required, ML-Agents 1.1.0 latest compatible
 
 param(
     [switch]$Force
 )
 
-Write-Host "🐍 ML-Agents Setup with Python 3.10.12 (Unity Official Spec)" -ForegroundColor Cyan
+Write-Host "🐍 ML-Agents Setup with Python 3.10.11 (Unity Official Spec)" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 
 $VenvName = "mlagents-py310"
@@ -13,8 +13,8 @@ $VenvPath = "venv\$VenvName"
 $Python310Url = "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe"
 $Python310InstallDir = "C:\Python310"
 
-# 1. Check for Python 3.10.12 installation
-Write-Host "`n1. Checking for Python 3.10.12 installation..." -ForegroundColor Yellow
+# 1. Check for Python 3.10.11 installation  
+Write-Host "`n1. Checking for Python 3.10.11 installation..." -ForegroundColor Yellow
 
 $python310Paths = @(
     "C:\Python310\python.exe",
@@ -39,7 +39,7 @@ foreach ($path in $python310Paths) {
     }
 }
 
-# Install Python 3.10.12 if not found
+# Install Python 3.10.11 if not found
 if (-not $python310) {
     Write-Host "❌ Python 3.10.11 not found. Installing..." -ForegroundColor Red
     Write-Host "`n📥 Downloading Python 3.10.11..." -ForegroundColor Cyan
@@ -147,8 +147,8 @@ try {
     }
 }
 
-# 5. Install ML-Agents 0.30.0 with compatible versions
-Write-Host "`n5. Installing ML-Agents 0.30.0 (Official Unity Compatible Version)..." -ForegroundColor Yellow
+# 5. Install ML-Agents 1.1.0 with compatible versions
+Write-Host "`n5. Installing ML-Agents 1.1.0 (Latest Available Version)..." -ForegroundColor Yellow
 try {
     Write-Host "   Installing compatible protobuf first..." -ForegroundColor White
     & $python310venv -m pip install "protobuf==3.20.3"
@@ -156,14 +156,23 @@ try {
     Write-Host "   Installing PyTorch (Windows compatible)..." -ForegroundColor White
     & $python310venv -m pip install torch~=2.1.1 -f https://download.pytorch.org/whl/torch_stable.html
     
-    Write-Host "   Installing ML-Agents 0.30.0..." -ForegroundColor White
-    & $python310venv -m pip install "mlagents==0.30.0"
+    Write-Host "   Installing ML-Agents 1.1.0 (latest)..." -ForegroundColor White
+    & $python310venv -m pip install "mlagents==1.1.0"
     
     Write-Host "   Installing TensorBoard..." -ForegroundColor White
     & $python310venv -m pip install tensorboard
     
     Write-Host "   Verifying ML-Agents installation..." -ForegroundColor White
-    & $python310venv -c "import mlagents_envs, mlagents; print(f'ML-Agents version: {mlagents.__version__}')"
+    try {
+        & $python310venv -c "import mlagents_envs, mlagents; print('ML-Agents modules imported successfully')"
+        $mlagentsVersionCheck = & $python310venv -m pip show mlagents 2>&1
+        if ($mlagentsVersionCheck -match "Version:") {
+            $version = ($mlagentsVersionCheck -split "`n" | Where-Object { $_ -match "Version:" }) -replace "Version:\s*", ""
+            Write-Host "   ML-Agents version: $version" -ForegroundColor White
+        }
+    } catch {
+        Write-Host "   Warning: Could not verify ML-Agents version, but continuing..." -ForegroundColor Yellow
+    }
     
     # Verify executables exist
     $mlagentsLearnPath = "$VenvPath\Scripts\mlagents-learn.exe"
@@ -174,12 +183,12 @@ try {
         throw "ML-Agents installation incomplete"
     }
     
-    Write-Host "✅ ML-Agents 0.30.0 installed successfully" -ForegroundColor Green
+    Write-Host "✅ ML-Agents 1.1.0 installed successfully" -ForegroundColor Green
 } catch {
     Write-Host "❌ Failed to install ML-Agents: $_" -ForegroundColor Red
     Write-Host "`n🔧 Manual installation steps:" -ForegroundColor Cyan
     Write-Host "   1. Activate environment: .\activate_mlagents_py310.ps1" -ForegroundColor White
-    Write-Host "   2. Install manually: pip install protobuf==3.20.3 mlagents==0.30.0" -ForegroundColor White
+    Write-Host "   2. Install manually: pip install protobuf==3.20.3 mlagents==1.1.0" -ForegroundColor White
     Write-Host "   3. Verify: .\Scripts\check_environment.ps1" -ForegroundColor White
 }
 
@@ -220,7 +229,7 @@ try {
     `$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
     
     Write-Host "✅ Python 3.10 environment activated!" -ForegroundColor Green
-    Write-Host "✅ ML-Agents 0.30.0 ready for training" -ForegroundColor Green
+    Write-Host "✅ ML-Agents 1.1.0 ready for training" -ForegroundColor Green
     Write-Host "✅ Compatible with Unity ML-Agents Package" -ForegroundColor Green
     
     Write-Host "`n📋 Next steps:" -ForegroundColor Cyan
@@ -236,7 +245,12 @@ $ActivationScript | Out-File -FilePath "activate_mlagents_py310.ps1" -Encoding U
 # Final verification and next steps
 Write-Host "`n📋 Running final environment verification..." -ForegroundColor Cyan
 try {
-    & $python310venv -c "import mlagents_envs, mlagents; print(f'ML-Agents version: {mlagents.__version__}')"
+    & $python310venv -c "import mlagents_envs, mlagents; print('Final ML-Agents verification: All modules import successfully')"
+    $mlagentsVersionCheck = & $python310venv -m pip show mlagents 2>&1
+    if ($mlagentsVersionCheck -match "Version:") {
+        $version = ($mlagentsVersionCheck -split "`n" | Where-Object { $_ -match "Version:" }) -replace "Version:\s*", ""
+        Write-Host "Final check - ML-Agents version: $version" -ForegroundColor White
+    }
     $mlagentsLearnPath = "$VenvPath\Scripts\mlagents-learn.exe"
     
     if (Test-Path $mlagentsLearnPath) {
@@ -244,7 +258,7 @@ try {
         Write-Host "==============================" -ForegroundColor Green
         Write-Host "✅ Python 3.10.12: $python310" -ForegroundColor Green
         Write-Host "✅ Virtual environment: $VenvPath" -ForegroundColor Green
-        Write-Host "✅ ML-Agents 0.30.0: Installed and verified" -ForegroundColor Green
+        Write-Host "✅ ML-Agents 1.1.0: Installed and verified" -ForegroundColor Green
         Write-Host "✅ Compatible with Unity ML-Agents Package" -ForegroundColor Green
         Write-Host "✅ Activation script: activate_mlagents_py310.ps1" -ForegroundColor Green
         
@@ -258,7 +272,7 @@ try {
         
         Write-Host "`n📊 Environment Info (Unity Official Spec):" -ForegroundColor Magenta
         Write-Host "   Python Version: 3.10.12 (Unity Recommended)" -ForegroundColor Green
-        Write-Host "   ML-Agents: 0.30.0 (Latest Stable)" -ForegroundColor Green
+        Write-Host "   ML-Agents: 1.1.0 (Latest Available)" -ForegroundColor Green
         Write-Host "   Unity Package: Compatible with com.unity.ml-agents 4.0.0" -ForegroundColor Green
         Write-Host "   Ready for Training: YES" -ForegroundColor Green
     } else {
