@@ -16,6 +16,14 @@ public class CubeAgent : Agent
     [Header("Observation Space Configuration")]
     public int raycastDirections = 8;
     
+    [Header("Episode Management")]
+    public int maxEpisodeSteps = 1000;              // Maximum steps per episode
+    public float episodeTimeLimit = 60f;            // Maximum time per episode (seconds)
+    
+    // Episode tracking
+    private int episodeStepCount;
+    private float episodeStartTime;
+    
     // Observation space constants
     public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
     public const int GOAL_OBSERVATIONS = 3;         // Local goal direction (x, y, z)
@@ -100,6 +108,10 @@ public class CubeAgent : Agent
 
     public override void OnEpisodeBegin()
     {
+        // Reset episode tracking
+        episodeStepCount = 0;
+        episodeStartTime = Time.time;
+        
         // Reset physics
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
@@ -188,33 +200,71 @@ public class CubeAgent : Agent
             Vector3 velocity = rb.linearVelocity;
             string status = velocity.magnitude > MOVEMENT_THRESHOLD ? "MOVING" : "STUCK";
             
-            // Only log if something noteworthy (stuck agents or behavior changes)
-            if (status == "STUCK" || behaviorType != "HeuristicOnly")
+            // Show episode progress and status
+            float goalDistance = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
+            float episodeTime = Time.time - episodeStartTime;
+            
+            // Only log if something noteworthy (stuck agents, training mode, or close to goal)
+            if (status == "STUCK" || behaviorType != "HeuristicOnly" || goalDistance < 3f)
             {
-                TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F1}", 
+                TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F1} | Goal={goalDistance:F1} | Step={episodeStepCount}/{maxEpisodeSteps} | Time={episodeTime:F0}s", 
                                          TrainArenaDebugManager.DebugLogLevel.Important);
             }
         }
 
+        // Increment episode step counter
+        episodeStepCount++;
+        
         // Time penalty + tiny energy penalty
         AddReward(-0.001f);
         AddReward(-0.0005f * localMove.sqrMagnitude);
 
+        // Goal reaching check
         if (goal != null)
         {
             float d = Vector3.Distance(transform.position, goal.position);
             AddReward(prevDist - d); // progress
             prevDist = d;
 
-            if (d < 0.6f)
+            if (d < 1.2f) // Increased from 0.6f to make goals easier to reach
             {
-                AddReward(+1.0f);
+                AddReward(+2.0f); // Increased reward for reaching goal
+                TrainArenaDebugManager.Log($"🎯 {gameObject.name} REACHED GOAL! Distance={d:F2} | Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s", 
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
                 EndEpisode();
+                return;
             }
         }
 
+        // Fall detection
         if (transform.position.y < -1f)
+        {
+            AddReward(-0.5f); // Penalty for falling
+            TrainArenaDebugManager.Log($"💥 {gameObject.name} FELL! Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
             EndEpisode();
+            return;
+        }
+        
+        // Episode step limit
+        if (episodeStepCount >= maxEpisodeSteps)
+        {
+            AddReward(-0.1f); // Small penalty for timeout
+            TrainArenaDebugManager.Log($"⏰ {gameObject.name} EPISODE TIMEOUT (steps)! Steps={episodeStepCount}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            EndEpisode();
+            return;
+        }
+        
+        // Episode time limit  
+        if (Time.time - episodeStartTime > episodeTimeLimit)
+        {
+            AddReward(-0.1f); // Small penalty for timeout
+            TrainArenaDebugManager.Log($"⏰ {gameObject.name} EPISODE TIMEOUT (time)! Time={Time.time - episodeStartTime:F1}s", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            EndEpisode();
+            return;
+        }
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)
