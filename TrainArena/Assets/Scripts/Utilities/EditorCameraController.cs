@@ -118,6 +118,10 @@ public class EditorCameraController : MonoBehaviour
         if (!Application.isEditor && Application.isPlaying)
             return;
             
+        // Only show camera controls when debug help is enabled
+        if (!TrainArenaDebugManager.ShowHelp)
+            return;
+            
         // Show controls hint
         GUI.color = Color.white;
         GUI.backgroundColor = new Color(0, 0, 0, 0.5f);

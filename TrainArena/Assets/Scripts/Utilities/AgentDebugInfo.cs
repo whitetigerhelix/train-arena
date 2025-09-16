@@ -24,14 +24,15 @@ public class AgentDebugInfo : MonoBehaviour
     {
         if (!TrainArenaDebugManager.ShowAgentDebugInfo || cubeAgent == null) return;
 
-        // Only show for one agent to avoid UI clutter
-        if (gameObject.name != "CubeAgent_Arena_0") return;
-
         Vector3 worldScreenPos = Camera.main.WorldToScreenPoint(transform.position + Vector3.up * 2f);
         if (worldScreenPos.z > 0) // Only show if in front of camera
         {
             Vector2 screenPos = new Vector2(worldScreenPos.x, worldScreenPos.y);
-            Rect infoRect = new Rect(screenPos.x - 75f, Screen.height - screenPos.y - 60f, 150f, 80f);
+            
+            // Adjust rect size based on whether observations are shown
+            float width = TrainArenaDebugManager.ShowObservations ? 200f : 150f;
+            float height = TrainArenaDebugManager.ShowObservations ? 250f : 80f;
+            Rect infoRect = new Rect(screenPos.x - width/2f, Screen.height - screenPos.y - height/2f, width, height);
 
             GUI.backgroundColor = new Color(0, 0, 0, 0.7f);
             GUI.Box(infoRect, "");
@@ -65,11 +66,11 @@ public class AgentDebugInfo : MonoBehaviour
                     GUILayout.Label($"Local Goal: ({localGoal.x:F2},{localGoal.y:F2},{localGoal.z:F2})");
                 }
                 
-                // Raycast distances (8 values)
+                // Raycast distances (configurable count)
                 GUILayout.Label("Raycast distances:");
-                for (int i = 0; i < 8; i++)
+                for (int i = 0; i < cubeAgent.raycastDirections; i++)
                 {
-                    float angle = i * 45f;
+                    float angle = i * (360f / cubeAgent.raycastDirections);
                     Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
                     if (Physics.Raycast(transform.position + Vector3.up * 0.2f, dir, out RaycastHit hit, cubeAgent.rayLength, cubeAgent.obstacleMask))
                     {

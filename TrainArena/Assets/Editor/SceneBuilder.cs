@@ -38,17 +38,12 @@ public static class SceneBuilder
         var manager = new GameObject("EnvManager");
         var init = manager.AddComponent<EnvInitializer>();
 
-        // Prefabs (create basic ones procedurally, then disable them so they don't interfere)
+        // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
         init.cubeAgentPrefab = CreateCubeAgentPrefab();
         init.goalPrefab = CreateGoalPrefab();
         init.obstaclePrefab = CreateObstaclePrefab();
-        
-        // Disable the prefab instances so they don't appear in the scene
-        init.cubeAgentPrefab.SetActive(false);
-        init.goalPrefab.SetActive(false);
-        init.obstaclePrefab.SetActive(false);
 
-        TrainArenaDebugManager.Log("Cube training scene created.  Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn.", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("Cube training scene created. Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn.", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     [MenuItem("Tools/ML Hack/Build Ragdoll Test Scene")]
@@ -111,9 +106,30 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorName = "CubeAgent";
-            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for manual testing
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for testing without trainer
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
+            
+            // Configure action and observation space
+            if (behaviorParams.BrainParameters.ActionSpec.NumContinuousActions == 0)
+            {
+                // Set up action space: 2 continuous actions (moveX, moveZ)
+                behaviorParams.BrainParameters.ActionSpec = 
+                    Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(2);
+            }
+            
+            // Configure observation space dynamically based on agent configuration
+            var cubeAgentComponent = agent.GetComponent<CubeAgent>();
+            int totalObservations = cubeAgentComponent.GetTotalObservationCount();
+            
+            if (behaviorParams.BrainParameters.VectorObservationSize != totalObservations)
+            {
+                behaviorParams.BrainParameters.VectorObservationSize = totalObservations;
+            }
+            
+            TrainArenaDebugManager.Log($"Configured agent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
+                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
         // Add simple face to show agent orientation

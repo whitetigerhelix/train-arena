@@ -25,6 +25,32 @@ public class EnvInitializer : MonoBehaviour
                 SpawnArena(center);
             }
         }
+        
+        // Clean up prefab instances after spawning all arenas
+        CleanupPrefabs();
+    }
+    
+    void CleanupPrefabs()
+    {
+        TrainArenaDebugManager.Log("Cleaning up prefab instances from scene hierarchy", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        if (cubeAgentPrefab != null)
+        {
+            cubeAgentPrefab.SetActive(false);
+            TrainArenaDebugManager.Log("Disabled cubeAgentPrefab", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
+        if (goalPrefab != null)
+        {
+            goalPrefab.SetActive(false);
+            TrainArenaDebugManager.Log("Disabled goalPrefab", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
+        if (obstaclePrefab != null)
+        {
+            obstaclePrefab.SetActive(false);
+            TrainArenaDebugManager.Log("Disabled obstaclePrefab", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
     }
 
     void SpawnArena(Vector3 center)

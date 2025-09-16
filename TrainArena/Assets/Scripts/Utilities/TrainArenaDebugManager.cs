@@ -12,6 +12,9 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowAgentDebugInfo = false;
     public static bool ShowArenaDebugInfo = false;
     public static bool ShowObservations = false;
+    public static bool ShowVelocityDisplay = false;
+    public static bool ShowArenaBounds = false;
+    public static bool ShowHelp = true; // Show by default
     
     [Header("Logging Controls")]
     public static DebugLogLevel LogLevel = DebugLogLevel.Warnings;
@@ -72,6 +75,20 @@ public class TrainArenaDebugManager : MonoBehaviour
             Debug.Log($"Observations Display: {(ShowObservations ? "ON" : "OFF")}");
         }
         
+        // Toggle velocity display with 'V' key
+        if (keyboard.vKey.wasPressedThisFrame)
+        {
+            ShowVelocityDisplay = !ShowVelocityDisplay;
+            Debug.Log($"Velocity Display: {(ShowVelocityDisplay ? "ON" : "OFF")}");
+        }
+        
+        // Toggle arena bounds with 'A' key
+        if (keyboard.aKey.wasPressedThisFrame)
+        {
+            ShowArenaBounds = !ShowArenaBounds;
+            Debug.Log($"Arena Bounds: {(ShowArenaBounds ? "ON" : "OFF")}");
+        }
+        
         // Cycle through log levels with 'L' key
         if (keyboard.lKey.wasPressedThisFrame)
         {
@@ -82,18 +99,21 @@ public class TrainArenaDebugManager : MonoBehaviour
         // Show help with 'H' key
         if (keyboard.hKey.wasPressedThisFrame)
         {
-            ShowHelp();
+            ShowHelp = !ShowHelp;
+            Debug.Log($"Debug Help: {(ShowHelp ? "ON" : "OFF")}");
         }
     }
     
-    void ShowHelp()
+    void LogHelp()
     {
         Debug.Log("=== TrainArena Debug Controls ===\n" +
                   "R - Toggle Raycast Visualization\n" +
                   "I - Toggle Agent Debug Info\n" +
                   "O - Toggle Observations Display\n" +
+                  "V - Toggle Velocity Display\n" +
+                  "A - Toggle Arena Bounds\n" +
                   "L - Cycle Log Level\n" +
-                  "H - Show this help\n" +
+                  "H - Toggle Help Display\n" +
                   "================================");
     }
     
@@ -103,11 +123,56 @@ public class TrainArenaDebugManager : MonoBehaviour
         string debugStatus = $"Debug: R:{(ShowRaycastVisualization ? "ON" : "OFF")} " +
                            $"I:{(ShowAgentDebugInfo ? "ON" : "OFF")} " +
                            $"O:{(ShowObservations ? "ON" : "OFF")} " +
-                           $"Log:{LogLevel}";
+                           $"V:{(ShowVelocityDisplay ? "ON" : "OFF")} " +
+                           $"A:{(ShowArenaBounds ? "ON" : "OFF")}";
         
         GUI.color = Color.white;
-        GUI.backgroundColor = new Color(0, 0, 0, 0.5f);
-        GUI.Label(new Rect(Screen.width - 200, 10, 190, 20), debugStatus);
+        GUI.backgroundColor = new Color(0, 0, 0, 0.7f);
+        
+        float statusWidth = 280f;
+        Rect statusRect = new Rect(Screen.width - statusWidth - 10, 10, statusWidth, 20);
+        GUI.Label(statusRect, debugStatus);
+        
+        // Show help panel positioned under status bar
+        if (ShowHelp)
+        {
+            float panelWidth = 280f;
+            float panelHeight = 200f;
+            float panelX = Screen.width - panelWidth - 10;
+            float panelY = 35f; // Just under the status bar
+            
+            Rect helpRect = new Rect(panelX, panelY, panelWidth, panelHeight);
+            
+            GUI.backgroundColor = new Color(0, 0, 0, 0.8f);
+            GUI.Box(helpRect, "");
+            
+            GUI.color = Color.white;
+            GUILayout.BeginArea(helpRect);
+            GUILayout.BeginVertical();
+            
+            GUILayout.Space(8);
+            GUILayout.Label("=== Debug Controls ===", GUI.skin.box);
+            
+            GUILayout.Label("R - Toggle Raycast Visualization");
+            GUILayout.Label("I - Toggle Agent Debug Info");
+            GUILayout.Label("O - Toggle Observations Display");
+            GUILayout.Label("V - Toggle Velocity Display");
+            GUILayout.Label("A - Toggle Arena Bounds");
+            GUILayout.Label("L - Cycle Log Level");
+            GUILayout.Label("H - Toggle this help");
+            
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+        }
+        else
+        {
+            // Show toggle indicator when help is hidden
+            GUI.color = Color.white;
+            GUI.backgroundColor = new Color(0, 0, 0, 0.5f);
+            string helpHint = "Press H for help";
+            Rect hintRect = new Rect(Screen.width - 120, 35, 110, 18);
+            GUI.Label(hintRect, helpHint);
+        }
     }
     
     // Logging methods with level filtering

@@ -12,15 +12,45 @@ public class CubeAgent : Agent
     public LayerMask obstacleMask;
     public float moveAccel = 10f;
     public float rayLength = 10f;
+    
+    [Header("Observation Space Configuration")]
+    public int raycastDirections = 8;
+    
+    // Observation space constants
+    public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
+    public const int GOAL_OBSERVATIONS = 3;         // Local goal direction (x, y, z)
+    // raycast observations = raycastDirections (configurable)
 
     Rigidbody rb;
     float prevDist;
     Vector3 lastAppliedForce;
+    
+    // For testing when ML-Agents isn't connected
+    private float randomActionTimer;
+    private Vector2 currentRandomAction;
+    
+    /// <summary>
+    /// Calculate total observation count based on configuration
+    /// </summary>
+    public int GetTotalObservationCount()
+    {
+        return VELOCITY_OBSERVATIONS + GOAL_OBSERVATIONS + raycastDirections;
+    }
 
     public override void Initialize()
     {
         rb = GetComponent<Rigidbody>();
         rb.maxAngularVelocity = 20f;
+        
+        // Initialize random action for testing
+        randomActionTimer = 0f;
+        GenerateRandomAction();
+    }
+    
+    void FixedUpdate()
+    {
+        // Request decisions for ML-Agents system to work
+        RequestDecision();
     }
 
     public override void OnEpisodeBegin()
@@ -68,10 +98,10 @@ public class CubeAgent : Agent
             sensor.AddObservation(Vector3.zero); // keep obs size consistent
         }
 
-        // 8 planar raycasts (N,E,S,W + diagonals)
-        for (int i = 0; i < 8; i++)
+        // Configurable raycast observations
+        for (int i = 0; i < raycastDirections; i++)
         {
-            float angle = i * 45f;
+            float angle = i * (360f / raycastDirections);
             Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
             if (Physics.Raycast(transform.position + Vector3.up * 0.2f, dir, out RaycastHit hit, rayLength, obstacleMask))
                 sensor.AddObservation(hit.distance / rayLength);
@@ -93,10 +123,10 @@ public class CubeAgent : Agent
         lastAppliedForce = worldForce;
         
         // Debug logging to check if actions are being received
-        if (TrainArenaDebugManager.LogLevel >= TrainArenaDebugManager.DebugLogLevel.Verbose)
+        if (TrainArenaDebugManager.LogLevel >= TrainArenaDebugManager.DebugLogLevel.Important)
         {
             TrainArenaDebugManager.Log($"Agent {gameObject.name}: Actions({moveX:F2},{moveZ:F2}) Force({worldForce.magnitude:F2})", 
-                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
         // Time penalty + tiny energy penalty
@@ -135,13 +165,52 @@ public class CubeAgent : Agent
             if (keyboard.dKey.isPressed) ca[0] += 1f; // Right
             if (keyboard.sKey.isPressed) ca[1] -= 1f; // Back
             if (keyboard.wKey.isPressed) ca[1] += 1f; // Forward
+            
+            // Debug log when any input is detected
+            if (ca[0] != 0f || ca[1] != 0f)
+            {
+                TrainArenaDebugManager.Log($"Heuristic input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
         }
         else
         {
             // Fallback to old Input system if new one isn't available
             ca[0] = Input.GetAxis("Horizontal");
             ca[1] = Input.GetAxis("Vertical");
+            
+            if (ca[0] != 0f || ca[1] != 0f)
+            {
+                TrainArenaDebugManager.Log($"Legacy input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
         }
+        
+        // If no manual input and not connected to ML-Agents, use random actions for testing
+        if (ca[0] == 0f && ca[1] == 0f)
+        {
+            randomActionTimer += Time.deltaTime;
+            if (randomActionTimer > 2f) // Change direction every 2 seconds
+            {
+                GenerateRandomAction();
+                randomActionTimer = 0f;
+            }
+            
+            ca[0] = currentRandomAction.x;
+            ca[1] = currentRandomAction.y;
+            
+            if (ca[0] != 0f || ca[1] != 0f)
+            {
+                TrainArenaDebugManager.Log($"Random action: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+        }
+    }
+    
+    private void GenerateRandomAction()
+    {
+        // Generate random movement direction
+        currentRandomAction = new Vector2(
+            Random.Range(-1f, 1f),
+            Random.Range(-1f, 1f)
+        );
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -152,50 +221,64 @@ public class CubeAgent : Agent
 
     private void OnDrawGizmos()
     {
-        // Show raycast visualization if global toggle is ON, during play mode
-        if (Application.isPlaying && TrainArenaDebugManager.ShowRaycastVisualization)
+        if (!Application.isPlaying) return;
+        
+        // Show raycast visualization if global toggle is ON
+        if (TrainArenaDebugManager.ShowRaycastVisualization)
         {
             DrawRaycastVisualization();
+        }
+        
+        // Show velocity vectors if enabled
+        if (TrainArenaDebugManager.ShowVelocityDisplay && rb != null)
+        {
+            Gizmos.color = Color.blue;
+            Vector3 velocity = rb.linearVelocity;
+            if (velocity.magnitude > 0.1f)
+            {
+                Gizmos.DrawLine(transform.position, transform.position + velocity);
+                Gizmos.DrawSphere(transform.position + velocity, 0.1f);
+            }
+        }
+        
+        // Show force vectors if observations enabled
+        if (TrainArenaDebugManager.ShowObservations && lastAppliedForce.magnitude > 0.1f)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(transform.position, transform.position + lastAppliedForce * 0.5f);
+            Gizmos.DrawSphere(transform.position + lastAppliedForce * 0.5f, 0.1f);
+        }
+        
+        // Show arena bounds if enabled
+        if (TrainArenaDebugManager.ShowArenaBounds)
+        {
+            Gizmos.color = Color.white;
+            var arena = transform.parent;
+            if (arena != null)
+            {
+                Vector3 center = arena.position;
+                Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f));
+            }
         }
     }
 
     private void OnDrawGizmosSelected()
     {
+        if (!Application.isPlaying) return;
+        
         // Show raycast visualization when selected (even if global toggle is OFF)
-        if (Application.isPlaying && !TrainArenaDebugManager.ShowRaycastVisualization)
+        if (!TrainArenaDebugManager.ShowRaycastVisualization)
         {
             DrawRaycastVisualization();
         }
         
-        // Additional info when selected
-        Gizmos.color = Color.white;
-        
-        // Draw arena bounds
+        // Highlight selected agent's arena bounds in bright yellow
+        Gizmos.color = Color.yellow;
         var arena = transform.parent;
         if (arena != null)
         {
             Vector3 center = arena.position;
-            Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f)); // Arena boundaries
-        }
-        
-        // Draw movement force vector
-        if (Application.isPlaying && rb != null)
-        {
-            Gizmos.color = Color.blue;
-            Vector3 velocity = rb.linearVelocity;
-            Gizmos.DrawLine(transform.position, transform.position + velocity);
-            
-            // Draw force vector if TrainArenaDebugManager.ShowObservations is enabled
-            if (TrainArenaDebugManager.ShowObservations)
-            {
-                // Show last applied force (we'll store this)
-                Gizmos.color = Color.red;
-                if (lastAppliedForce.magnitude > 0.1f)
-                {
-                    Gizmos.DrawLine(transform.position, transform.position + lastAppliedForce * 0.5f);
-                    Gizmos.DrawSphere(transform.position + lastAppliedForce * 0.5f, 0.1f);
-                }
-            }
+            Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f));
         }
     }
     
@@ -203,9 +286,9 @@ public class CubeAgent : Agent
     {
         Vector3 rayStart = transform.position + Vector3.up * 0.2f;
         
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < raycastDirections; i++)
         {
-            float angle = i * 45f;
+            float angle = i * (360f / raycastDirections);
             Vector3 dir = Quaternion.Euler(0f, angle, 0f) * transform.forward;
             
             // Perform the same raycast as in CollectObservations
