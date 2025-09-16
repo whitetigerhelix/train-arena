@@ -60,11 +60,15 @@ public class AutoBehaviorSwitcher : MonoBehaviour
         
         // Log initial setup
         currentBehaviorType = behaviorParams.BehaviorType;
-        TrainArenaDebugManager.Log($"AutoBehaviorSwitcher initialized on {gameObject.name}. Initial behavior: {currentBehaviorType}", 
+        TrainArenaDebugManager.Log($"🔄 AutoBehaviorSwitcher initialized on {gameObject.name}. Initial behavior: {currentBehaviorType}", 
                                    TrainArenaDebugManager.DebugLogLevel.Important);
         
         // Perform initial check
         CheckAndUpdateBehaviorType();
+        
+        // Log initial state for debugging
+        TrainArenaDebugManager.Log($"🔍 Initial connection check: Academy.IsCommunicatorOn = {academy.IsCommunicatorOn}, TimeScale = {Time.timeScale:F1}x", 
+                                   TrainArenaDebugManager.DebugLogLevel.Important);
     }
     
     void Update()

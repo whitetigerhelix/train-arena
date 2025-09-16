@@ -39,6 +39,9 @@ public static class SceneBuilder
         // Add camera controller for WASD navigation
         cam.AddComponent<EditorCameraController>();
         
+        // Add camera controls UI (positioned to not conflict with TimeScaleManager)
+        cam.AddComponent<CameraControlsUI>();
+        
         // Add debug manager to scene
         var debugManager = new GameObject("TrainArenaDebugManager");
         debugManager.AddComponent<TrainArenaDebugManager>();

@@ -17,7 +17,10 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowHelp = true; // Show by default
     
     [Header("Logging Controls")]
-    public static DebugLogLevel LogLevel = DebugLogLevel.Warnings;
+    public static DebugLogLevel LogLevel = DebugLogLevel.Important;  // Changed from Warnings to Important
+    
+    [Header("Auto-Adjust Log Level")]
+    public static bool autoAdjustLogLevel = true;  // Automatically increase logging during training
     
     public enum DebugLogLevel
     {
@@ -47,6 +50,84 @@ public class TrainArenaDebugManager : MonoBehaviour
     void Update()
     {
         HandleInput();
+        
+        // Auto-adjust log level for training mode
+        if (autoAdjustLogLevel && Time.fixedTime % 5f < Time.fixedDeltaTime) // Check every 5 seconds
+        {
+            CheckAndAdjustLogLevel();
+        }
+        
+        // Log training status periodically
+        if (Time.fixedTime % 10f < Time.fixedDeltaTime) // Every 10 seconds
+        {
+            LogTrainingStatus();
+        }
+    }
+    
+    private void LogTrainingStatus()
+    {
+        var academy = Unity.MLAgents.Academy.Instance;
+        if (academy != null)
+        {
+            var agents = FindObjectsOfType<Unity.MLAgents.Agent>();
+            var behaviorSwitchers = FindObjectsOfType<AutoBehaviorSwitcher>();
+            
+            Log($"🎯 Training Status Report:", DebugLogLevel.Important);
+            Log($"   📊 Academy Connected: {academy.IsCommunicatorOn}", DebugLogLevel.Important);
+            Log($"   🎮 Agents in Scene: {agents.Length}", DebugLogLevel.Important);
+            Log($"   ⏱️ Time Scale: {Time.timeScale:F1}x", DebugLogLevel.Important);
+            Log($"   🔄 Auto Switchers: {behaviorSwitchers.Length}", DebugLogLevel.Important);
+            Log($"   📈 Academy Steps: {academy.TotalStepCount}", DebugLogLevel.Important);
+            
+            // Count agents by behavior type
+            int defaultBehavior = 0, heuristicBehavior = 0, inferenceBehavior = 0;
+            foreach (var agent in agents)
+            {
+                var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+                if (behaviorParams != null)
+                {
+                    switch (behaviorParams.BehaviorType)
+                    {
+                        case Unity.MLAgents.Policies.BehaviorType.Default:
+                            defaultBehavior++;
+                            break;
+                        case Unity.MLAgents.Policies.BehaviorType.HeuristicOnly:
+                            heuristicBehavior++;
+                            break;
+                        case Unity.MLAgents.Policies.BehaviorType.InferenceOnly:
+                            inferenceBehavior++;
+                            break;
+                    }
+                }
+            }
+            
+            Log($"   🤖 Behavior Types - Default: {defaultBehavior}, Heuristic: {heuristicBehavior}, Inference: {inferenceBehavior}", DebugLogLevel.Important);
+        }
+    }
+    
+    private void CheckAndAdjustLogLevel()
+    {
+        var academy = Unity.MLAgents.Academy.Instance;
+        bool isTraining = academy != null && academy.IsCommunicatorOn;
+        
+        if (isTraining)
+        {
+            // During training, use Verbose logging to see everything
+            if (LogLevel < DebugLogLevel.Verbose)
+            {
+                LogLevel = DebugLogLevel.Verbose;
+                Log("🔊 Auto-enabled Verbose logging for training session", DebugLogLevel.Important);
+            }
+        }
+        else
+        {
+            // When not training, use Important level to reduce noise
+            if (LogLevel > DebugLogLevel.Important)
+            {
+                LogLevel = DebugLogLevel.Important;
+                Log("🔇 Auto-reduced logging to Important level (not training)", DebugLogLevel.Important);
+            }
+        }
     }
     
     void HandleInput()

@@ -132,36 +132,81 @@ public class TimeScaleManager : MonoBehaviour
     {
         if (!Application.isPlaying) return;
         
-        // Simple on-screen display
-        GUILayout.BeginArea(new Rect(10, 100, 300, 120));
-        GUILayout.BeginVertical("Box");
+        // Prominent UI in top-left corner
+        float panelWidth = 280f;
+        float panelHeight = 120f;
         
-        GUILayout.Label($"⏱️ Time Scale: {currentTimeScale:F1}x", 
-                       new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold });
+        // Background box with more prominent styling
+        GUI.Box(new Rect(10, 10, panelWidth, panelHeight), "", 
+               new GUIStyle(GUI.skin.box) { 
+                   normal = { background = MakeTex(2, 2, new Color(0, 0, 0, 0.8f)) }
+               });
+        
+        GUILayout.BeginArea(new Rect(15, 15, panelWidth - 10, panelHeight - 10));
+        
+        // Title with larger, bold text
+        var titleStyle = new GUIStyle(GUI.skin.label) { 
+            fontSize = 16, 
+            fontStyle = FontStyle.Bold, 
+            normal = { textColor = Color.white }
+        };
+        GUILayout.Label($"⏱️ TIME SCALE: {currentTimeScale:F1}x", titleStyle);
+        
+        // Training status with prominent color coding
+        var statusStyle = new GUIStyle(GUI.skin.label) { 
+            fontSize = 14, 
+            fontStyle = FontStyle.Bold 
+        };
         
         if (isTrainingActive)
         {
-            GUILayout.Label("🚄 Training Mode (Fast)", 
-                           new GUIStyle(GUI.skin.label) { normal = { textColor = Color.green } });
+            statusStyle.normal.textColor = Color.green;
+            GUILayout.Label("🚄 TRAINING MODE (FAST)", statusStyle);
         }
         else
         {
-            GUILayout.Label("🏃 Normal Mode", 
-                           new GUIStyle(GUI.skin.label) { normal = { textColor = Color.yellow } });
+            statusStyle.normal.textColor = Color.yellow;
+            GUILayout.Label("� TESTING MODE (NORMAL)", statusStyle);
         }
         
-        if (manualTimeScaleControl)
-        {
-            GUILayout.Label("🔧 Manual Control", 
-                           new GUIStyle(GUI.skin.label) { normal = { textColor = Color.cyan } });
-        }
-        else
-        {
-            GUILayout.Label("🤖 Auto Control", 
-                           new GUIStyle(GUI.skin.label) { normal = { textColor = Color.white } });
-        }
+        // Control mode indicator
+        var controlStyle = new GUIStyle(GUI.skin.label) { 
+            fontSize = 12,
+            normal = { textColor = manualTimeScaleControl ? Color.cyan : Color.white }
+        };
         
-        GUILayout.EndVertical();
+        string controlText = manualTimeScaleControl ? "🔧 Manual Control" : "🤖 Auto Control";
+        GUILayout.Label(controlText, controlStyle);
+        
+        // Quick action buttons
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("1x", GUILayout.Width(40)))
+        {
+            SetNormalSpeed();
+        }
+        if (GUILayout.Button("20x", GUILayout.Width(40)))
+        {
+            SetTrainingSpeed();
+        }
+        if (GUILayout.Button("Auto", GUILayout.Width(50)))
+        {
+            EnableAutoTimeScale();
+        }
+        GUILayout.EndHorizontal();
+        
         GUILayout.EndArea();
+    }
+    
+    // Helper method to create colored textures for UI backgrounds
+    private Texture2D MakeTex(int width, int height, Color col)
+    {
+        Color[] pix = new Color[width * height];
+        for (int i = 0; i < pix.Length; i++)
+            pix[i] = col;
+        
+        Texture2D result = new Texture2D(width, height);
+        result.SetPixels(pix);
+        result.Apply();
+        return result;
     }
 }

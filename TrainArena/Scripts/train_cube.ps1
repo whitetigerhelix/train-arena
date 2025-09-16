@@ -6,7 +6,7 @@ param(
     [string]$ConfigPath = "Assets/ML-Agents/Configs/cube_ppo.yaml",
     [switch]$Resume,
     [switch]$SkipTensorBoard,
-    [int]$TimeoutWait = 120
+    [int]$TimeoutWait = 30
 )
 
 Write-Host "🚀 Starting ML-Agents Cube Training" -ForegroundColor Green

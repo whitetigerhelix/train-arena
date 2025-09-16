@@ -25,6 +25,11 @@ public class CubeAgent : Agent
     float prevDist;
     Vector3 lastAppliedForce;
     
+    // Physics debugging
+    private Vector3 totalForceThisFrame;
+    private int forceApplicationCount;
+    private float lastPhysicsDebugTime;
+    
     // For testing when ML-Agents isn't connected
     private float randomActionTimer;
     private Vector2 currentRandomAction;
@@ -51,6 +56,27 @@ public class CubeAgent : Agent
     {
         // Request decisions for ML-Agents system to work
         RequestDecision();
+    }
+    
+    void LateUpdate()
+    {
+        // Physics debugging every 3 seconds
+        if (Time.time - lastPhysicsDebugTime > 3f)
+        {
+            if (forceApplicationCount > 0)
+            {
+                Vector3 avgForce = totalForceThisFrame / forceApplicationCount;
+                string physicsStatus = rb.linearVelocity.magnitude > 0.1f ? "MOVING" : "STUCK";
+                
+                TrainArenaDebugManager.Log($"🔧 {gameObject.name} PHYSICS: {physicsStatus} | AvgForce={avgForce.magnitude:F1} | Velocity={rb.linearVelocity.magnitude:F1} | Mass={rb.mass:F1} | Forces/3s={forceApplicationCount}", 
+                                         TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+            
+            // Reset counters
+            totalForceThisFrame = Vector3.zero;
+            forceApplicationCount = 0;
+            lastPhysicsDebugTime = Time.time;
+        }
     }
 
     public override void OnEpisodeBegin()
@@ -122,11 +148,21 @@ public class CubeAgent : Agent
         // Store for debug visualization
         lastAppliedForce = worldForce;
         
-        // Debug logging to check if actions are being received
-        if (TrainArenaDebugManager.LogLevel >= TrainArenaDebugManager.DebugLogLevel.Important)
+        // Track physics debugging
+        totalForceThisFrame += worldForce;
+        forceApplicationCount++;
+        
+        // Debug logging to check if actions are being received (throttled to avoid spam)
+        if (Time.fixedTime % 2f < Time.fixedDeltaTime) // Every 2 seconds
         {
-            TrainArenaDebugManager.Log($"Agent {gameObject.name}: Actions({moveX:F2},{moveZ:F2}) Force({worldForce.magnitude:F2})", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+            string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
+            
+            Vector3 velocity = rb.linearVelocity;
+            string status = velocity.magnitude > 0.1f ? "MOVING" : "STATIONARY";
+            
+            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | Behavior={behaviorType} | Actions=({moveX:F2},{moveZ:F2}) | Force={worldForce.magnitude:F1} | Velocity={velocity.magnitude:F1}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
 
         // Time penalty + tiny energy penalty
