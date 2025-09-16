@@ -15,11 +15,19 @@ Write-Host "Config: $ConfigPath" -ForegroundColor Cyan
 # Check if we're in a virtual environment (required for training)
 if ($env:VIRTUAL_ENV) {
     Write-Host "✅ Using virtual environment: $env:VIRTUAL_ENV" -ForegroundColor Green
+    
+    # Check environment compatibility
+    if ($env:VIRTUAL_ENV -match "mlagents-py310") {
+        Write-Host "   ✅ Python 3.10 environment (Unity recommended)" -ForegroundColor Green
+    } elseif ($env:VIRTUAL_ENV -match "mlagents-py311") {
+        Write-Host "   ⚠️  Python 3.11 environment - may have issues" -ForegroundColor Yellow
+        Write-Host "   Consider using Python 3.10: .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+    }
 } else {
     Write-Host "❌ No virtual environment detected" -ForegroundColor Red
     Write-Host "   Setup and activate environment first:" -ForegroundColor White
-    Write-Host "   .\Scripts\setup_python311.ps1" -ForegroundColor Cyan
-    Write-Host "   .\activate_mlagents_py311.ps1" -ForegroundColor Cyan
+    Write-Host "   .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+    Write-Host "   .\activate_mlagents_py310.ps1" -ForegroundColor Cyan
     exit 1
 }
 

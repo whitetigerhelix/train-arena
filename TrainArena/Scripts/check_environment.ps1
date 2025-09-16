@@ -9,15 +9,25 @@ Write-Host "`n0. Checking virtual environment..." -ForegroundColor Yellow
 if ($env:VIRTUAL_ENV) {
     Write-Host "✅ Virtual environment active: $env:VIRTUAL_ENV" -ForegroundColor Green
     
+    # Check environment type and provide guidance
+    if ($env:VIRTUAL_ENV -match "mlagents-py310") {
+        Write-Host "   ✅ Using Python 3.10 environment (Unity official requirement)" -ForegroundColor Green
+    } elseif ($env:VIRTUAL_ENV -match "mlagents-py311") {
+        Write-Host "   ⚠️  Using Python 3.11 environment (may have compatibility issues)" -ForegroundColor Yellow
+        Write-Host "   💡 Consider switching to Python 3.10: .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+    } else {
+        Write-Host "   ⚠️  Using unknown ML-Agents environment" -ForegroundColor Yellow
+    }
+    
     # Set compatibility mode if not already set
     if (!$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION) {
         $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
         Write-Host "   Set protobuf compatibility mode" -ForegroundColor White
     }
 } else {
-    Write-Host "⚠️  No virtual environment detected" -ForegroundColor Yellow
-    Write-Host "   Run setup first: .\Scripts\setup_python311.ps1" -ForegroundColor Cyan
-    Write-Host "   Then activate: .\activate_mlagents_py311.ps1" -ForegroundColor Cyan
+    Write-Host "❌ No virtual environment detected" -ForegroundColor Red
+    Write-Host "   Run setup first: .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+    Write-Host "   Then activate: .\activate_mlagents_py310.ps1" -ForegroundColor Cyan
 }
 
 # Check Python installation and version compatibility
