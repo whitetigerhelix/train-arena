@@ -2,6 +2,22 @@
 
 Use this document to drive GitHub Copilot / tasks. Keep commits small and runnable.
 
+## 🎯 Current Status (Sept 15, 2025)
+**Phase:** Day 1 - Scene Building COMPLETE ✅, Ready for PPO Training 🚀
+
+**What's Working:**
+- ✅ Unity 6.2 with ML-Agents package
+- ✅ CubeAgent with 14 observations (velocity + goal + 8 raycasts) + 2 continuous actions
+- ✅ 16-arena training environment with programmatic scene generation
+- ✅ Comprehensive debug system with keyboard controls (R/I/O/V/A/H)
+- ✅ Proper BehaviorParameters configuration (eliminates console warnings)
+- ✅ Physics-based movement with reward system
+
+**Next Steps:**
+1. Switch BehaviorType from "Heuristic Only" to "Default" 
+2. Run training command: `mlagents-learn Assets/ML-Agents/Configs/cube_ppo.yaml --run-id=cube_run_01 --train`
+3. Monitor with TensorBoard
+
 ---
 
 ## Goals
@@ -14,10 +30,10 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 ## Day-by-Day Schedule
 
 ### Day 1 – Boot & Baseline (Cube)
-- [ ] Create Unity project, add ML-Agents + Barracuda
-- [ ] Add `CubeAgent`, `EnvInitializer`, and scene builder menu
-- [ ] Run a few env instances in play mode
-- [ ] Train PPO with `cube_ppo.yaml`
+- [x] Create Unity project, add ML-Agents + Barracuda
+- [x] Add `CubeAgent`, `EnvInitializer`, and scene builder menu
+- [x] Run a few env instances in play mode (16 arenas implemented)
+- [ ] Train PPO with `cube_ppo.yaml` ← **NEXT STEP**
 - Deliverable: short clip of early learning + TensorBoard plot
 
 ### Day 2 – Game-ify Cube
@@ -59,11 +75,11 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 ## Technical Tasks (Copilot-friendly)
 
 ### A. Cube Agent
-- [ ] Implement `CollectObservations`: local vel, vector-to-goal, 8 raycasts
-- [ ] Implement `OnActionReceived`: apply local force, time & energy penalties
-- [ ] Implement goal success / obstacle penalties
-- [ ] Add `Heuristic` for WASD
-- [ ] Add `EnvInitializer` to spawn N arenas laid out in a grid
+- [x] Implement `CollectObservations`: local vel, vector-to-goal, 8 raycasts (14 total observations)
+- [x] Implement `OnActionReceived`: apply local force, time & energy penalties
+- [x] Implement goal success / obstacle penalties
+- [x] Add `Heuristic` for WASD (+ random actions for testing)
+- [x] Add `EnvInitializer` to spawn N arenas laid out in a grid (4x4 = 16 arenas)
 
 ### B. Ragdoll
 - [ ] Build joint hierarchy; add `PDJointController` per joint
@@ -73,8 +89,8 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - [ ] EndEpisode on fall (pelvis height low or tilt > threshold)
 
 ### C. Training/Infra
-- [ ] Provide PPO YAMLs (cube & ragdoll)
-- [ ] Add shell/PowerShell scripts to launch training
+- [x] Provide PPO YAMLs (cube & ragdoll) - `cube_ppo.yaml` ready
+- [ ] Add shell/PowerShell scripts to launch training ← **TODO: Next**
 - [ ] Add TensorBoard instructions
 - [ ] Add `Results/` to .gitignore
 
