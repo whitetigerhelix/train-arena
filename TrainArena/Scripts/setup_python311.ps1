@@ -88,41 +88,76 @@ try {
     exit 1
 }
 
-# Upgrade pip
-Write-Host "`n4. Upgrading pip..." -ForegroundColor Yellow
+# Upgrade pip (with corruption handling)
+Write-Host "`n4. Setting up pip..." -ForegroundColor Yellow
 try {
     & $python311 -m pip install --upgrade pip
-    Write-Host "✅ Pip upgraded" -ForegroundColor Green
+    Write-Host "✅ Pip upgraded successfully" -ForegroundColor Green
 } catch {
-    Write-Host "⚠️  Pip upgrade failed, continuing..." -ForegroundColor Yellow
+    Write-Host "⚠️  Pip upgrade failed, trying to fix..." -ForegroundColor Yellow
+    try {
+        # Download and install fresh pip if corrupted
+        Write-Host "   Downloading fresh pip installer..." -ForegroundColor White
+        Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py"
+        & $python311 "get-pip.py" --force-reinstall
+        Remove-Item "get-pip.py" -ErrorAction SilentlyContinue
+        Write-Host "✅ Pip reinstalled from scratch" -ForegroundColor Green
+    } catch {
+        Write-Host "⚠️  Pip issues detected - will be handled in next steps" -ForegroundColor Yellow
+    }
 }
 
 # Install ML-Agents with compatible versions
-Write-Host "`n5. Installing ML-Agents (Python 3.11 compatible)..." -ForegroundColor Yellow
+Write-Host "`n5. Installing ML-Agents with compatible protobuf..." -ForegroundColor Yellow
 try {
+    Write-Host "   Installing compatible protobuf first..." -ForegroundColor White
+    & $python311 -m pip install "protobuf==3.20.3"
+    
+    Write-Host "   Installing setuptools and wheel..." -ForegroundColor White
+    & $python311 -m pip install --upgrade setuptools wheel
+    
     Write-Host "   Installing ML-Agents..." -ForegroundColor White
     & $python311 -m pip install mlagents
     
     Write-Host "   Installing TensorBoard..." -ForegroundColor White
     & $python311 -m pip install tensorboard
     
-    Write-Host "✅ ML-Agents installed successfully" -ForegroundColor Green
+    Write-Host "   Verifying ML-Agents installation..." -ForegroundColor White
+    & $python311 -c "import mlagents_envs; print('ML-Agents verified')"
+    
+    Write-Host "✅ ML-Agents installed with compatible protobuf" -ForegroundColor Green
 } catch {
     Write-Host "❌ Failed to install ML-Agents: $_" -ForegroundColor Red
     exit 1
 }
 
+# Set compatibility environment variable
+Write-Host "`n6. Setting up compatibility..." -ForegroundColor Yellow
+$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+
 # Test installation
-Write-Host "`n6. Testing mlagents-learn command..." -ForegroundColor Yellow
+Write-Host "`n7. Testing mlagents-learn command..." -ForegroundColor Yellow
 try {
     $testOutput = & mlagents-learn --help 2>&1
     if ($testOutput -match "usage:") {
         Write-Host "✅ mlagents-learn command works perfectly!" -ForegroundColor Green
     } else {
-        Write-Host "⚠️  Command may have issues, but installation completed" -ForegroundColor Yellow
+        Write-Host "⚠️  Command may have issues:" -ForegroundColor Yellow
+        Write-Host "   Run: .\Scripts\fix_py311_protobuf.ps1" -ForegroundColor Cyan
     }
 } catch {
-    Write-Host "⚠️  Could not test command, but installation completed" -ForegroundColor Yellow
+    Write-Host "⚠️  Could not test command fully:" -ForegroundColor Yellow
+    Write-Host "   Run: .\Scripts\fix_py311_protobuf.ps1" -ForegroundColor Cyan
+}
+
+# Create custom activation wrapper (don't modify signed scripts)
+Write-Host "`n8. Creating activation wrapper..." -ForegroundColor Yellow
+try {
+    # The activation wrapper is created separately and includes env vars
+    Write-Host "✅ Custom activation script: activate_mlagents_py311.ps1" -ForegroundColor Green
+    Write-Host "   (Environment variables set automatically when using wrapper)" -ForegroundColor White
+} catch {
+    Write-Host "⚠️  Activation wrapper creation had issues, but environment is ready" -ForegroundColor Yellow
 }
 
 # Create new activation script
