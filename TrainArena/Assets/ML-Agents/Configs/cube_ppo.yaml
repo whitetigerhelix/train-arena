@@ -18,6 +18,6 @@ behaviors:
         gamma: 0.99
         strength: 1.0
     max_steps: 500000
-    time_horizon: 500 # Increased to allow for longer episodes
+    time_horizon: 100 # Matching shorter episode length
     summary_freq: 1000 # More frequent summaries to track progress
     checkpoint_interval: 50000 # More frequent checkpoints

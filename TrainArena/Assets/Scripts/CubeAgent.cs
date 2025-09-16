@@ -17,12 +17,16 @@ public class CubeAgent : Agent
     public int raycastDirections = 8;
     
     [Header("Episode Management")]
-    public int maxEpisodeSteps = 1000;              // Maximum steps per episode
-    public float episodeTimeLimit = 60f;            // Maximum time per episode (seconds)
+    public int maxEpisodeSteps = 100;               // Ultra-short episodes to prevent Unity hanging
+    public float episodeTimeLimit = 10f;            // Ultra-short time limit (10 seconds)
     
     // Episode tracking
     private int episodeStepCount;
     private float episodeStartTime;
+    private int totalEpisodesCompleted;
+    
+    // Memory management
+    private static int globalEpisodeCount = 0;
     
     // Observation space constants
     public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
@@ -111,6 +115,16 @@ public class CubeAgent : Agent
         // Reset episode tracking
         episodeStepCount = 0;
         episodeStartTime = Time.time;
+        totalEpisodesCompleted++;
+        globalEpisodeCount++;
+        
+        // Periodic garbage collection to prevent memory buildup
+        if (globalEpisodeCount % 50 == 0)
+        {
+            System.GC.Collect();
+            TrainArenaDebugManager.Log($"🧹 Performed garbage collection after {globalEpisodeCount} episodes", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
         
         // Reset physics
         rb.linearVelocity = Vector3.zero;
@@ -191,8 +205,8 @@ public class CubeAgent : Agent
         totalForceThisFrame += worldForce;
         forceApplicationCount++;
         
-        // Minimal agent status logging (much less frequent)
-        if (Time.fixedTime % (AGENT_LOG_INTERVAL * 4f) < Time.fixedDeltaTime) // Every 20 seconds
+        // Minimal agent status logging (very infrequent to reduce Unity stress)
+        if (Time.fixedTime % (AGENT_LOG_INTERVAL * 12f) < Time.fixedDeltaTime) // Every 60 seconds
         {
             var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
             string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
@@ -215,9 +229,8 @@ public class CubeAgent : Agent
         // Increment episode step counter
         episodeStepCount++;
         
-        // Time penalty + tiny energy penalty
-        AddReward(-0.001f);
-        AddReward(-0.0005f * localMove.sqrMagnitude);
+        // Simplified penalties to reduce computation
+        AddReward(-0.005f); // Single time penalty per step
 
         // Goal reaching check
         if (goal != null)
@@ -226,10 +239,10 @@ public class CubeAgent : Agent
             AddReward(prevDist - d); // progress
             prevDist = d;
 
-            if (d < 1.2f) // Increased from 0.6f to make goals easier to reach
+            if (d < 1.5f) // Even easier goal to ensure regular completion
             {
-                AddReward(+2.0f); // Increased reward for reaching goal
-                TrainArenaDebugManager.Log($"🎯 {gameObject.name} REACHED GOAL! Distance={d:F2} | Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s", 
+                AddReward(+3.0f); // Higher reward for reaching goal
+                TrainArenaDebugManager.Log($"🎯 {gameObject.name} REACHED GOAL! Distance={d:F2} | Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s | Episodes={totalEpisodesCompleted}", 
                                          TrainArenaDebugManager.DebugLogLevel.Important);
                 EndEpisode();
                 return;
@@ -246,21 +259,30 @@ public class CubeAgent : Agent
             return;
         }
         
-        // Episode step limit
+        // Aggressive episode limits to prevent Unity hanging
         if (episodeStepCount >= maxEpisodeSteps)
         {
-            AddReward(-0.1f); // Small penalty for timeout
-            TrainArenaDebugManager.Log($"⏰ {gameObject.name} EPISODE TIMEOUT (steps)! Steps={episodeStepCount}", 
+            AddReward(-0.5f); // Penalty for timeout
+            TrainArenaDebugManager.Log($"⏰ {gameObject.name} STEP TIMEOUT! Steps={episodeStepCount} | Episodes={totalEpisodesCompleted}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
             EndEpisode();
             return;
         }
         
-        // Episode time limit  
         if (Time.time - episodeStartTime > episodeTimeLimit)
         {
-            AddReward(-0.1f); // Small penalty for timeout
-            TrainArenaDebugManager.Log($"⏰ {gameObject.name} EPISODE TIMEOUT (time)! Time={Time.time - episodeStartTime:F1}s", 
+            AddReward(-0.5f); // Penalty for timeout
+            TrainArenaDebugManager.Log($"⏰ {gameObject.name} TIME TIMEOUT! Time={Time.time - episodeStartTime:F1}s | Episodes={totalEpisodesCompleted}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            EndEpisode();
+            return;
+        }
+        
+        // Emergency reset if agent is stuck in one place for too long
+        if (episodeStepCount > 50 && rb.linearVelocity.magnitude < 0.05f)
+        {
+            AddReward(-0.3f); // Penalty for being stuck
+            TrainArenaDebugManager.Log($"🚫 {gameObject.name} STUCK RESET! Vel={rb.linearVelocity.magnitude:F3} | Steps={episodeStepCount}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
             EndEpisode();
             return;
