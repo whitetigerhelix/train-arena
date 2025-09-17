@@ -55,9 +55,9 @@ public class EditorCameraController : MonoBehaviour
         
         // Up/Down movement
         if (keyboard.qKey.isPressed)
-            moveDirection += Vector3.up;
-        if (keyboard.eKey.isPressed)
             moveDirection -= Vector3.up;
+        if (keyboard.eKey.isPressed)
+            moveDirection += Vector3.up;
 
         // Apply movement
         transform.position += moveDirection.normalized * currentSpeed * Time.unscaledDeltaTime;
