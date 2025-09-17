@@ -24,9 +24,7 @@ public static class SelfPlayTagSceneBuilder
         lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
 
         // Ground
-        var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        ground.transform.localScale = Vector3.one * 1.5f;
-        ground.name = "Ground";
+        var ground = PrimitiveBuilder.CreateGround(Vector3.zero, Vector3.one * 1.5f, new Color(0.788f, 0.788f, 0.788f));
 
         // Domain randomization + UI
         var dom = new GameObject("DomainRandomizer").AddComponent<DomainRandomizer>();
@@ -34,26 +32,18 @@ public static class SelfPlayTagSceneBuilder
         ui.randomizer = dom;
 
         // Runner
-        var runner = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        runner.name = "Runner";
-        var rrb = runner.AddComponent<Rigidbody>();
-        rrb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        var runner = PrimitiveBuilder.CreateAgent("Runner", new Vector3(-2, 0.5f, 0), Color.blue);
         var runnerAgent = runner.AddComponent<RunnerAgent>();
         var rBP = runner.AddComponent<BehaviorParameters>();
         rBP.BehaviorName = "RunnerAgent";
         rBP.BehaviorType = BehaviorType.Default;
-        runner.transform.position = new Vector3(-2, 0.5f, 0);
 
         // Tagger (trainable)
-        var tagger = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        tagger.name = "Tagger";
-        var trb = tagger.AddComponent<Rigidbody>();
-        trb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        var tagger = PrimitiveBuilder.CreateAgent("Tagger", new Vector3(2, 0.5f, 0), Color.red);
         var taggerAgent = tagger.AddComponent<TaggerAgentTrainable>();
         var tBP = tagger.AddComponent<BehaviorParameters>();
         tBP.BehaviorName = "TaggerAgent";
         tBP.BehaviorType = BehaviorType.Default;
-        tagger.transform.position = new Vector3(2, 0.5f, 0);
 
         runnerAgent.tagger = tagger.transform;
         taggerAgent.runner = runner.transform;

@@ -16,8 +16,11 @@ public class ArenaHelper
 
     [Header("Height Settings")]
     [SerializeField] private float agentSpawnHeight = 0.5f; // Half cube height above ground
+    public float AgentSpawnHeight => agentSpawnHeight;
     [SerializeField] private float goalHeight = 1.0f;       // Goal height above ground
+    public float GoalHeight => goalHeight;
     [SerializeField] private float obstacleHeight = 1.0f;   // Obstacle height above ground
+    public float ObstacleHeight => obstacleHeight;
     
     [Header("Placement Constraints")]
     [SerializeField] private float minGoalDistance = 1.5f;     // Minimum distance between agent and goal
@@ -126,7 +129,7 @@ public class ArenaHelper
             // Use same range calculation as EnvInitializer
             float xOffset = Random.Range(-GroundRadius, GroundRadius) * safeZonePercentage;
             float zOffset = Random.Range(-GroundRadius, GroundRadius) * safeZonePercentage;
-            obstaclePosition = arenaCenter + new Vector3(xOffset, obstacleHeight, zOffset);
+            obstaclePosition = arenaCenter + new Vector3(xOffset, obstacleHeight / 2f, zOffset);
             
             // Check distances (preserving exact logic from EnvInitializer)
             float distanceFromGoal = Vector3.Distance(obstaclePosition, goalPosition);

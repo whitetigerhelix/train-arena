@@ -122,11 +122,10 @@ public class EnvInitializer : MonoBehaviour
         TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x - arenaHelper.ArenaRadius} to {center.x + arenaHelper.ArenaRadius}], Z[{center.z - arenaHelper.ArenaRadius} to {center.z + arenaHelper.ArenaRadius}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
         TrainArenaDebugManager.Log(arenaHelper.GetDebugInfo(), TrainArenaDebugManager.DebugLogLevel.Verbose);
 
-        // Ground - use ArenaHelper for exact scale calculation
-        var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        // Ground - use PrimitiveBuilder for consistent materials and ArenaHelper for scale
+        var ground = PrimitiveBuilder.CreateGround("Ground");
         ground.transform.position = center;
         ground.transform.localScale = arenaHelper.GetGroundScale();
-        ground.name = "Ground";
         ground.transform.parent = arenaContainer.transform;
 
         // Agent - use ArenaHelper for initial positioning (will be overridden in OnEpisodeBegin)
@@ -184,11 +183,19 @@ public class EnvInitializer : MonoBehaviour
 
     void StyleGoal(Renderer r)
     {
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        var gold = new Color(1f,0.83f,0.29f);
-        mat.SetColor("_BaseColor", gold);
-        mat.SetColor("_EmissionColor", gold * 2f);
-        mat.EnableKeyword("_EMISSION");
-        r.material = mat;
+        // Use PrimitiveBuilder for consistent goal materials
+        var goalMaterial = PrimitiveBuilder.CreateURPMaterial(smoothness: 0.3f, metallic: 0.0f);
+        var gold = new Color(1f, 0.83f, 0.29f);
+        goalMaterial.color = gold;
+        goalMaterial.name = "GoalMaterial";
+        
+        // Add emission for better visibility
+        if (goalMaterial.HasProperty("_EmissionColor"))
+        {
+            goalMaterial.SetColor("_EmissionColor", gold * 2f);
+            goalMaterial.EnableKeyword("_EMISSION");
+        }
+        
+        r.material = goalMaterial;
     }
 }

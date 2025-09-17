@@ -351,9 +351,9 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawTrainingStatusBanner(bool isTraining)
     {
-        // Prominent banner at top-center of screen
-        float bannerWidth = 300f;
-        float bannerHeight = 35f;
+        // Smaller, less intrusive banner at top-center of screen
+        float bannerWidth = 220f; // Reduced from 300f
+        float bannerHeight = 25f; // Reduced from 35f
         float bannerX = (Screen.width - bannerWidth) / 2f;
         float bannerY = 10f;
         
@@ -374,10 +374,17 @@ public class TrainArenaDebugManager : MonoBehaviour
         
         GUILayout.BeginArea(bannerRect);
         GUILayout.BeginVertical();
-        GUILayout.Space(8);
+        GUILayout.Space(4); // Reduced spacing
         
-        string status = isTraining ? "🎯 TRAINING MODE ACTIVE" : "🧠 INFERENCE/DEMO MODE";
-        GUILayout.Label(status, GUI.skin.box);
+        // Smaller, more concise status text
+        string status = isTraining ? "🎯 TRAINING" : "🧠 DEMO MODE";
+        var bannerStyle = new GUIStyle(GUI.skin.label) { 
+            fontSize = 12, // Smaller font
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = isTraining ? Color.black : Color.white }
+        };
+        GUILayout.Label(status, bannerStyle);
         
         GUILayout.EndVertical();
         GUILayout.EndArea();
@@ -714,11 +721,11 @@ public class TrainArenaDebugManager : MonoBehaviour
     }
     
     // Logging methods with level filtering
-    public static void Log(string message, DebugLogLevel level = DebugLogLevel.Important)
+    public static void Log(string message, DebugLogLevel level = DebugLogLevel.Important, Object context = null)
     {
         if (LogLevel >= level)
         {
-            Debug.Log($"[TrainArena] {message}");
+            Debug.Log($"[TrainArena] {message}", context);
         }
     }
     

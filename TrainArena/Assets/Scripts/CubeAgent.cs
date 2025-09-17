@@ -92,11 +92,12 @@ public class CubeAgent : Agent
 
     public override void Initialize()
     {
-        rb = GetComponent<Rigidbody>();
-        rb.maxAngularVelocity = 20f;
+        TrainArenaDebugManager.Log($"{gameObject.name} iniitializing", context: transform);
         
+        rb = GetComponent<Rigidbody>();
+
         // Get ArenaHelper from parent EnvInitializer
-        var envManager = GetComponentInParent<EnvInitializer>();
+        EnvInitializer envManager = FindFirstObjectByType<EnvInitializer>(); // Should only be one
         if (envManager != null)
         {
             arenaHelper = envManager.ArenaHelper;
@@ -257,6 +258,7 @@ public class CubeAgent : Agent
             rb.angularDamping = 5f;           // Higher angular drag for stability
             rb.isKinematic = false;           // Must be false for forces to work
             rb.useGravity = true;             // Keep gravity for realistic physics
+            rb.maxAngularVelocity = 20f;
             rb.constraints = RigidbodyConstraints.None;
         }
     }
