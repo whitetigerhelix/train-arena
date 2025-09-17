@@ -17,13 +17,14 @@ public class CubeAgent : Agent
     public int raycastDirections = 8;
     
     [Header("Episode Management")]
-    public int maxEpisodeSteps = 100;               // Ultra-short episodes to prevent Unity hanging
-    public float episodeTimeLimit = 10f;            // Ultra-short time limit (10 seconds)
+    public int maxEpisodeSteps = 500;               // Balanced episode length: visible navigation + performance
+    public float episodeTimeLimit = 30f;            // 30 seconds: enough time to navigate, better performance
     
     // Episode tracking
     private int episodeStepCount;
     private float episodeStartTime;
     private int totalEpisodesCompleted;
+    private int totalActionsReceived;
     
     // Memory management
     private static int globalEpisodeCount = 0;
@@ -116,6 +117,7 @@ public class CubeAgent : Agent
         episodeStepCount = 0;
         episodeStartTime = Time.time;
         totalEpisodesCompleted++;
+        totalActionsReceived = 0; // Reset action counter for new episode
         globalEpisodeCount++;
         
         // Periodic garbage collection to prevent memory buildup
@@ -185,15 +187,21 @@ public class CubeAgent : Agent
     {
         float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
         float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
+        
+        // Count non-zero actions to detect if agent is receiving proper actions
+        if (Mathf.Abs(moveX) > 0.01f || Mathf.Abs(moveZ) > 0.01f)
+        {
+            totalActionsReceived++;
+        }
 
         Vector3 localMove = new Vector3(moveX, 0f, moveZ);
         Vector3 worldForce = transform.TransformDirection(localMove) * moveAccel;
         
-        // Verbose debug: Log action details (only when verbose level enabled)
-        if ((Mathf.Abs(moveX) > 0.01f || Mathf.Abs(moveZ) > 0.01f) && Time.fixedTime % (AGENT_LOG_INTERVAL * 4f) < Time.fixedDeltaTime)
+        // Debug: Log significant actions for troubleshooting (very infrequent)
+        if ((Mathf.Abs(moveX) > 0.1f || Mathf.Abs(moveZ) > 0.1f) && Time.fixedTime % 10f < Time.fixedDeltaTime)
         {
-            TrainArenaDebugManager.Log($"🎮 {gameObject.name} ACTION: ({moveX:F3},{moveZ:F3}) → Force={worldForce.magnitude:F1}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+            TrainArenaDebugManager.Log($"🎮 {gameObject.name} ACTION: ({moveX:F2},{moveZ:F2}) → Force={worldForce.magnitude:F1} | Vel={rb.linearVelocity.magnitude:F2}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
         rb.AddForce(worldForce, ForceMode.Acceleration);
@@ -205,8 +213,8 @@ public class CubeAgent : Agent
         totalForceThisFrame += worldForce;
         forceApplicationCount++;
         
-        // Minimal agent status logging (very infrequent to reduce Unity stress)
-        if (Time.fixedTime % (AGENT_LOG_INTERVAL * 12f) < Time.fixedDeltaTime) // Every 60 seconds
+        // More frequent status logging for debugging movement issues
+        if (Time.fixedTime % 15f < Time.fixedDeltaTime) // Every 15 seconds
         {
             var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
             string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
@@ -218,12 +226,9 @@ public class CubeAgent : Agent
             float goalDistance = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
             float episodeTime = Time.time - episodeStartTime;
             
-            // Only log if something noteworthy (stuck agents, training mode, or close to goal)
-            if (status == "STUCK" || behaviorType != "HeuristicOnly" || goalDistance < 3f)
-            {
-                TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F1} | Goal={goalDistance:F1} | Step={episodeStepCount}/{maxEpisodeSteps} | Time={episodeTime:F0}s", 
-                                         TrainArenaDebugManager.DebugLogLevel.Important);
-            }
+            // Always log for debugging - include action count to verify actions are being received
+            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F2} | Goal={goalDistance:F1} | Actions={totalActionsReceived} | Step={episodeStepCount}/{maxEpisodeSteps}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
         // Increment episode step counter
@@ -278,15 +283,7 @@ public class CubeAgent : Agent
             return;
         }
         
-        // Emergency reset if agent is stuck in one place for too long
-        if (episodeStepCount > 50 && rb.linearVelocity.magnitude < 0.05f)
-        {
-            AddReward(-0.3f); // Penalty for being stuck
-            TrainArenaDebugManager.Log($"🚫 {gameObject.name} STUCK RESET! Vel={rb.linearVelocity.magnitude:F3} | Steps={episodeStepCount}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-            EndEpisode();
-            return;
-        }
+        // Removed emergency stuck reset - let agents have time to navigate properly
     }
 
     public override void Heuristic(in ActionBuffers actionsOut)

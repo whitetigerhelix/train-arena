@@ -7,15 +7,65 @@ public class EnvInitializer : MonoBehaviour
     public GameObject goalPrefab;
     public GameObject obstaclePrefab;
 
-    [Header("Layout")]
+    [Header("Layout Configuration")]
+    [SerializeField] private EnvPreset preset = EnvPreset.Training;
+    [Space]
+    [Header("Manual Configuration (when preset = Custom)")]
     public int envCountX = 4;
     public int envCountZ = 4;
     public float arenaSize = 20f; // spacing between arena centers (was 14f - too close!)
     public int obstaclesPerArena = 6;
+    
+    public enum EnvPreset
+    {
+        SingleArena,  // 1x1 for testing
+        Training,     // 4x4 for training 
+        LargeTraining, // 6x6 for intensive training
+        Custom        // Use manual settings above
+    }
+
+    void ApplyPreset()
+    {
+        switch (preset)
+        {
+            case EnvPreset.SingleArena:
+                envCountX = 1;
+                envCountZ = 1;
+                arenaSize = 20f;
+                obstaclesPerArena = 3; // Fewer obstacles for testing
+                TrainArenaDebugManager.Log("📋 Applied SingleArena preset: 1x1 grid for testing", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.Training:
+                envCountX = 3;
+                envCountZ = 3;
+                arenaSize = 20f;
+                obstaclesPerArena = 4; // Reduced obstacles for better performance
+                TrainArenaDebugManager.Log("📋 Applied Training preset: 3x3 grid for optimized training performance", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.LargeTraining:
+                envCountX = 6;
+                envCountZ = 6;
+                arenaSize = 20f;
+                obstaclesPerArena = 8;
+                TrainArenaDebugManager.Log("📋 Applied LargeTraining preset: 6x6 grid for intensive training", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.Custom:
+                TrainArenaDebugManager.Log($"📋 Using Custom settings: {envCountX}x{envCountZ} grid", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+        }
+    }
 
     void Start()
     {
         if (cubeAgentPrefab == null || goalPrefab == null) { Debug.LogError("Assign prefabs in EnvInitializer"); return; }
+
+        // Apply preset configuration
+        ApplyPreset();
+        
+        TrainArenaDebugManager.Log($"🏗️ Creating {envCountX}x{envCountZ} arena grid (Total: {envCountX * envCountZ} arenas)", TrainArenaDebugManager.DebugLogLevel.Important);
 
         for (int x = 0; x < envCountX; x++)
         {
