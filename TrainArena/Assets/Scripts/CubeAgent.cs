@@ -10,7 +10,7 @@ public class CubeAgent : Agent
     [Header("Scene Refs")]
     public Transform goal;
     public LayerMask obstacleMask;
-    public float moveAccel = 10f;
+    public float moveAccel = 50f;                   // Increased force for better movement
     public float rayLength = 10f;
     
     [Header("Observation Space Configuration")]
@@ -38,7 +38,7 @@ public class CubeAgent : Agent
     private const float PHYSICS_DEBUG_INTERVAL = 10f;       // Physics debugging every 10 seconds
     private const float AGENT_LOG_INTERVAL = 5f;            // Agent status logging every 5 seconds
     private const float RANDOM_ACTION_CHANGE_TIME = 2f;     // Change random actions every 2 seconds
-    private const float MOVEMENT_THRESHOLD = 0.1f;          // Minimum velocity to consider "moving"
+    private const float MOVEMENT_THRESHOLD = 0.02f;         // Lower threshold since physics seem sluggish
     private const float HIGH_VELOCITY_THRESHOLD = 2f;       // High velocity worth logging
     private const float FORCE_DISPLAY_THRESHOLD = 0.1f;     // Minimum force to display in gizmos
 
@@ -67,6 +67,13 @@ public class CubeAgent : Agent
     {
         rb = GetComponent<Rigidbody>();
         rb.maxAngularVelocity = 20f;
+        
+        // Ensure optimal physics settings for movement
+        rb.mass = 1f;                    // Standard mass
+        rb.linearDamping = 0.5f;          // Low drag for responsive movement  
+        rb.angularDamping = 5f;           // Higher angular drag for stability
+        rb.isKinematic = false;           // Must be false for forces to work
+        rb.useGravity = true;             // Keep gravity for realistic physics
         
         // Debug Rigidbody setup (only at verbose level - not needed during normal operation)
         TrainArenaDebugManager.Log($"🔧 {gameObject.name} INITIALIZED: Mass={rb.mass:F1} | Drag={rb.linearDamping:F1} | AngDrag={rb.angularDamping:F1} | isKinematic={rb.isKinematic} | Constraints={rb.constraints}", 

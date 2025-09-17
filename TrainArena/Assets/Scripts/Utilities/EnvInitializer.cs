@@ -37,11 +37,11 @@ public class EnvInitializer : MonoBehaviour
                 break;
                 
             case EnvPreset.Training:
-                envCountX = 3;
-                envCountZ = 3;
+                envCountX = 2;
+                envCountZ = 2;
                 arenaSize = 20f;
-                obstaclesPerArena = 4; // Reduced obstacles for better performance
-                TrainArenaDebugManager.Log("📋 Applied Training preset: 3x3 grid for optimized training performance", TrainArenaDebugManager.DebugLogLevel.Important);
+                obstaclesPerArena = 2; // Minimal obstacles for maximum performance
+                TrainArenaDebugManager.Log("📋 Applied Training preset: 2x2 grid for maximum performance", TrainArenaDebugManager.DebugLogLevel.Important);
                 break;
                 
             case EnvPreset.LargeTraining:

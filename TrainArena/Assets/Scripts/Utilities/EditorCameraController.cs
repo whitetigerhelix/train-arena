@@ -116,7 +116,7 @@ public class EditorCameraController : MonoBehaviour
         }
     }
 
-    void OnGUI()
+    /*void OnGUI()
     {
         if (!Application.isEditor && Application.isPlaying)
             return;
@@ -140,5 +140,5 @@ public class EditorCameraController : MonoBehaviour
         const float HELP_HEIGHT = 120f;
         const float HELP_MARGIN = 10f;
         GUI.Label(new Rect(HELP_MARGIN, HELP_MARGIN, HELP_WIDTH, HELP_HEIGHT), controls);
-    }
+    }*/
 }
