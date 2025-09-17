@@ -153,6 +153,9 @@ public class TimeScaleManager : MonoBehaviour
     {
         if (!Application.isPlaying) return;
         
+        // Check if TimeScale UI should be shown (controlled by TrainArenaDebugManager)
+        if (!TrainArenaDebugManager.ShowTimeScale) return;
+        
         // Prominent UI in top-left corner
         const float PANEL_WIDTH = 280f;
         const float PANEL_HEIGHT = 120f;

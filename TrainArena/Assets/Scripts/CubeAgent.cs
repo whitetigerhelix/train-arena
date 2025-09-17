@@ -5,6 +5,16 @@ using Unity.MLAgents.Sensors;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Agent activity state for demo control
+/// This is separate from ML-Agents BehaviorType and controls whether agents respond to actions
+/// </summary>
+public enum AgentActivity
+{
+    Active,     // Agent responds normally to all actions
+    Inactive    // Agent ignores all actions and remains stationary (for demos)
+}
+
 [RequireComponent(typeof(Rigidbody))]
 public class CubeAgent : Agent
 {
@@ -20,6 +30,9 @@ public class CubeAgent : Agent
     [Header("Episode Management")]
     public int maxEpisodeSteps = 500;               // Balanced episode length: visible navigation + performance
     public float episodeTimeLimit = 30f;            // 30 seconds: enough time to navigate, better performance
+    
+    [Header("Demo Control")]
+    public AgentActivity agentActivity = AgentActivity.Active;  // Controls whether agent responds to actions
     
     // Episode tracking
     private int episodeStepCount;
@@ -274,6 +287,12 @@ public class CubeAgent : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        // If agent is inactive, ignore all actions (for demo purposes)
+        if (agentActivity == AgentActivity.Inactive)
+        {
+            return;
+        }
+        
         float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
         float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
         
@@ -414,6 +433,14 @@ public class CubeAgent : Agent
     public override void Heuristic(in ActionBuffers actionsOut)
     {
         var ca = actionsOut.ContinuousActions;
+        
+        // If agent is inactive, return zero actions (agent will not move)
+        if (agentActivity == AgentActivity.Inactive)
+        {
+            ca[0] = 0f;
+            ca[1] = 0f;
+            return;
+        }
         
         // Use new Input System for Unity 6.2 compatibility
         var keyboard = UnityEngine.InputSystem.Keyboard.current;

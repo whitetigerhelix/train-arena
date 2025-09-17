@@ -15,6 +15,7 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowVelocityDisplay = false;
     public static bool ShowArenaBounds = false;
     public static bool ShowMLAgentsStatus = true; // Show ML-Agents behavior info by default
+    public static bool ShowTimeScale = true; // Show TimeScale UI by default
     public static bool ShowHelp = true; // Show by default
     
     [Header("Logging Controls")]
@@ -183,8 +184,8 @@ public class TrainArenaDebugManager : MonoBehaviour
             Log($"Velocity Display: {(ShowVelocityDisplay ? "ON" : "OFF")}");
         }
         
-        // Toggle arena bounds with 'A' key
-        if (keyboard.aKey.wasPressedThisFrame)
+        // Toggle arena bounds with 'B' key (A is camera control)
+        if (keyboard.bKey.wasPressedThisFrame)
         {
             ShowArenaBounds = !ShowArenaBounds;
             Log($"Arena Bounds: {(ShowArenaBounds ? "ON" : "OFF")}");
@@ -209,6 +210,19 @@ public class TrainArenaDebugManager : MonoBehaviour
         {
             ShowHelp = !ShowHelp;
             Log($"Debug Help: {(ShowHelp ? "ON" : "OFF")}");
+        }
+        
+        // Toggle TimeScale UI with 'T' key
+        if (keyboard.tKey.wasPressedThisFrame)
+        {
+            ShowTimeScale = !ShowTimeScale;
+            Log($"TimeScale UI: {(ShowTimeScale ? "ON" : "OFF")}");
+        }
+        
+        // Toggle all agents activity with 'Z' key (for demos) - Q is camera control
+        if (keyboard.zKey.wasPressedThisFrame)
+        {
+            ToggleAllAgentsActivity();
         }
     }
     
@@ -249,9 +263,11 @@ public class TrainArenaDebugManager : MonoBehaviour
                            $"{(ShowAgentDebugInfo ? "🟢" : "⚫")}I " +
                            $"{(ShowObservations ? "🟢" : "⚫")}O " +
                            $"{(ShowVelocityDisplay ? "🟢" : "⚫")}V " +
-                           $"{(ShowArenaBounds ? "🟢" : "⚫")}A " +
+                           $"{(ShowArenaBounds ? "🟢" : "⚫")}B " +
                            $"{(ShowMLAgentsStatus ? "🟢" : "⚫")}M " +
-                           $"LogLvl: 📊{LogLevel}";
+                           $"{(ShowTimeScale ? "🟢" : "⚫")}T " +
+                           $"🎮Z " +
+                           $"📊{LogLevel}";
         
         GUILayout.BeginArea(statusRect);
         GUILayout.Space(4);
@@ -285,12 +301,15 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUILayout.Label($"{(ShowAgentDebugInfo ? "🟢" : "⚫")} [I] - Agent Debug Info");
             GUILayout.Label($"{(ShowObservations ? "🟢" : "⚫")} [O] - Observations Display");
             GUILayout.Label($"{(ShowVelocityDisplay ? "🟢" : "⚫")} [V] - Velocity Display");
-            GUILayout.Label($"{(ShowArenaBounds ? "🟢" : "⚫")} [A] - Arena Bounds");
+            GUILayout.Label($"{(ShowArenaBounds ? "🟢" : "⚫")} [B] - Arena Bounds");
             GUILayout.Label($"{(ShowMLAgentsStatus ? "🟢" : "⚫")} [M] - ML-Agents Status Panel");
+            GUILayout.Label($"{(ShowTimeScale ? "🟢" : "⚫")} [T] - TimeScale UI");
             
             GUILayout.Space(4);
             GUI.color = Color.gray;
             GUILayout.Label("─────────────────────────────");
+            GUI.color = Color.yellow;
+            GUILayout.Label("🎮 [Z] - Toggle All Agents Active/Inactive");
             GUI.color = Color.white;
             GUILayout.Label($"📊 [L] - Log Level: {LogLevel}");
             GUILayout.Label("❓ [H] - Toggle This Help");
@@ -378,18 +397,22 @@ public class TrainArenaDebugManager : MonoBehaviour
         }
         
         // Panel positioning - top-left corner
-        float panelWidth = 550f;
-        float maxPanelHeight = Screen.height * 0.7f; // Max 70% of screen height
+        float panelWidth = 650f; // Wider for better button layout
+        float maxPanelHeight = Screen.height * 0.8f; // Max 80% of screen height for more room
         float posX = 10f;
         float posY = 140f;
         
-        // More accurate height calculation with compact legend
-        float headerHeight = 50f; // Title + training warning + global controls + compact legend + spacing
-        float agentHeight = 25f; // Ultra-compact single-line agent display
-        int maxAgents = Mathf.Min(agents.Length, 15); // Show more agents with ultra-compact display
-        float agentSectionHeight = 25f + (maxAgents * agentHeight); // Label + agents
+        // Better height calculation that shows more agents
+        float headerHeight = 120f; // Title + training warning + global controls + activity controls + spacing
+        float agentHeight = 28f; // Slightly more height per agent for better readability
+        float agentLabelHeight = 25f;
         
-        float contentHeight = headerHeight + agentSectionHeight + 20f; // Extra padding
+        // Calculate how many agents we can fit vs want to show
+        float availableScrollHeight = maxPanelHeight - headerHeight - 40f; // Space for scroll area
+        int maxVisibleAgents = Mathf.FloorToInt(availableScrollHeight / agentHeight);
+        
+        // Always use maximum available space but ensure scroll works when needed
+        float contentHeight = headerHeight + agentLabelHeight + (Mathf.Min(agents.Length, maxVisibleAgents) * agentHeight) + 40f;
         float panelHeight = Mathf.Min(contentHeight, maxPanelHeight);
         
         Rect panelRect = new Rect(posX, posY, panelWidth, panelHeight);
@@ -445,6 +468,31 @@ public class TrainArenaDebugManager : MonoBehaviour
         
         GUI.backgroundColor = new Color(0, 0, 0, 0.85f); // Reset to panel background
         GUILayout.EndHorizontal();
+        
+        // Global activity controls - separate row
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Activity:", GUILayout.Width(110));
+        
+        GUI.backgroundColor = new Color(0f, 0.8f, 0.2f, 0.8f); // Green for active
+        if (GUILayout.Button("🟢 All Active", GUILayout.Width(100)))
+        {
+            SetAllAgentsActivity(AgentActivity.Active);
+        }
+        
+        GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.8f); // Gray for inactive
+        if (GUILayout.Button("⚫ All Inactive", GUILayout.Width(100)))
+        {
+            SetAllAgentsActivity(AgentActivity.Inactive);
+        }
+        
+        GUI.backgroundColor = new Color(1f, 1f, 0f, 0.8f); // Yellow for toggle
+        if (GUILayout.Button("🎮 Toggle (Z)", GUILayout.Width(100)))
+        {
+            ToggleAllAgentsActivity();
+        }
+        
+        GUI.backgroundColor = new Color(0, 0, 0, 0.85f); // Reset to panel background
+        GUILayout.EndHorizontal();
         GUI.enabled = true; // Re-enable GUI
         
         GUILayout.Space(6);
@@ -452,9 +500,12 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUILayout.Label($"Agent Status ({agents.Length} total):", GUI.skin.label);
         GUI.color = Color.white;
         
-        // Scroll view for agent controls - this should be the main focus area
-        float scrollHeight = panelHeight - headerHeight - 30f; // Maximize scroll area
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, GUILayout.MinHeight(scrollHeight), GUILayout.MaxHeight(scrollHeight));
+        // Scroll view for agent controls with proper sizing
+        float scrollHeight = panelHeight - headerHeight - 50f; // Account for spacing and label
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, 
+                                                 GUILayout.Width(panelWidth - 20), 
+                                                 GUILayout.Height(scrollHeight),
+                                                 GUILayout.ExpandHeight(false));
         
         // Display ALL agents with compact layout - no artificial limit
         for (int i = 0; i < agents.Length; i++)
@@ -506,17 +557,21 @@ public class TrainArenaDebugManager : MonoBehaviour
             }
         }
         
+        // Get activity status
+        string activityEmoji = agent.agentActivity == AgentActivity.Active ? "🟢" : "⚫";
+        string activityStatus = agent.agentActivity == AgentActivity.Active ? "Active" : "Inactive";
+        
         // Ultra-compact single-line agent display with inline model info
         GUILayout.BeginHorizontal();
         
         // Agent name with status info inline for compactness
         GUI.color = statusColor;
-        string agentDisplay = $"{behaviorEmoji} {agent.name}";
+        string agentDisplay = $"{activityEmoji} {behaviorEmoji} {agent.name}";
         
         // Add model info directly inline for AI agents
         if (behaviorParams != null && behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly && !string.IsNullOrEmpty(modelName) && modelName != "NO MODEL")
         {
-            string shortModel = modelName.Length > 35 ? modelName.Substring(0, 32) + "..." : modelName;
+            string shortModel = modelName.Length > 30 ? modelName.Substring(0, 27) + "..." : modelName;
             agentDisplay += $" ({behaviorType} {shortModel})";
         }
         else
@@ -524,11 +579,30 @@ public class TrainArenaDebugManager : MonoBehaviour
             agentDisplay += $" ({behaviorType})";
         }
         
-        GUILayout.Label(agentDisplay, GUILayout.Width(420));
+        float agentDescriptionWidth = 425f; // Not including buttons to the right
+        GUILayout.Label(agentDisplay, GUILayout.Width(agentDescriptionWidth));
         GUI.color = Color.white;
         
         // Spacer to push buttons to the right
         GUILayout.FlexibleSpace();
+        
+        // Activity toggle button
+        if (agent.agentActivity == AgentActivity.Active)
+        {
+            GUI.backgroundColor = new Color(0f, 0.8f, 0.2f, 0.8f); // Green for active
+            if (GUILayout.Button("🟢", GUILayout.Width(25)))
+            {
+                SetAgentActivity(agent, AgentActivity.Inactive);
+            }
+        }
+        else
+        {
+            GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.8f); // Gray for inactive
+            if (GUILayout.Button("⚫", GUILayout.Width(25)))
+            {
+                SetAgentActivity(agent, AgentActivity.Active);
+            }
+        }
         
         // Individual behavior type buttons (more compact)
         GUI.backgroundColor = new Color(0f, 0.8f, 1f, 0.6f);
@@ -550,7 +624,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUI.backgroundColor = new Color(0, 0, 0, 0.85f);
         GUILayout.EndHorizontal();
         
-        GUILayout.Space(1); // Minimal spacing between agents for compact display
+        GUILayout.Space(3); // Better spacing between agents for readability and scroll accuracy
     }
     
     void SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType behaviorType)
@@ -593,6 +667,50 @@ public class TrainArenaDebugManager : MonoBehaviour
             
             Log($"Set {agent.name} to {behaviorName} behavior type");
         }
+    }
+    
+    void ToggleAllAgentsActivity()
+    {
+        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        if (cubeAgents.Length == 0)
+        {
+            Log("No agents found to toggle activity");
+            return;
+        }
+        
+        // Determine current state by checking first agent
+        AgentActivity newActivity = cubeAgents[0].agentActivity == AgentActivity.Active ? 
+                                   AgentActivity.Inactive : AgentActivity.Active;
+        
+        int toggledCount = 0;
+        foreach (var agent in cubeAgents)
+        {
+            agent.agentActivity = newActivity;
+            toggledCount++;
+        }
+        
+        string activityName = newActivity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
+        Log($"Toggled {toggledCount} agents to {activityName} (press Z to toggle)", DebugLogLevel.Important);
+    }
+    
+    void SetAllAgentsActivity(AgentActivity activity)
+    {
+        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        foreach (var agent in cubeAgents)
+        {
+            agent.agentActivity = activity;
+        }
+        
+        string activityName = activity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
+        Log($"Set all {cubeAgents.Length} agents to {activityName}");
+    }
+    
+    void SetAgentActivity(CubeAgent agent, AgentActivity activity)
+    {
+        agent.agentActivity = activity;
+        
+        string activityName = activity == AgentActivity.Active ? "🟢 Active" : "⚫ Inactive";
+        Log($"Set {agent.name} to {activityName}");
     }
     
     // Logging methods with level filtering

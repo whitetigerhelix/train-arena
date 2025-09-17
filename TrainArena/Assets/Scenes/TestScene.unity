@@ -1512,6 +1512,7 @@ MonoBehaviour:
   raycastDirections: 8
   maxEpisodeSteps: 500
   episodeTimeLimit: 30
+  agentActivity: 1
 --- !u!114 &2058639878
 MonoBehaviour:
   m_ObjectHideFlags: 0
