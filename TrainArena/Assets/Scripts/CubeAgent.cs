@@ -47,6 +47,10 @@ public class CubeAgent : Agent
     float prevDist;
     Vector3 lastAppliedForce;
     
+    // Arena integration
+    private ArenaHelper arenaHelper;
+    private Vector3 arenaCenter;
+    
     // Physics debugging
     private Vector3 totalForceThisFrame;
     private int forceApplicationCount;
@@ -77,6 +81,20 @@ public class CubeAgent : Agent
     {
         rb = GetComponent<Rigidbody>();
         rb.maxAngularVelocity = 20f;
+        
+        // Get ArenaHelper from parent EnvInitializer
+        var envManager = GetComponentInParent<EnvInitializer>();
+        if (envManager != null)
+        {
+            arenaHelper = envManager.ArenaHelper;
+            arenaCenter = transform.parent ? transform.parent.position : Vector3.zero;
+            TrainArenaDebugManager.Log($"🔗 {gameObject.name} connected to ArenaHelper: {arenaHelper.GetDebugInfo()}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        else
+        {
+            TrainArenaDebugManager.LogError($"❌ {gameObject.name} could not find EnvInitializer parent! Arena positioning will not work correctly.");
+        }
         
         // Ensure optimal physics settings for movement
         rb.mass = 1f;                    // Standard mass
@@ -186,41 +204,41 @@ public class CubeAgent : Agent
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
-        // Randomize start & goal within arena bounds (assumes parent positions origin of arena)
-        var arena = transform.parent;
-        Vector3 center = arena ? arena.position : Vector3.zero;
-
-        // Get EnvManager to determine ground size
-        float xOffset = 0f;
-        float zOffset = 0f;
-        var envManager = arena ? arena.GetComponentInParent<EnvInitializer>() : null;
-        if (envManager != null)
+        // Use ArenaHelper for consistent position generation (removes all hardcoding)
+        if (arenaHelper != null)
         {
-            //TODO: Hardcoding - should use same approach as EnvInitializer.cs agent placement - need to integrate better
-            xOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
-            zOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
-        }
+            // Generate new agent position using ArenaHelper
+            Vector3 newAgentPos = arenaHelper.GetRandomAgentPosition(arenaCenter);
+            transform.position = newAgentPos;
+            transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
 
-        // Position agent ON TOP of ground
-        float spawnHeight = 0.5f; // Half the agent height to sit on ground
-        Vector3 newAgentPos = center + new Vector3(xOffset, spawnHeight, zOffset);
-        transform.position = newAgentPos;
-        transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
-
-        if (goal != null)
-        {
-            if (envManager != null)
+            // Generate new goal position using ArenaHelper (ensures minimum distance from agent)
+            if (goal != null)
             {
-                //TODO: Hardcoding - should use same approach as EnvInitializer.cs goal placement - need to integrate better
-                xOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
-                zOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
+                Vector3 newGoalPos = arenaHelper.GetRandomGoalPosition(arenaCenter, newAgentPos);
+                goal.position = newGoalPos;
+                
+                // Enhanced debug logging with distance validation
+                float distance = Vector3.Distance(newAgentPos, newGoalPos);
+                bool withinBounds = arenaHelper.IsWithinArenaBounds(newAgentPos, arenaCenter) && 
+                                   arenaHelper.IsWithinArenaBounds(newGoalPos, arenaCenter);
+                TrainArenaDebugManager.Log($"Episode Reset: Agent {gameObject.name} → {newAgentPos}, Goal → {newGoalPos} | Distance: {distance:F2} | InBounds: {withinBounds}", 
+                                         TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
-            Vector3 newGoalPos = center + new Vector3(xOffset, 1.0f, zOffset);
-            goal.position = newGoalPos;
+        }
+        else
+        {
+            // Fallback to old method if ArenaHelper not available
+            TrainArenaDebugManager.LogWarning($"⚠️ {gameObject.name}: ArenaHelper not available, using fallback positioning");
+            var arena = transform.parent;
+            Vector3 center = arena ? arena.position : Vector3.zero;
+            transform.position = center + new Vector3(Random.Range(-8f, 8f), 0.5f, Random.Range(-8f, 8f));
+            transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
             
-            // Debug logging for episode resets (verbose level only)
-            TrainArenaDebugManager.Log($"Episode Reset: Agent {gameObject.name} moved to {newAgentPos}, Goal to {newGoalPos}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+            if (goal != null)
+            {
+                goal.position = center + new Vector3(Random.Range(-8f, 8f), 1.0f, Random.Range(-8f, 8f));
+            }
         }
 
         prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
@@ -520,16 +538,17 @@ public class CubeAgent : Agent
             Gizmos.DrawSphere(transform.position + lastAppliedForce * 0.5f, 0.1f);
         }
         
-        // Show arena bounds if enabled
-        if (TrainArenaDebugManager.ShowArenaBounds)
+        // Show arena bounds if enabled (using ArenaHelper dimensions)
+        if (TrainArenaDebugManager.ShowArenaBounds && arenaHelper != null)
         {
             Gizmos.color = Color.white;
-            var arena = transform.parent;
-            if (arena != null)
-            {
-                Vector3 center = arena.position;
-                Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f));
-            }
+            Vector3 arenaSize = new Vector3(arenaHelper.GroundRadius * 2f, 0.1f, arenaHelper.GroundRadius * 2f);
+            Gizmos.DrawWireCube(arenaCenter, arenaSize);
+            
+            // Also show safe zone bounds
+            Gizmos.color = Color.yellow;
+            Vector3 safeZoneSize = new Vector3(arenaHelper.SafeZoneRadius * 2f, 0.1f, arenaHelper.SafeZoneRadius * 2f);
+            Gizmos.DrawWireCube(arenaCenter, safeZoneSize);
         }
     }
 
@@ -543,13 +562,17 @@ public class CubeAgent : Agent
             DrawRaycastVisualization();
         }
         
-        // Highlight selected agent's arena bounds in bright yellow
-        Gizmos.color = Color.yellow;
-        var arena = transform.parent;
-        if (arena != null)
+        // Highlight selected agent's arena bounds (using ArenaHelper dimensions)
+        if (arenaHelper != null)
         {
-            Vector3 center = arena.position;
-            Gizmos.DrawWireCube(center, new Vector3(14f, 0.1f, 14f));
+            Gizmos.color = Color.yellow;
+            Vector3 arenaSize = new Vector3(arenaHelper.GroundRadius * 2f, 0.1f, arenaHelper.GroundRadius * 2f);
+            Gizmos.DrawWireCube(arenaCenter, arenaSize);
+            
+            // Show safe zone in bright green
+            Gizmos.color = Color.green;
+            Vector3 safeZoneSize = new Vector3(arenaHelper.SafeZoneRadius * 2f, 0.1f, arenaHelper.SafeZoneRadius * 2f);
+            Gizmos.DrawWireCube(arenaCenter, safeZoneSize);
         }
     }
     
