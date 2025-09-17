@@ -93,9 +93,9 @@ public static class SceneBuilder
         ground.transform.localScale = Vector3.one;
         ground.name = "Ground";
         
-        // Unity 6.2 compatible ground material
-        Material groundMat = CreateCompatibleMaterial();
-        groundMat.color = Color.white;
+        // Unity 6.2 compatible ground material (slightly rough surface)
+        Material groundMat = CreateCompatibleMaterial(smoothness: 0.2f, metallic: 0.0f);
+        groundMat.color = new Color(0.788f, 0.788f, 0.788f); // #C9C9C9 in linear space
         groundMat.name = "GroundMaterial";
         ground.GetComponent<Renderer>().material = groundMat;
 
@@ -108,10 +108,10 @@ public static class SceneBuilder
         Object.DestroyImmediate(agent.GetComponent<Collider>());
         agent.name = "CubeAgent";
         
-        // Set up material for the agent
+        // Set up material for the agent (smooth finish for nice look)
         var mr = agent.GetComponent<Renderer>();
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.blue;
+        Material mat = CreateCompatibleMaterial(smoothness: 0.6f, metallic: 0.1f);
+        mat.color = new Color(0.216f, 0.490f, 1.0f); // #377DFF in linear space
         mat.name = "AgentMaterial";
         mr.material = mat;
         
@@ -186,9 +186,9 @@ public static class SceneBuilder
         goal.transform.localScale = Vector3.one * 0.6f;
         var mr = goal.GetComponent<Renderer>();
         
-        // Unity 6.2 compatible material creation
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.yellow;
+        // Unity 6.2 compatible material creation (slight smoothness for goals)
+        Material mat = CreateCompatibleMaterial(smoothness: 0.3f, metallic: 0.0f);
+        mat.color = new Color(1.0f, 0.835f, 0.290f); // #FFD54A in linear space
         mat.name = "GoalMaterial";
         mr.material = mat;
         
@@ -202,9 +202,9 @@ public static class SceneBuilder
         obs.transform.localScale = new Vector3(0.8f, 1.0f, 0.8f);
         var mr = obs.GetComponent<Renderer>();
         
-        // Unity 6.2 compatible material creation
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.red;
+        // Unity 6.2 compatible material creation (matte finish for obstacles)
+        Material mat = CreateCompatibleMaterial(smoothness: 0.0f, metallic: 0.0f);
+        mat.color = new Color(0.906f, 0.298f, 0.235f); // #E74C3C in linear space
         mat.name = "ObstacleMaterial";
         mr.material = mat; // Use instance material, not shared
         
@@ -218,9 +218,9 @@ public static class SceneBuilder
     }
     
     /// <summary>
-    /// Creates a material compatible with Unity 6.2, handling URP/Built-in pipeline differences
+    /// Creates a material compatible with Unity 6.2 URP with specified surface properties
     /// </summary>
-    static Material CreateCompatibleMaterial()
+    static Material CreateCompatibleMaterial(float smoothness = 0.0f, float metallic = 0.0f)
     {
         // Try URP Lit shader first (Unity 6.2 default), fall back to Standard for Built-in
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
@@ -234,7 +234,23 @@ public static class SceneBuilder
             shader = Shader.Find("Unlit/Color");
         }
         
-        return new Material(shader);
+        Material mat = new Material(shader);
+        
+        // Set surface properties for URP/Lit or Standard shader
+        if (shader.name.Contains("Universal Render Pipeline/Lit"))
+        {
+            // URP Lit shader properties
+            mat.SetFloat("_Smoothness", smoothness);
+            mat.SetFloat("_Metallic", metallic);
+        }
+        else if (shader.name == "Standard")
+        {
+            // Built-in Standard shader properties
+            mat.SetFloat("_Glossiness", smoothness);
+            mat.SetFloat("_Metallic", metallic);
+        }
+        
+        return mat;
     }
     
     /// <summary>
@@ -269,8 +285,8 @@ public static class SceneBuilder
         rightEye.transform.localPosition = new Vector3(0.2f, 0.2f, 0.51f); // Outside cube surface
         rightEye.transform.localScale = Vector3.one * 0.15f;
         
-        // Make eyes white/black for visibility
-        var eyeMaterial = CreateCompatibleMaterial();
+        // Make eyes white with slight gloss for realism
+        var eyeMaterial = CreateCompatibleMaterial(smoothness: 0.8f, metallic: 0.0f);
         eyeMaterial.color = Color.white;
         eyeMaterial.name = "EyeMaterial";
         

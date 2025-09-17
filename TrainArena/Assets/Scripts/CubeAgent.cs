@@ -110,11 +110,7 @@ public class CubeAgent : Agent
         }
         
         // Ensure optimal physics settings for movement
-        rb.mass = 1f;                    // Standard mass
-        rb.linearDamping = 0.5f;          // Low drag for responsive movement  
-        rb.angularDamping = 5f;           // Higher angular drag for stability
-        rb.isKinematic = false;           // Must be false for forces to work
-        rb.useGravity = true;             // Keep gravity for realistic physics
+        SetPhysics(rb);
         
         // Debug Rigidbody setup (only at verbose level - not needed during normal operation)
         TrainArenaDebugManager.Log($"🔧 {gameObject.name} INITIALIZED: Mass={rb.mass:F1} | Drag={rb.linearDamping:F1} | AngDrag={rb.angularDamping:F1} | isKinematic={rb.isKinematic} | Constraints={rb.constraints}", 
@@ -206,12 +202,7 @@ public class CubeAgent : Agent
         if (isInference)
         {
             // Force correct physics settings for inference
-            rb.mass = 1f;
-            rb.linearDamping = 0.5f;
-            rb.angularDamping = 5f;
-            rb.isKinematic = false;
-            rb.useGravity = true;
-            rb.constraints = RigidbodyConstraints.None;
+            SetPhysics(rb);
             
             TrainArenaDebugManager.Log($"🔧 INFERENCE PHYSICS CHECK: Mass={rb.mass} | Drag={rb.linearDamping} | Kinematic={rb.isKinematic} | Constraints={rb.constraints} | MoveAccel={moveAccel} | TimeScale={Time.timeScale} | FixedDeltaTime={Time.fixedDeltaTime}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
@@ -255,6 +246,19 @@ public class CubeAgent : Agent
         }
 
         prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
+    }
+
+    void SetPhysics(Rigidbody rb)
+    {
+        if (rb != null)
+        {
+            rb.mass = 1f;                     // Standard mass
+            rb.linearDamping = 0.5f;          // Low drag for responsive movement  
+            rb.angularDamping = 5f;           // Higher angular drag for stability
+            rb.isKinematic = false;           // Must be false for forces to work
+            rb.useGravity = true;             // Keep gravity for realistic physics
+            rb.constraints = RigidbodyConstraints.None;
+        }
     }
 
     public override void CollectObservations(VectorSensor sensor)

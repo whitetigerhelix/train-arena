@@ -141,6 +141,7 @@ public class EnvInitializer : MonoBehaviour
         var goalPosition = arenaHelper.GetDistributedGoalPosition(center, arenaIndex);
         var goalGO = Instantiate(goalPrefab, goalPosition, Quaternion.identity, arenaContainer.transform);
         goalGO.name = $"Goal_Arena_{arenaIndex}";
+        StyleGoal(goalGO.GetComponent<Renderer>());
         if (agent != null) 
         {
             agent.goal = goalGO.transform;
@@ -179,5 +180,15 @@ public class EnvInitializer : MonoBehaviour
         arenaHelper.ValidateArenaObjects(arenaContainer.transform, center, arenaIndex, true);
         
         TrainArenaDebugManager.Log($"Arena {arenaIndex} setup complete", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+
+    void StyleGoal(Renderer r)
+    {
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        var gold = new Color(1f,0.83f,0.29f);
+        mat.SetColor("_BaseColor", gold);
+        mat.SetColor("_EmissionColor", gold * 2f);
+        mat.EnableKeyword("_EMISSION");
+        r.material = mat;
     }
 }
