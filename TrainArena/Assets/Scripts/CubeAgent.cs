@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -51,9 +52,18 @@ public class CubeAgent : Agent
     private int forceApplicationCount;
     private float lastPhysicsDebugTime;
     
+    // Velocity tracking for debugging
+    private Vector3 lastFrameVelocity;
+    private Vector3 lastAppliedForceForTracking;
+    private bool trackingVelocity = false;
+    
     // For testing when ML-Agents isn't connected
     private float randomActionTimer;
     private Vector2 currentRandomAction;
+    
+    // Add these fields to your class
+    private List<Collision> activeCollisions = new List<Collision>();
+    private List<ContactPoint> currentContacts = new List<ContactPoint>();
     
     /// <summary>
     /// Calculate total observation count based on configuration
@@ -94,6 +104,25 @@ public class CubeAgent : Agent
     
     void FixedUpdate()
     {
+        // Track velocity changes for debugging inference issues
+        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
+        
+        if (trackingVelocity && isInference && totalActionsReceived <= 25)
+        {
+            Vector3 currentVelocity = rb.linearVelocity;
+            Vector3 velocityChange = currentVelocity - lastFrameVelocity;
+            
+            TrainArenaDebugManager.Log($"📊 VELOCITY TRACKING: " +
+                                     $"LastVel={lastFrameVelocity.magnitude:F3} | CurrentVel={currentVelocity.magnitude:F3} | " +
+                                     $"Change={velocityChange.magnitude:F3} | LastForce={lastAppliedForceForTracking.magnitude:F1}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            trackingVelocity = false; // Only track for one frame after force application
+        }
+        
+        // Store current velocity for next frame comparison
+        lastFrameVelocity = rb.linearVelocity;
+        
         // Request decisions for ML-Agents system to work
         RequestDecision();
     }
@@ -138,6 +167,24 @@ public class CubeAgent : Agent
         // Reset physics
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
+        
+        // CRITICAL: Verify physics settings are correct (especially for inference mode)
+        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
+        
+        if (isInference)
+        {
+            // Force correct physics settings for inference
+            rb.mass = 1f;
+            rb.linearDamping = 0.5f;
+            rb.angularDamping = 5f;
+            rb.isKinematic = false;
+            rb.useGravity = true;
+            rb.constraints = RigidbodyConstraints.None;
+            
+            TrainArenaDebugManager.Log($"🔧 INFERENCE PHYSICS CHECK: Mass={rb.mass} | Drag={rb.linearDamping} | Kinematic={rb.isKinematic} | Constraints={rb.constraints} | MoveAccel={moveAccel} | TimeScale={Time.timeScale} | FixedDeltaTime={Time.fixedDeltaTime}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
 
         // Randomize start & goal within arena bounds (assumes parent positions origin of arena)
         var arena = transform.parent;
@@ -200,18 +247,57 @@ public class CubeAgent : Agent
         {
             totalActionsReceived++;
         }
+        
+        // Debug inference mode - always log first few actions to verify model is working
+        // Get behavior parameters once and use for all debugging
+        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
+        string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
+        string modelName = behaviorParams?.Model?.name ?? "NO_MODEL";
+        bool hasModel = behaviorParams?.Model != null;
+        
+        if (isInference && totalActionsReceived <= 10)
+        {
+            TrainArenaDebugManager.Log($"🧠 INFERENCE ACTION #{totalActionsReceived}: Raw=({actions.ContinuousActions[0]:F4}, {actions.ContinuousActions[1]:F4}) | Clamped=({moveX:F4}, {moveZ:F4})", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
 
         Vector3 localMove = new Vector3(moveX, 0f, moveZ);
         Vector3 worldForce = transform.TransformDirection(localMove) * moveAccel;
         
-        // Debug: Log significant actions for troubleshooting (very infrequent)
-        if ((Mathf.Abs(moveX) > 0.1f || Mathf.Abs(moveZ) > 0.1f) && Time.fixedTime % 10f < Time.fixedDeltaTime)
+        // Enhanced debugging for inference mode - always log actions during inference
+        if (isInference || (Mathf.Abs(moveX) > 0.1f || Mathf.Abs(moveZ) > 0.1f) && Time.fixedTime % 5f < Time.fixedDeltaTime)
         {
-            TrainArenaDebugManager.Log($"🎮 {gameObject.name} ACTION: ({moveX:F2},{moveZ:F2}) → Force={worldForce.magnitude:F1} | Vel={rb.linearVelocity.magnitude:F2}", 
+            string mode = isInference ? "INFERENCE" : "TRAINING";
+            TrainArenaDebugManager.Log($"🎮 {gameObject.name} [{mode}] MODEL:{modelName} ACTION: ({moveX:F3},{moveZ:F3}) → Force={worldForce.magnitude:F1} | Vel={rb.linearVelocity.magnitude:F2}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
+        // CRITICAL: Apply force before debugging so we can see the immediate effect
+        Vector3 velocityBeforeForce = rb.linearVelocity;
         rb.AddForce(worldForce, ForceMode.Acceleration);
+        
+        // Enable velocity tracking for next frame
+        if (isInference && totalActionsReceived <= 25)
+        {
+            trackingVelocity = true;
+            lastAppliedForceForTracking = worldForce;
+        }
+        
+        // Enhanced physics debugging for inference issues
+        if (isInference && totalActionsReceived <= 20)
+        {
+            // Check if agent is grounded or colliding with something
+            bool isGrounded = Physics.Raycast(transform.position, Vector3.down, 1.1f);
+            int contactCount = GetContactCount(); // Use the proper collision callback system
+            
+            TrainArenaDebugManager.Log($"🔬 PHYSICS DEBUG #{totalActionsReceived}: " +
+                                     $"Mass={rb.mass:F1} | Drag={rb.linearDamping:F1} | Kinematic={rb.isKinematic} | " +
+                                     $"Constraints={rb.constraints} | Grounded={isGrounded} | Contacts={contactCount} | " +
+                                     $"Position={transform.position} | " +
+                                     $"VelBefore={velocityBeforeForce.magnitude:F3} | Force={worldForce.magnitude:F1}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
         
         // Store for debug visualization
         lastAppliedForce = worldForce;
@@ -223,9 +309,6 @@ public class CubeAgent : Agent
         // More frequent status logging for debugging movement issues
         if (Time.fixedTime % 15f < Time.fixedDeltaTime) // Every 15 seconds
         {
-            var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
-            string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
-            
             Vector3 velocity = rb.linearVelocity;
             string status = velocity.magnitude > MOVEMENT_THRESHOLD ? "MOVING" : "STUCK";
             
@@ -233,8 +316,8 @@ public class CubeAgent : Agent
             float goalDistance = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
             float episodeTime = Time.time - episodeStartTime;
             
-            // Always log for debugging - include action count to verify actions are being received
-            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Vel={velocity.magnitude:F2} | Goal={goalDistance:F1} | Actions={totalActionsReceived} | Step={episodeStepCount}/{maxEpisodeSteps}", 
+            // Enhanced logging with model info - especially important for inference debugging
+            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Model:{modelName}({hasModel}) | Vel={velocity.magnitude:F2} | Goal={goalDistance:F1} | Actions={totalActionsReceived} | Step={episodeStepCount}/{maxEpisodeSteps}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
@@ -355,8 +438,39 @@ public class CubeAgent : Agent
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.collider.CompareTag("Obstacle"))
-            AddReward(-0.1f);
+        if (!activeCollisions.Contains(collision))
+        {
+            activeCollisions.Add(collision);
+        }
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        // Update existing collision
+        for (int i = 0; i < activeCollisions.Count; i++)
+        {
+            if (activeCollisions[i].gameObject == collision.gameObject)
+            {
+                activeCollisions[i] = collision;
+                break;
+            }
+        }
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        activeCollisions.RemoveAll(c => c.gameObject == collision.gameObject);
+    }
+
+    // Method to get current contact count
+    private int GetContactCount()
+    {
+        currentContacts.Clear();
+        foreach (var collision in activeCollisions)
+        {
+            currentContacts.AddRange(collision.contacts);
+        }
+        return currentContacts.Count;
     }
 
     private void OnDrawGizmos()
