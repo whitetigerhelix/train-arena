@@ -899,10 +899,11 @@ MonoBehaviour:
   cubeAgentPrefab: {fileID: 1293313843}
   goalPrefab: {fileID: 852815692}
   obstaclePrefab: {fileID: 1174462281}
-  preset: 0
-  envCountX: 4
-  envCountZ: 4
-  arenaSize: 20
+  preset: 3
+  groundPercentage: 0.7
+  envCountX: 2
+  envCountZ: 2
+  arenaSize: 30
   obstaclesPerArena: 6
 --- !u!4 &1027938605
 Transform:

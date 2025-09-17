@@ -9,12 +9,16 @@ public class EnvInitializer : MonoBehaviour
 
     [Header("Layout Configuration")]
     [SerializeField] private EnvPreset preset = EnvPreset.Training;
+    [SerializeField, Range(0.1f, 1f)] private float groundPercentage = 0.7f; // Percentage of arena size for ground plane (0.0 to 1.0)
+    public float groundRadius => (arenaSize * groundPercentage) / 2f;
     [Space]
+    
     [Header("Manual Configuration (when preset = Custom)")]
-    public int envCountX = 4;
-    public int envCountZ = 4;
-    public float arenaSize = 20f; // spacing between arena centers (was 14f - too close!)
-    public int obstaclesPerArena = 6;
+    [SerializeField] private int envCountX = 4;
+    [SerializeField] private int envCountZ = 4;
+    [SerializeField] private float arenaSize = 20f; // spacing between arena centers
+    public float arenaRadius => arenaSize / 2f; // Full width/depth of arena
+    [SerializeField] private int obstaclesPerArena = 6;
     
     public enum EnvPreset
     {
@@ -105,6 +109,8 @@ public class EnvInitializer : MonoBehaviour
 
     void SpawnArena(Vector3 center)
     {
+        float arenaRadius = arenaSize / 2f;
+
         // Create arena container to group all objects for this specific arena
         var arenaIndex = transform.childCount;
         var arenaContainer = new GameObject($"Arena_{arenaIndex}");
@@ -112,18 +118,18 @@ public class EnvInitializer : MonoBehaviour
         arenaContainer.transform.position = center;
         
         // Verbose logging for arena setup
-        TrainArenaDebugManager.Log($"Spawning Arena {arenaIndex} at {center}", TrainArenaDebugManager.DebugLogLevel.Verbose);
-        TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x-7f} to {center.x+7f}], Z[{center.z-7f} to {center.z+7f}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"Spawning Arena {arenaIndex} at {center} with radius {arenaRadius}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x - arenaRadius} to {center.x + arenaRadius}], Z[{center.z - arenaRadius} to {center.z + arenaRadius}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
 
-        // Ground - make it big enough for the 12x12 agent spawn area
+        // Ground - make it big enough for the agent spawn area
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.position = center;
-        ground.transform.localScale = Vector3.one * 1.4f; // 10x10 plane -> 14x14 world (matches arenaSize)
+        ground.transform.localScale = Vector3.one * ((groundRadius * 2f) / 10f); // 10x10 plane scaled to match ground
         ground.name = "Ground";
         ground.transform.parent = arenaContainer.transform;
 
         // Agent - spawn at arena center, properly positioned ON TOP of ground
-        var agentPosition = center + Vector3.up * 1.0f; // 1.0f = half cube height above ground
+        var agentPosition = center + Vector3.up * 0.5f; // Half cube height above ground
         var agentGO = Instantiate(cubeAgentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
         agentGO.name = $"CubeAgent_Arena_{transform.childCount}";
         var agent = agentGO.GetComponent<CubeAgent>();
@@ -133,7 +139,7 @@ public class EnvInitializer : MonoBehaviour
         // Goal - place in a distributed pattern within THIS arena
         // Use the arenaIndex we calculated at the start, not childCount which is now off by 1
         var goalAngle = (arenaIndex * 73f) % 360f; // Spread goals around using prime number offset
-        var goalDistance = Random.Range(2f, 4f);
+        var goalDistance = Random.Range(groundRadius * 0.2f, groundRadius * 0.8f); // Avoid edges and center
         var goalOffset = new Vector3(
             Mathf.Cos(goalAngle * Mathf.Deg2Rad) * goalDistance,
             1.0f, // Goal height above ground (same as agent)
@@ -161,7 +167,8 @@ public class EnvInitializer : MonoBehaviour
                 
                 do
                 {
-                    offset = new Vector3(Random.Range(-4f, 4f), 1.0f, Random.Range(-4f, 4f)); // Fixed height to 1.0f
+                    //TODO: Hardcoding 0.8f in a lot of places - should be a variable
+                    offset = new Vector3(Random.Range(-groundRadius, groundRadius) * 0.8f, 1.0f, Random.Range(-groundRadius, groundRadius) * 0.8f); // Fixed height to 1.0f
                     attempts++;
                     
                     // Check distance from goal and agent spawn point
@@ -197,15 +204,14 @@ public class EnvInitializer : MonoBehaviour
     
     void ValidateArenaObjects(GameObject arenaContainer, Vector3 center, int arenaIndex)
     {
-        float arenaBounds = 7f; // Half of 14x14 arena
         bool allValid = true;
         
         foreach (Transform child in arenaContainer.transform)
         {
             Vector3 pos = child.position;
             Vector3 localPos = pos - center;
-            
-            if (Mathf.Abs(localPos.x) > arenaBounds || Mathf.Abs(localPos.z) > arenaBounds)
+
+            if (Mathf.Abs(localPos.x) > groundRadius || Mathf.Abs(localPos.z) > groundRadius)
             {
                 TrainArenaDebugManager.LogError($"Arena {arenaIndex}: {child.name} is OUTSIDE arena bounds at {pos}! Local offset: {localPos}");
                 allValid = false;

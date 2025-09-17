@@ -189,16 +189,33 @@ public class CubeAgent : Agent
         // Randomize start & goal within arena bounds (assumes parent positions origin of arena)
         var arena = transform.parent;
         Vector3 center = arena ? arena.position : Vector3.zero;
-        float radius = 4f; // Reduced to match ground size (14x14 ground = 7 radius, use 4 for safety margin)
-        
-        // Position agent ON TOP of ground (Y = 1.0f, not 0.5f)
-        Vector3 newAgentPos = center + new Vector3(Random.Range(-radius, radius), 1.0f, Random.Range(-radius, radius));
+
+        // Get EnvManager to determine ground size
+        float xOffset = 0f;
+        float zOffset = 0f;
+        var envManager = arena ? arena.GetComponentInParent<EnvInitializer>() : null;
+        if (envManager != null)
+        {
+            //TODO: Hardcoding - should use same approach as EnvInitializer.cs agent placement - need to integrate better
+            xOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
+            zOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
+        }
+
+        // Position agent ON TOP of ground
+        float spawnHeight = 0.5f; // Half the agent height to sit on ground
+        Vector3 newAgentPos = center + new Vector3(xOffset, spawnHeight, zOffset);
         transform.position = newAgentPos;
         transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
 
         if (goal != null)
         {
-            Vector3 newGoalPos = center + new Vector3(Random.Range(-radius, radius), 1.0f, Random.Range(-radius, radius));
+            if (envManager != null)
+            {
+                //TODO: Hardcoding - should use same approach as EnvInitializer.cs goal placement - need to integrate better
+                xOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
+                zOffset = Random.Range(-envManager.groundRadius * 0.8f, envManager.groundRadius * 0.8f);
+            }
+            Vector3 newGoalPos = center + new Vector3(xOffset, 1.0f, zOffset);
             goal.position = newGoalPos;
             
             // Debug logging for episode resets (verbose level only)
