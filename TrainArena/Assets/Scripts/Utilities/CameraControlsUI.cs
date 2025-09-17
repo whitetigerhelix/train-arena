@@ -78,7 +78,7 @@ public class CameraControlsUI : MonoBehaviour
         const float PANEL_WIDTH = 220f;
         const float PANEL_HEIGHT = 140f;
         const float RIGHT_MARGIN = 40f;
-        const float BELOW_HELP_OFFSET = 300f;  // Position below existing help UI
+        const float BELOW_HELP_OFFSET = 330f;  // Position below existing help UI
         
         float xPos = topRightPosition ? Screen.width - PANEL_WIDTH - RIGHT_MARGIN : 300; // Offset from TimeScaleManager
         float yPos = topRightPosition ? BELOW_HELP_OFFSET : 10f;  // Position below existing help UI

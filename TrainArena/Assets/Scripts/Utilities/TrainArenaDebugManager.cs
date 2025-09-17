@@ -38,6 +38,9 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     // Singleton instance
     private static TrainArenaDebugManager instance;
+    
+    // UI state variables
+    private Vector2 scrollPosition = Vector2.zero;
     public static TrainArenaDebugManager Instance
     {
         get
@@ -156,100 +159,116 @@ public class TrainArenaDebugManager : MonoBehaviour
         if (keyboard.rKey.wasPressedThisFrame)
         {
             ShowRaycastVisualization = !ShowRaycastVisualization;
-            Debug.Log($"Raycast Visualization: {(ShowRaycastVisualization ? "ON" : "OFF")}");
+            Log($"Raycast Visualization: {(ShowRaycastVisualization ? "ON" : "OFF")}");
         }
         
         // Toggle agent debug info with 'I' key
         if (keyboard.iKey.wasPressedThisFrame)
         {
             ShowAgentDebugInfo = !ShowAgentDebugInfo;
-            Debug.Log($"Agent Debug Info: {(ShowAgentDebugInfo ? "ON" : "OFF")}");
+            Log($"Agent Debug Info: {(ShowAgentDebugInfo ? "ON" : "OFF")}");
         }
         
         // Toggle observations with 'O' key
         if (keyboard.oKey.wasPressedThisFrame)
         {
             ShowObservations = !ShowObservations;
-            Debug.Log($"Observations Display: {(ShowObservations ? "ON" : "OFF")}");
+            Log($"Observations Display: {(ShowObservations ? "ON" : "OFF")}");
         }
         
         // Toggle velocity display with 'V' key
         if (keyboard.vKey.wasPressedThisFrame)
         {
             ShowVelocityDisplay = !ShowVelocityDisplay;
-            Debug.Log($"Velocity Display: {(ShowVelocityDisplay ? "ON" : "OFF")}");
+            Log($"Velocity Display: {(ShowVelocityDisplay ? "ON" : "OFF")}");
         }
         
         // Toggle arena bounds with 'A' key
         if (keyboard.aKey.wasPressedThisFrame)
         {
             ShowArenaBounds = !ShowArenaBounds;
-            Debug.Log($"Arena Bounds: {(ShowArenaBounds ? "ON" : "OFF")}");
+            Log($"Arena Bounds: {(ShowArenaBounds ? "ON" : "OFF")}");
         }
         
         // Toggle ML-Agents status with 'M' key
         if (keyboard.mKey.wasPressedThisFrame)
         {
             ShowMLAgentsStatus = !ShowMLAgentsStatus;
-            Debug.Log($"ML-Agents Status: {(ShowMLAgentsStatus ? "ON" : "OFF")}");
+            Log($"ML-Agents Status: {(ShowMLAgentsStatus ? "ON" : "OFF")}");
         }
         
         // Cycle through log levels with 'L' key
         if (keyboard.lKey.wasPressedThisFrame)
         {
             LogLevel = (DebugLogLevel)(((int)LogLevel + 1) % 5);
-            Debug.Log($"Log Level: {LogLevel}");
+            Log($"Log Level: {LogLevel}");
         }
         
         // Show help with 'H' key
         if (keyboard.hKey.wasPressedThisFrame)
         {
             ShowHelp = !ShowHelp;
-            Debug.Log($"Debug Help: {(ShowHelp ? "ON" : "OFF")}");
+            Log($"Debug Help: {(ShowHelp ? "ON" : "OFF")}");
         }
     }
     
     void LogHelp()
     {
-        Debug.Log("=== TrainArena Debug Controls ===\n" +
-                  "R - Toggle Raycast Visualization\n" +
-                  "I - Toggle Agent Debug Info\n" +
-                  "O - Toggle Observations Display\n" +
-                  "V - Toggle Velocity Display\n" +
-                  "A - Toggle Arena Bounds\n" +
-                  "L - Cycle Log Level\n" +
-                  "H - Toggle Help Display\n" +
-                  "================================");
+        Log("=== TrainArena Debug Controls ===\n" +
+            "R - Toggle Raycast Visualization\n" +
+            "I - Toggle Agent Debug Info\n" +
+            "O - Toggle Observations Display\n" +
+            "V - Toggle Velocity Display\n" +
+            "A - Toggle Arena Bounds\n" +
+            "L - Cycle Log Level\n" +
+            "H - Toggle Help Display\n" +
+            "================================");
     }
     
     void OnGUI()
     {
-        // Show current debug status in top-right corner
-        string debugStatus = $"Debug: R:{(ShowRaycastVisualization ? "ON" : "OFF")} " +
-                           $"I:{(ShowAgentDebugInfo ? "ON" : "OFF")} " +
-                           $"O:{(ShowObservations ? "ON" : "OFF")} " +
-                           $"V:{(ShowVelocityDisplay ? "ON" : "OFF")} " +
-                           $"A:{(ShowArenaBounds ? "ON" : "OFF")} " +
-                           $"M:{(ShowMLAgentsStatus ? "ON" : "OFF")}";
+        // Check training status for UI state management
+        var academy = Unity.MLAgents.Academy.Instance;
+        bool isTraining = academy != null && academy.IsCommunicatorOn;
         
+        // Training Status Banner (prominent top-center display)
+        DrawTrainingStatusBanner(isTraining);
+        
+        // Show current debug status in top-right corner with better formatting
         GUI.color = Color.white;
-        GUI.backgroundColor = new Color(0, 0, 0, 0.7f);
+        GUI.backgroundColor = new Color(0, 0, 0, 0.8f);
         
-        float statusWidth = 310f; // Increased to fit ML-Agents toggle
-        Rect statusRect = new Rect(Screen.width - statusWidth - 10, 10, statusWidth, 20);
-        GUI.Label(statusRect, debugStatus);
+        float statusWidth = 400f;
+        float statusHeight = 25f;
+        Rect statusRect = new Rect(Screen.width - statusWidth - 10, 10, statusWidth, statusHeight);
+        GUI.Box(statusRect, "");
+        
+        // Create cleaner debug status with emoji indicators
+        string debugStatus = $"🔧 Debug: " +
+                           $"{(ShowRaycastVisualization ? "🟢" : "⚫")}R " +
+                           $"{(ShowAgentDebugInfo ? "🟢" : "⚫")}I " +
+                           $"{(ShowObservations ? "🟢" : "⚫")}O " +
+                           $"{(ShowVelocityDisplay ? "🟢" : "⚫")}V " +
+                           $"{(ShowArenaBounds ? "🟢" : "⚫")}A " +
+                           $"{(ShowMLAgentsStatus ? "🟢" : "⚫")}M " +
+                           $"LogLvl: 📊{LogLevel}";
+        
+        GUILayout.BeginArea(statusRect);
+        GUILayout.Space(4);
+        GUILayout.Label(debugStatus);
+        GUILayout.EndArea();
         
         // Show help panel positioned under status bar
         if (ShowHelp)
         {
-            float panelWidth = 310f; // Match status bar width
-            float panelHeight = 220f; // Increased for new M key option
+            float panelWidth = 400f; // Match status bar width
+            float panelHeight = 280f; // Increased for better spacing
             float panelX = Screen.width - panelWidth - 10;
-            float panelY = 35f; // Just under the status bar
+            float panelY = 40f; // Just under the status bar
             
             Rect helpRect = new Rect(panelX, panelY, panelWidth, panelHeight);
             
-            GUI.backgroundColor = new Color(0, 0, 0, 0.8f);
+            GUI.backgroundColor = new Color(0, 0, 0, 0.85f);
             GUI.Box(helpRect, "");
             
             GUI.color = Color.white;
@@ -257,16 +276,34 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUILayout.BeginVertical();
             
             GUILayout.Space(8);
-            GUILayout.Label("=== Debug Controls ===", GUI.skin.box);
+            GUI.color = Color.cyan;
+            GUILayout.Label("🔧 === DEBUG CONTROLS ===", GUI.skin.box);
+            GUI.color = Color.white;
             
-            GUILayout.Label("R - Toggle Raycast Visualization");
-            GUILayout.Label("I - Toggle Agent Debug Info");
-            GUILayout.Label("O - Toggle Observations Display");
-            GUILayout.Label("V - Toggle Velocity Display");
-            GUILayout.Label("A - Toggle Arena Bounds");
-            GUILayout.Label("M - Toggle ML-Agents Status");
-            GUILayout.Label("L - Cycle Log Level");
-            GUILayout.Label("H - Toggle this help");
+            GUILayout.Space(6);
+            GUILayout.Label($"{(ShowRaycastVisualization ? "🟢" : "⚫")} [R] - Raycast Visualization");
+            GUILayout.Label($"{(ShowAgentDebugInfo ? "🟢" : "⚫")} [I] - Agent Debug Info");
+            GUILayout.Label($"{(ShowObservations ? "🟢" : "⚫")} [O] - Observations Display");
+            GUILayout.Label($"{(ShowVelocityDisplay ? "🟢" : "⚫")} [V] - Velocity Display");
+            GUILayout.Label($"{(ShowArenaBounds ? "🟢" : "⚫")} [A] - Arena Bounds");
+            GUILayout.Label($"{(ShowMLAgentsStatus ? "🟢" : "⚫")} [M] - ML-Agents Status Panel");
+            
+            GUILayout.Space(4);
+            GUI.color = Color.gray;
+            GUILayout.Label("─────────────────────────────");
+            GUI.color = Color.white;
+            GUILayout.Label($"📊 [L] - Log Level: {LogLevel}");
+            GUILayout.Label("❓ [H] - Toggle This Help");
+            
+            if (isTraining)
+            {
+                GUILayout.Space(6);
+                GUI.color = Color.yellow;
+                GUILayout.Label("⚠️ TRAINING MODE ACTIVE");
+                GUI.color = Color.gray;
+                GUILayout.Label("(Some controls disabled during training)");
+                GUI.color = Color.white;
+            }
             
             GUILayout.EndVertical();
             GUILayout.EndArea();
@@ -275,7 +312,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         // Show ML-Agents Status Panel (always visible when enabled)
         if (ShowMLAgentsStatus)
         {
-            DrawMLAgentsStatusPanel();
+            DrawMLAgentsStatusPanel(isTraining);
         }
         
         if (!ShowHelp)
@@ -293,7 +330,44 @@ public class TrainArenaDebugManager : MonoBehaviour
         }
     }
     
-    void DrawMLAgentsStatusPanel()
+    void DrawTrainingStatusBanner(bool isTraining)
+    {
+        // Prominent banner at top-center of screen
+        float bannerWidth = 300f;
+        float bannerHeight = 35f;
+        float bannerX = (Screen.width - bannerWidth) / 2f;
+        float bannerY = 10f;
+        
+        Rect bannerRect = new Rect(bannerX, bannerY, bannerWidth, bannerHeight);
+        
+        if (isTraining)
+        {
+            GUI.backgroundColor = new Color(1f, 0.8f, 0f, 0.9f); // Bright yellow/orange for training
+            GUI.color = Color.black;
+        }
+        else
+        {
+            GUI.backgroundColor = new Color(0f, 0.6f, 0.2f, 0.9f); // Green for inference/demo
+            GUI.color = Color.white;
+        }
+        
+        GUI.Box(bannerRect, "");
+        
+        GUILayout.BeginArea(bannerRect);
+        GUILayout.BeginVertical();
+        GUILayout.Space(8);
+        
+        string status = isTraining ? "🎯 TRAINING MODE ACTIVE" : "🧠 INFERENCE/DEMO MODE";
+        GUILayout.Label(status, GUI.skin.box);
+        
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
+        
+        GUI.color = Color.white;
+        GUI.backgroundColor = Color.clear;
+    }
+    
+    void DrawMLAgentsStatusPanel(bool isTraining)
     {
         // Find all CubeAgent instances in the scene
         CubeAgent[] agents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
@@ -304,17 +378,18 @@ public class TrainArenaDebugManager : MonoBehaviour
         }
         
         // Panel positioning - top-left corner
-        float panelWidth = 420f;
-        float maxPanelHeight = Screen.height * 0.6f; // Max 60% of screen height
-        float lineHeight = 18f;
-        float numLines = 2f;
-        float headerHeight = 25f;
-        float padding = 8f;
+        float panelWidth = 550f;
+        float maxPanelHeight = Screen.height * 0.7f; // Max 70% of screen height
         float posX = 10f;
         float posY = 140f;
         
-        // Calculate required height based on agent count
-        float contentHeight = headerHeight + (agents.Length * lineHeight * numLines) + padding * numLines; // numLines per agent
+        // More accurate height calculation with compact legend
+        float headerHeight = 50f; // Title + training warning + global controls + compact legend + spacing
+        float agentHeight = 25f; // Ultra-compact single-line agent display
+        int maxAgents = Mathf.Min(agents.Length, 15); // Show more agents with ultra-compact display
+        float agentSectionHeight = 25f + (maxAgents * agentHeight); // Label + agents
+        
+        float contentHeight = headerHeight + agentSectionHeight + 20f; // Extra padding
         float panelHeight = Mathf.Min(contentHeight, maxPanelHeight);
         
         Rect panelRect = new Rect(posX, posY, panelWidth, panelHeight);
@@ -329,28 +404,72 @@ public class TrainArenaDebugManager : MonoBehaviour
         
         GUILayout.Space(4);
         
-        // Header
+        // Header with global controls
         GUI.color = Color.cyan;
-        GUILayout.Label("=== ML-AGENTS STATUS ===", GUI.skin.box);
+        GUILayout.Label("=== ML-AGENTS CONTROL ===", GUI.skin.box);
         GUI.color = Color.white;
         
-        // Scrollable area if needed
-        if (agents.Length > 8) // If more than 8 agents, make scrollable
+        // Training status indicator
+        if (isTraining)
         {
-            GUILayout.Label($"Showing first 8 of {agents.Length} agents");
+            GUI.color = Color.yellow;
+            GUILayout.Label("⚠️ TRAINING ACTIVE - Controls Disabled");
+            GUI.color = Color.white;
         }
         
-        // Display agent information
-        for (int i = 0; i < Mathf.Min(agents.Length, 8); i++)
+        // Global behavior type switching (disabled during training)
+        GUI.enabled = !isTraining;
+        GUILayout.BeginHorizontal();
+        GUILayout.Label($"All Agents ({agents.Length}):", GUILayout.Width(110));
+        
+        GUI.backgroundColor = new Color(0f, 0.8f, 1f, isTraining ? 0.3f : 0.8f); // Dimmed when training
+        if (GUILayout.Button("🎯 Training", GUILayout.Width(100)))
         {
-            DrawAgentStatus(agents[i]);
+            SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType.Default);
         }
+        
+        if (!isTraining)
+        {
+            GUI.backgroundColor = new Color(0f, 0.8f, 1f, isTraining ? 0.3f : 0.8f); // Dimmed when training
+            if (GUILayout.Button("🤷 Random", GUILayout.Width(100)))
+            {
+                SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType.HeuristicOnly);
+            }
+            
+            GUI.backgroundColor = new Color(0f, 0.8f, 1f, isTraining ? 0.3f : 0.8f); // Dimmed when training
+            if (GUILayout.Button("🧠 AI Model", GUILayout.Width(100)))
+            {
+                SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType.InferenceOnly);
+            }
+        }
+        
+        GUI.backgroundColor = new Color(0, 0, 0, 0.85f); // Reset to panel background
+        GUILayout.EndHorizontal();
+        GUI.enabled = true; // Re-enable GUI
+        
+        GUILayout.Space(6);
+        GUI.color = Color.gray;
+        GUILayout.Label($"Agent Status ({agents.Length} total):", GUI.skin.label);
+        GUI.color = Color.white;
+        
+        // Scroll view for agent controls - this should be the main focus area
+        float scrollHeight = panelHeight - headerHeight - 30f; // Maximize scroll area
+        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, GUILayout.MinHeight(scrollHeight), GUILayout.MaxHeight(scrollHeight));
+        
+        // Display ALL agents with compact layout - no artificial limit
+        for (int i = 0; i < agents.Length; i++)
+        {
+            DrawAgentStatus(agents[i], isTraining);
+        }
+        
+        GUILayout.EndScrollView();
+        GUILayout.Space(16);
         
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
     
-    void DrawAgentStatus(CubeAgent agent)
+    void DrawAgentStatus(CubeAgent agent, bool isTraining)
     {
         if (agent == null) return;
         
@@ -359,36 +478,121 @@ public class TrainArenaDebugManager : MonoBehaviour
         string behaviorType = "Unknown";
         string modelName = "NO MODEL";
         Color statusColor = Color.white;
+        string behaviorEmoji = "❓";
         
         if (behaviorParams != null)
         {
             behaviorType = behaviorParams.BehaviorType.ToString();
             modelName = behaviorParams.Model?.name ?? "NO MODEL";
             
-            // Color code by behavior type
+            // Color code and emoji by behavior type
             switch (behaviorParams.BehaviorType)
             {
                 case Unity.MLAgents.Policies.BehaviorType.Default:
-                    statusColor = Color.yellow;
+                    statusColor = Color.orange;
+                    behaviorEmoji = "🎯";
+                    behaviorType = "Training";
                     break;
                 case Unity.MLAgents.Policies.BehaviorType.HeuristicOnly:
-                    statusColor = Color.green;
+                    statusColor = Color.cyan;
+                    behaviorEmoji = "🤷";
+                    behaviorType = "Random";
                     break;
                 case Unity.MLAgents.Policies.BehaviorType.InferenceOnly:
-                    statusColor = Color.cyan;
+                    statusColor = Color.yellow;
+                    behaviorEmoji = "🧠";
+                    behaviorType = "AI Model: "; // Inference
                     break;
             }
         }
         
-        // Agent name and behavior type
+        // Ultra-compact single-line agent display with inline model info
+        GUILayout.BeginHorizontal();
+        
+        // Agent name with status info inline for compactness
         GUI.color = statusColor;
-        GUILayout.Label($"🤖 {agent.name}");
+        string agentDisplay = $"{behaviorEmoji} {agent.name}";
+        
+        // Add model info directly inline for AI agents
+        if (behaviorParams != null && behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly && !string.IsNullOrEmpty(modelName) && modelName != "NO MODEL")
+        {
+            string shortModel = modelName.Length > 35 ? modelName.Substring(0, 32) + "..." : modelName;
+            agentDisplay += $" ({behaviorType} {shortModel})";
+        }
+        else
+        {
+            agentDisplay += $" ({behaviorType})";
+        }
+        
+        GUILayout.Label(agentDisplay, GUILayout.Width(420));
         GUI.color = Color.white;
         
-        // Status details
-        GUILayout.Label($"   Type: {behaviorType} | Model: {modelName}");
+        // Spacer to push buttons to the right
+        GUILayout.FlexibleSpace();
         
-        GUILayout.Space(2);
+        // Individual behavior type buttons (more compact)
+        GUI.backgroundColor = new Color(0f, 0.8f, 1f, 0.6f);
+        if (GUILayout.Button("🎯", GUILayout.Width(25)))
+        {
+            SetAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.Default);
+        }
+        
+        if (GUILayout.Button("🤷", GUILayout.Width(25)))
+        {
+            SetAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.HeuristicOnly);
+        }
+        
+        if (GUILayout.Button("🧠", GUILayout.Width(25)))
+        {
+            SetAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.InferenceOnly);
+        }
+        
+        GUI.backgroundColor = new Color(0, 0, 0, 0.85f);
+        GUILayout.EndHorizontal();
+        
+        GUILayout.Space(1); // Minimal spacing between agents for compact display
+    }
+    
+    void SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType behaviorType)
+    {
+        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        foreach (var agent in cubeAgents)
+        {
+            var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+            if (behaviorParams != null)
+            {
+                behaviorParams.BehaviorType = behaviorType;
+            }
+        }
+        
+        string behaviorName = behaviorType switch
+        {
+            Unity.MLAgents.Policies.BehaviorType.Default => "Training",
+            Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+            Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
+            _ => behaviorType.ToString()
+        };
+        
+        Log($"Set all {cubeAgents.Length} agents to {behaviorName} behavior type");
+    }
+    
+    void SetAgentBehaviorType(CubeAgent agent, Unity.MLAgents.Policies.BehaviorType behaviorType)
+    {
+        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        if (behaviorParams != null)
+        {
+            behaviorParams.BehaviorType = behaviorType;
+            
+            string behaviorName = behaviorType switch
+            {
+                Unity.MLAgents.Policies.BehaviorType.Default => "Training",
+                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+                Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
+                _ => behaviorType.ToString()
+            };
+            
+            Log($"Set {agent.name} to {behaviorName} behavior type");
+        }
     }
     
     // Logging methods with level filtering
