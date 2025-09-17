@@ -215,6 +215,28 @@ See `RESET_GUIDE.md` for detailed reset options.
 
 ---
 
+## 📚 **Documentation**
+
+**Quick Navigation:**
+
+- 🚀 **[Quick Start Guide](Docs/QUICK_START.md)** - 5-minute setup and first training
+- 📖 **[Complete Training Guide](Docs/TRAINING_GUIDE.md)** - In-depth training workflow and optimization
+- 🔧 **[Debug & Troubleshooting](Docs/DEBUG_AND_TROUBLESHOOTING.md)** - Debug system usage and problem solving
+- 🌟 **[Advanced Features](Docs/ADVANCED_FEATURES.md)** - Self-play, domain randomization, TensorBoard integration
+- 🎬 **[Recording & Demo Guide](Docs/RECORDING_AND_DEMO.md)** - Create shareable videos and demos
+- 📋 **[API Reference](Docs/API_REFERENCE.md)** - Technical code reference and integration
+
+**User Journey:**
+
+1. **New to project?** Start with [Quick Start Guide](Docs/QUICK_START.md)
+2. **Training issues?** Check [Debug & Troubleshooting](Docs/DEBUG_AND_TROUBLESHOOTING.md)
+3. **Want to learn more?** Read the [Complete Training Guide](Docs/TRAINING_GUIDE.md)
+4. **Ready for advanced features?** Explore [Advanced Features](Docs/ADVANCED_FEATURES.md)
+5. **Creating demos?** Use [Recording & Demo Guide](Docs/RECORDING_AND_DEMO.md)
+6. **Building custom features?** Reference [API Documentation](Docs/API_REFERENCE.md)
+
+---
+
 ## 6) Next steps / Stretch
 
 - Multi-agent "tag" (runner vs chaser)
