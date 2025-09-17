@@ -7,21 +7,77 @@ public class EnvInitializer : MonoBehaviour
     public GameObject goalPrefab;
     public GameObject obstaclePrefab;
 
-    [Header("Layout")]
-    public int envCountX = 4;
-    public int envCountZ = 4;
-    public float arenaSize = 20f; // spacing between arena centers (was 14f - too close!)
-    public int obstaclesPerArena = 6;
+    [Header("Layout Configuration")]
+    [SerializeField] private EnvPreset preset = EnvPreset.Training;
+    [Space]
+    
+    [Header("Manual Configuration (when preset = Custom)")]
+    [SerializeField] private int envCountX = 4;
+    [SerializeField] private int envCountZ = 4;
+    [SerializeField] private int obstaclesPerArena = 6;
+    
+    [Header("Arena Configuration")]
+    [SerializeField] private ArenaHelper arenaHelper = new ArenaHelper();
+    
+    // Expose ArenaHelper for CubeAgent access
+    public ArenaHelper ArenaHelper => arenaHelper;
+    
+    public enum EnvPreset
+    {
+        SingleArena,  // 1x1 for testing
+        Training,     // 4x4 for training 
+        LargeTraining, // 6x6 for intensive training
+        Custom        // Use manual settings above
+    }
+
+    void ApplyPreset()
+    {
+        switch (preset)
+        {
+            case EnvPreset.SingleArena:
+                envCountX = 1;
+                envCountZ = 1;
+                arenaHelper.ArenaSize = 20f;
+                obstaclesPerArena = 3; // Fewer obstacles for testing
+                TrainArenaDebugManager.Log("📋 Applied SingleArena preset: 1x1 grid for testing", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.Training:
+                envCountX = 2;
+                envCountZ = 2;
+                arenaHelper.ArenaSize = 20f;
+                obstaclesPerArena = 2; // Minimal obstacles for maximum performance
+                TrainArenaDebugManager.Log("📋 Applied Training preset: 2x2 grid for maximum performance", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.LargeTraining:
+                envCountX = 6;
+                envCountZ = 6;
+                arenaHelper.ArenaSize = 20f;
+                obstaclesPerArena = 8;
+                TrainArenaDebugManager.Log("📋 Applied LargeTraining preset: 6x6 grid for intensive training", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+                
+            case EnvPreset.Custom:
+                TrainArenaDebugManager.Log($"📋 Using Custom settings: {envCountX}x{envCountZ} grid", TrainArenaDebugManager.DebugLogLevel.Important);
+                break;
+        }
+    }
 
     void Start()
     {
-        if (cubeAgentPrefab == null || goalPrefab == null) { Debug.LogError("Assign prefabs in EnvInitializer"); return; }
+        if (cubeAgentPrefab == null || goalPrefab == null) { TrainArenaDebugManager.LogError("Assign prefabs in EnvInitializer"); return; }
+
+        // Apply preset configuration
+        ApplyPreset();
+        
+        TrainArenaDebugManager.Log($"🏗️ Creating {envCountX}x{envCountZ} arena grid (Total: {envCountX * envCountZ} arenas)", TrainArenaDebugManager.DebugLogLevel.Important);
 
         for (int x = 0; x < envCountX; x++)
         {
             for (int z = 0; z < envCountZ; z++)
             {
-                Vector3 center = transform.position + new Vector3(x * arenaSize, 0f, z * arenaSize);
+                Vector3 center = transform.position + new Vector3(x * arenaHelper.ArenaSize, 0f, z * arenaHelper.ArenaSize);
                 SpawnArena(center);
             }
         }
@@ -62,109 +118,84 @@ public class EnvInitializer : MonoBehaviour
         arenaContainer.transform.position = center;
         
         // Verbose logging for arena setup
-        TrainArenaDebugManager.Log($"Spawning Arena {arenaIndex} at {center}", TrainArenaDebugManager.DebugLogLevel.Verbose);
-        TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x-7f} to {center.x+7f}], Z[{center.z-7f} to {center.z+7f}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"Spawning Arena {arenaIndex} at {center} with radius {arenaHelper.ArenaRadius}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"Arena Bounds: X[{center.x - arenaHelper.ArenaRadius} to {center.x + arenaHelper.ArenaRadius}], Z[{center.z - arenaHelper.ArenaRadius} to {center.z + arenaHelper.ArenaRadius}]", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log(arenaHelper.GetDebugInfo(), TrainArenaDebugManager.DebugLogLevel.Verbose);
 
-        // Ground - make it big enough for the 12x12 agent spawn area
-        var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        // Ground - use PrimitiveBuilder for consistent materials and ArenaHelper for scale
+        var ground = PrimitiveBuilder.CreateGround("Ground");
         ground.transform.position = center;
-        ground.transform.localScale = Vector3.one * 1.4f; // 10x10 plane -> 14x14 world (matches arenaSize)
-        ground.name = "Ground";
+        ground.transform.localScale = arenaHelper.GetGroundScale();
         ground.transform.parent = arenaContainer.transform;
 
-        // Agent - spawn at arena center, properly positioned ON TOP of ground
-        var agentPosition = center + Vector3.up * 1.0f; // 1.0f = half cube height above ground
+        // Agent - use ArenaHelper for initial positioning (will be overridden in OnEpisodeBegin)
+        var agentPosition = center + Vector3.up * 0.5f; // Initial position at center
         var agentGO = Instantiate(cubeAgentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
-        agentGO.name = $"CubeAgent_Arena_{transform.childCount}";
+        agentGO.name = $"CubeAgent_Arena_{arenaIndex}";
         var agent = agentGO.GetComponent<CubeAgent>();
         
         TrainArenaDebugManager.Log($"Spawned Agent at {agentPosition} in {arenaContainer.name}", TrainArenaDebugManager.DebugLogLevel.Verbose);
 
-        // Goal - place in a distributed pattern within THIS arena
-        // Use the arenaIndex we calculated at the start, not childCount which is now off by 1
-        var goalAngle = (arenaIndex * 73f) % 360f; // Spread goals around using prime number offset
-        var goalDistance = Random.Range(2f, 4f);
-        var goalOffset = new Vector3(
-            Mathf.Cos(goalAngle * Mathf.Deg2Rad) * goalDistance,
-            1.0f, // Goal height above ground (same as agent)
-            Mathf.Sin(goalAngle * Mathf.Deg2Rad) * goalDistance
-        );
-        
-        var goalPosition = center + goalOffset;
+        // Goal - use ArenaHelper for distributed placement pattern
+        var goalPosition = arenaHelper.GetDistributedGoalPosition(center, arenaIndex);
         var goalGO = Instantiate(goalPrefab, goalPosition, Quaternion.identity, arenaContainer.transform);
-        goalGO.name = $"Goal_Arena_{transform.childCount}";
+        goalGO.name = $"Goal_Arena_{arenaIndex}";
+        StyleGoal(goalGO.GetComponent<Renderer>());
         if (agent != null) 
         {
             agent.goal = goalGO.transform;
             TrainArenaDebugManager.Log($"Arena {arenaIndex}: Agent -> Goal distance: {Vector3.Distance(agentPosition, goalPosition):F2}", TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
-        // Obstacles - distribute around the arena, avoiding goal area, parented to arena container
+        // Obstacles - use ArenaHelper for smart placement avoiding agent and goal
         if (obstaclePrefab != null)
         {
             int successfulObstacles = 0;
+            var existingObstacles = new System.Collections.Generic.List<Vector3>();
+            
             for (int i = 0; i < obstaclesPerArena; i++)
             {
-                Vector3 offset;
-                int attempts = 0;
-                bool validPosition = false;
+                var obstaclePosition = arenaHelper.GetValidObstaclePosition(center, agentPosition, goalPosition, existingObstacles);
                 
-                do
+                // Check if position is valid (ArenaHelper will warn if not)
+                if (arenaHelper.IsWithinSafeZone(obstaclePosition, center))
                 {
-                    offset = new Vector3(Random.Range(-4f, 4f), 1.0f, Random.Range(-4f, 4f)); // Fixed height to 1.0f
-                    attempts++;
-                    
-                    // Check distance from goal and agent spawn point
-                    float distanceFromGoal = Vector3.Distance(offset, goalOffset);
-                    float distanceFromAgent = Vector3.Distance(offset, Vector3.up * 1.0f); // Agent at center + up
-                    
-                    validPosition = distanceFromGoal > 1.5f && distanceFromAgent > 1.5f;
-                    
-                } while (!validPosition && attempts < 20); // Increased attempts
-                
-                if (validPosition)
-                {
-                    var obsPosition = center + offset;
-                    var obs = Instantiate(obstaclePrefab, obsPosition, Quaternion.identity, arenaContainer.transform);
-                    obs.name = $"Obstacle_{i}_Arena_{transform.childCount}";
+                    var obs = Instantiate(obstaclePrefab, obstaclePosition, Quaternion.identity, arenaContainer.transform);
+                    obs.name = $"Obstacle_{i}_Arena_{arenaIndex}";
                     obs.tag = "Obstacle";
+                    existingObstacles.Add(obstaclePosition);
                     successfulObstacles++;
-                    TrainArenaDebugManager.Log($"Arena {arenaIndex}: Placed Obstacle {i} at {obsPosition}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                    TrainArenaDebugManager.Log($"Arena {arenaIndex}: Placed Obstacle {i} at {obstaclePosition}", TrainArenaDebugManager.DebugLogLevel.Verbose);
                 }
                 else
                 {
-                    TrainArenaDebugManager.LogWarning($"Arena {arenaIndex}: Failed to place Obstacle {i} after {attempts} attempts");
+                    TrainArenaDebugManager.LogWarning($"Arena {arenaIndex}: Failed to place Obstacle {i} - position outside safe zone");
                 }
             }
             TrainArenaDebugManager.Log($"Arena {arenaIndex}: Placed {successfulObstacles}/{obstaclesPerArena} obstacles", TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
-        // Validation: Ensure all objects are within arena bounds
-        ValidateArenaObjects(arenaContainer, center, arenaIndex);
+        // Validation: Use ArenaHelper for enhanced validation
+        arenaHelper.ValidateArenaObjects(arenaContainer.transform, center, arenaIndex, true);
         
         TrainArenaDebugManager.Log($"Arena {arenaIndex} setup complete", TrainArenaDebugManager.DebugLogLevel.Important);
     }
-    
-    void ValidateArenaObjects(GameObject arenaContainer, Vector3 center, int arenaIndex)
+
+    void StyleGoal(Renderer r)
     {
-        float arenaBounds = 7f; // Half of 14x14 arena
-        bool allValid = true;
+        // Use PrimitiveBuilder for consistent goal materials
+        var goalMaterial = PrimitiveBuilder.CreateURPMaterial(smoothness: 0.3f, metallic: 0.0f);
+        var gold = new Color(1f, 0.83f, 0.29f);
+        goalMaterial.color = gold;
+        goalMaterial.name = "GoalMaterial";
         
-        foreach (Transform child in arenaContainer.transform)
+        // Add emission for better visibility
+        if (goalMaterial.HasProperty("_EmissionColor"))
         {
-            Vector3 pos = child.position;
-            Vector3 localPos = pos - center;
-            
-            if (Mathf.Abs(localPos.x) > arenaBounds || Mathf.Abs(localPos.z) > arenaBounds)
-            {
-                TrainArenaDebugManager.LogError($"Arena {arenaIndex}: {child.name} is OUTSIDE arena bounds at {pos}! Local offset: {localPos}");
-                allValid = false;
-            }
+            goalMaterial.SetColor("_EmissionColor", gold * 2f);
+            goalMaterial.EnableKeyword("_EMISSION");
         }
         
-        if (allValid)
-        {
-            TrainArenaDebugManager.Log($"Arena {arenaIndex}: All objects within bounds ✓", TrainArenaDebugManager.DebugLogLevel.Important);
-        }
+        r.material = goalMaterial;
     }
 }

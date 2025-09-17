@@ -1,31 +1,44 @@
 # TrainArena (Cube -> Ragdoll -> Mini-Game)
 
 This project is a **minimal Unity 6** starter to learn PPO-based Reinforcement Learning with
-**Unity ML-Agents** and ship a slick demo by week’s end. It includes:
-- A **CubeAgent** scene builder (programmatic) for the *reach-the-goal & avoid obstacles* task.
+**Unity ML-Agents** and ship a slick demo by week's end. It includes:
+
+- A **CubeAgent** scene builder (programmatic) for the _reach-the-goal & avoid obstacles_ task.
 - PPO **trainer configs** for cube and ragdoll.
 - A **PD joint controller** and agent skeleton for ragdoll locomotion.
+- **Automated Python setup** with verified compatibility.
 - Tools and docs to keep you moving fast.
 
-> You’ll create an empty Unity project, then drop this `Assets/` and `Tools/` in.
-> Scenes are created **programmatically** so you don’t need binary `.unity` files.
+> You'll create an empty Unity project, then drop this `Assets/` and `Tools/` in.
+> Scenes are created **programmatically** so you don't need binary `.unity` files.
 
 ---
 
-## 0) Prereqs
+## 🚀 **Quick Start (Verified Setup)**
 
-- **Unity 6.2+**
-- Package Manager: add
-  - **ML Agents** (com.unity.ml-agents)
-  - **Barracuda** (com.unity.barracuda)
-- Python 3.10+
-  ```bash
-  pip install mlagents tensorboard
-  ```
+### **Prerequisites**
 
-Optional (for ragdoll exploration):
-```bash
-pip install numpy
+- **Unity 6.2+** with **com.unity.ml-agents v4.0.0** and **com.unity.barracuda** package
+- **Python and ML dependencies** (automatically installed by setup script - see [Scripts README](./Scripts/README.md))
+  - **Python 3.10.11**
+  - **ML-Agents 1.1.0** (latest compatible version)
+  - **PyTorch 2.1.2** with CUDA support
+  - **TensorBoard 2.20.0** for training monitoring
+
+### **One-Command Setup**
+
+```powershell
+# Automated setup - installs Python 3.10.11 + ML-Agents 1.1.0
+.\Scripts\setup_python310.ps1
+
+# Activate environment
+.\Scripts\activate_mlagents_py310.ps1
+
+# Verify everything works
+.\Scripts\check_environment.ps1
+
+# Start training
+.\Scripts\train_cube.ps1
 ```
 
 ---
@@ -50,17 +63,20 @@ pip install numpy
 - For training, use the Python trainer (below).
 
 ### Observations
+
 - Local velocity (3)
 - Vector to goal in agent local frame (3)
 - 8 planar raycasts distances for obstacle sensing (8)
 
 ### Actions
+
 - 2 continuous actions → force along local XZ
 
 ### Rewards (per step)
+
 - Progress toward goal (+)
 - Small time penalty (-)
-- Energy penalty (-||action||² * coeff)
+- Energy penalty (-||action||² \* coeff)
 - Obstacle collision penalty (-)
 - Success bonus (+1) and EndEpisode
 
@@ -68,21 +84,37 @@ pip install numpy
 
 ## 3) Train PPO (Cube)
 
-In a terminal from the project root (where `Assets/` lives):
+**Automated Training** (Recommended):
 
-```bash
+```powershell
+# Start training with automatic TensorBoard
+.\Scripts\train_cube.ps1
+
+# Then open Unity and press PLAY
+```
+
+> 💡 **Optimized Configuration**: The included `cube_ppo.yaml` uses input normalization and balanced hyperparameters for fast, stable learning. Expect visible progress within 10-20 minutes!
+
+**Manual Training**:
+
+```powershell
+# Activate environment first
+.\Scripts\activate_mlagents_py310.ps1
+
+# Start training
 mlagents-learn Assets/ML-Agents/Configs/cube_ppo.yaml --run-id=cube_run_01 --train
+
+# In another terminal, start TensorBoard
+tensorboard --logdir=results
 ```
 
 - In Unity, enter **Play** mode in the training scene (or start a headless player build).
-- Watch TensorBoard:
-```bash
-tensorboard --logdir=results
-```
+- Watch TensorBoard at: http://localhost:6006
 
 When training finishes, an `.onnx` policy is exported under `results/<run-id>/`.
 
 ### Inference in Unity
+
 - Select the CubeAgent prefab in play or your scene.
 - In **Behavior Parameters**, set **Model** to the exported `.onnx` file and **Behavior Type** to `Inference Only`.
 - Press Play. You now have a trained cube agent.
@@ -98,12 +130,18 @@ The starter includes minimal components for ragdoll control:
 - `ragdoll_ppo.yaml` — a reasonable starting PPO config (will need tuning).
 
 **Workflow**
+
 1. Construct a ragdoll using **ArticulationBody** (preferred) or **ConfigurableJoint**.
 2. Add `PDJointController` to each actuated joint.
 3. Add `RagdollAgent` to the pelvis/root with references to joints.
 4. Use the provided menu **Tools ▸ ML Hack ▸ Build Ragdoll Test Scene** for a minimal flat world.
 5. Train with:
-   ```bash
+
+   ```powershell
+   # Automated (when available)
+   .\Scripts\train_ragdoll.ps1
+
+   # Or manual
    mlagents-learn Assets/ML-Agents/Configs/ragdoll_ppo.yaml --run-id=ragdoll_run_01 --train
    ```
 
@@ -124,22 +162,126 @@ Assets/
     Ragdoll/PDJointController.cs
     Ragdoll/RagdollAgent.cs
     Utilities/EnvInitializer.cs
-Tools/
-  train_cube.sh
-  train_cube.ps1
-  train_ragdoll.sh
-  train_ragdoll.ps1
-README.md
-PLAN.md
+
+Scripts/                          # Python environment management
+  setup_python310.ps1            # Primary setup script
+  activate_mlagents_py310.ps1     # Environment activation
+  check_environment.ps1           # Verification script
+  train_cube.ps1                 # Training launcher
+  purgatory/                     # Archived scripts
+
+RESET_GUIDE.md                   # Clean project reset instructions
+README.md                        # This file
+PLAN.md                         # Development plan
 ```
 
 ---
 
+## 🔧 **Environment Management**
+
+### **Clean Reset**
+
+If you need to reset your Python environment:
+
+```powershell
+# Surgical cleanup (recommended)
+.\Scripts\surgical_cleanup.ps1
+
+# Then fresh setup
+.\Scripts\setup_python310.ps1
+```
+
+See `RESET_GUIDE.md` for detailed reset options.
+
+### **Troubleshooting**
+
+**Environment issues?**
+
+```powershell
+.\Scripts\check_environment.ps1  # Diagnose problems
+```
+
+**Training connection issues?**
+
+- Ensure Unity ML-Agents package is installed
+- Check that BehaviorType is set to "Default" in Unity
+- Verify the scene has CubeAgent objects
+
+**Performance issues?**
+
+- Use `--no-graphics` flag for headless training
+- Increase `--time-scale` for faster training
+- Monitor GPU usage during training
+
+---
+
+## 📚 **Documentation**
+
+**Quick Navigation:**
+
+- 🚀 **[Quick Start Guide](Docs/QUICK_START.md)** - 5-minute setup and first training
+- 📖 **[Complete Training Guide](Docs/TRAINING_GUIDE.md)** - In-depth training workflow and optimization
+- 🔧 **[Debug & Troubleshooting](Docs/DEBUG_AND_TROUBLESHOOTING.md)** - Debug system usage and problem solving
+- 🌟 **[Advanced Features](Docs/ADVANCED_FEATURES.md)** - Self-play, domain randomization, TensorBoard integration
+- 🎬 **[Recording & Demo Guide](Docs/RECORDING_AND_DEMO.md)** - Create shareable videos and demos
+- 📋 **[API Reference](Docs/API_REFERENCE.md)** - Technical code reference and integration
+
+**User Journey:**
+
+1. **New to project?** Start with [Quick Start Guide](Docs/QUICK_START.md)
+2. **Training issues?** Check [Debug & Troubleshooting](Docs/DEBUG_AND_TROUBLESHOOTING.md)
+3. **Want to learn more?** Read the [Complete Training Guide](Docs/TRAINING_GUIDE.md)
+4. **Ready for advanced features?** Explore [Advanced Features](Docs/ADVANCED_FEATURES.md)
+5. **Creating demos?** Use [Recording & Demo Guide](Docs/RECORDING_AND_DEMO.md)
+6. **Building custom features?** Reference [API Documentation](Docs/API_REFERENCE.md)
+
+---
+
 ## 6) Next steps / Stretch
-- Multi-agent “tag” (runner vs chaser)
+
+- Multi-agent "tag" (runner vs chaser)
 - Domain randomization toggles in UI
 - In-game reward breakdown bars for live debugging
 - ONNX model switcher (Random / Heuristic / Trained)
 - Record training timelapse for your sizzle reel
 
 Good luck and have fun! 🚀
+
+---
+
+## 📊 **Verified Compatibility**
+
+This project uses the latest compatible versions as of September 2025:
+
+- **Unity**: 6.2+ with ML-Agents Package v4.0.0
+- **Python**: 3.10.11 (Unity official requirement)
+- **ML-Agents**: 1.1.0 (latest available)
+- **PyTorch**: 2.1.2+cu121 (CUDA support)
+- **TensorBoard**: 2.20.0 (latest)
+
+All compatibility issues with newer Python versions have been resolved.
+
+---
+
+## ⚙️ **Optimized Training Configuration**
+
+The included `cube_ppo.yaml` configuration has been optimized for fast, stable learning:
+
+### **Key Optimizations**
+
+- ✅ **Input normalization enabled** - Faster convergence and smoother learning curves
+- ✅ **Balanced hyperparameters** - Stable learning without overfitting
+- ✅ **Appropriate network size** - 128 hidden units, 2 layers for cube navigation
+- ✅ **Conservative training steps** - 500K steps for quick initial results
+
+### **Expected Performance**
+
+- **Learning visible** within 50K-100K steps (10-20 minutes)
+- **Smooth training curves** with normalization enabled
+- **Stable convergence** to good performance
+- **Ready for inference** after full 500K step training
+
+### **Configuration Details**
+
+For complete parameter explanations and tuning guidance, see:
+📚 **[Assets/ML-Agents/Configs/README.md](./Assets/ML-Agents/Configs/README.md)**

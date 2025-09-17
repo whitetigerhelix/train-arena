@@ -37,10 +37,7 @@ public static class TagSceneBuilder
 
     static GameObject CreateRunnerPrefab()
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        go.name = "Runner";
-        var rb = go.AddComponent<Rigidbody>();
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        var go = PrimitiveBuilder.CreateAgent("Runner");//TODO:, Vector3.zero, Color.blue);
 
         var agent = go.AddComponent<RunnerAgent>();
         var bp = go.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
@@ -57,10 +54,7 @@ public static class TagSceneBuilder
 
     static GameObject CreateTaggerPrefab()
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        go.name = "Tagger";
-        var rb = go.AddComponent<Rigidbody>();
-        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        var go = PrimitiveBuilder.CreateAgent("Tagger");//TODO:, Vector3.zero, Color.red);
         go.AddComponent<HeuristicTagger>();
         return go;
     }

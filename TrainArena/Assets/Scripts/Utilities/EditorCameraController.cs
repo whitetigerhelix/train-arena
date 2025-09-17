@@ -16,6 +16,9 @@ public class EditorCameraController : MonoBehaviour
     [Header("Zoom Limits")]
     public float minZoom = 2f;
     public float maxZoom = 100f;
+    
+    // Precision constants
+    private const float SCROLL_PRECISION = 0.01f;           // Minimum scroll delta to process
 
     private Vector3 lastMousePosition;
     private bool isRotating = false;
@@ -52,9 +55,9 @@ public class EditorCameraController : MonoBehaviour
         
         // Up/Down movement
         if (keyboard.qKey.isPressed)
-            moveDirection += Vector3.up;
-        if (keyboard.eKey.isPressed)
             moveDirection -= Vector3.up;
+        if (keyboard.eKey.isPressed)
+            moveDirection += Vector3.up;
 
         // Apply movement
         transform.position += moveDirection.normalized * currentSpeed * Time.unscaledDeltaTime;
@@ -96,7 +99,7 @@ public class EditorCameraController : MonoBehaviour
         if (mouse == null) return;
 
         float scroll = mouse.scroll.ReadValue().y;
-        if (Mathf.Abs(scroll) > 0.01f)
+        if (Mathf.Abs(scroll) > SCROLL_PRECISION)
         {
             // Normalize scroll value and apply zoom
             scroll = scroll * 0.01f; // Scale down the scroll input
@@ -113,7 +116,7 @@ public class EditorCameraController : MonoBehaviour
         }
     }
 
-    void OnGUI()
+    /*void OnGUI()
     {
         if (!Application.isEditor && Application.isPlaying)
             return;
@@ -133,6 +136,9 @@ public class EditorCameraController : MonoBehaviour
                          "Right Click + Mouse - Look\n" +
                          "Mouse Wheel - Zoom";
         
-        GUI.Label(new Rect(10, 10, 200, 120), controls);
-    }
+        const float HELP_WIDTH = 200f;
+        const float HELP_HEIGHT = 120f;
+        const float HELP_MARGIN = 10f;
+        GUI.Label(new Rect(HELP_MARGIN, HELP_MARGIN, HELP_WIDTH, HELP_HEIGHT), controls);
+    }*/
 }

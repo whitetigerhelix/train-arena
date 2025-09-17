@@ -5,45 +5,81 @@ using System.Linq;
 
 public static class SceneBuilder
 {
+    /// <summary>
+    /// Detects if ML-Agents training is active by checking for Academy communication port
+    /// This allows automatic switching between training and testing modes
+    /// </summary>
+    private static bool IsMLAgentsTrainingActive()
+    {
+        // Check if Academy is connected to external trainer
+        var academy = Unity.MLAgents.Academy.Instance;
+        if (academy != null)
+        {
+            // In training mode, Academy.IsCommunicatorOn returns true when connected to mlagents-learn
+            return academy.IsCommunicatorOn;
+        }
+        return false;
+    }
+
     [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
     public static void BuildCubeScene()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
 
-        // Camera with controller for navigation
+        // Camera with controller for navigation - optimized for 16:9 and isometric view
         var cam = new GameObject("Main Camera");
         var camera = cam.AddComponent<Camera>();
         cam.tag = "MainCamera";
-        // Position camera to view 4x4 grid: arenas at (0,0), (20,0), (40,0), (60,0), etc.
+        
+        // Position camera with slight isometric angle for better arena framing
         // Center of grid is at (30, 0, 30) - halfway between (0,0) and (60,60)
-        cam.transform.position = new Vector3(30, 40, -20); 
+        cam.transform.position = new Vector3(30, 50, -15); // Higher and closer for better framing
         cam.transform.LookAt(new Vector3(30, 0, 30)); // Look at center of 4x4 arena grid
+        
+        // Optimize for 16:9 aspect ratio
+        camera.aspect = 16f / 9f;
+        camera.fieldOfView = 60f; // Slightly wider FOV to frame all arenas tightly
         camera.clearFlags = CameraClearFlags.Skybox;
         
         // Add camera controller for WASD navigation
         cam.AddComponent<EditorCameraController>();
         
+        // Add camera controls UI (positioned to not conflict with TimeScaleManager)
+        cam.AddComponent<CameraControlsUI>();
+        
         // Add debug manager to scene
         var debugManager = new GameObject("TrainArenaDebugManager");
         debugManager.AddComponent<TrainArenaDebugManager>();
+        
+        // Add time scale manager for training speed monitoring
+        var timeManager = new GameObject("TimeScaleManager");
+        timeManager.AddComponent<TimeScaleManager>();
 
-        // Light
+        // Light - Enhanced setup with soft shadows
         var lightGO = new GameObject("Directional Light");
         var light = lightGO.AddComponent<Light>();
         light.type = LightType.Directional;
         light.intensity = 1.2f;
         lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
+        
+        // Enhanced lighting settings for better quality
+        light.shadows = LightShadows.Soft;
+        light.shadowStrength = 0.6f;
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium; // 1024x1024
 
         // Manager
         var manager = new GameObject("EnvManager");
         var init = manager.AddComponent<EnvInitializer>();
 
         // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
-        init.cubeAgentPrefab = CreateCubeAgentPrefab();
-        init.goalPrefab = CreateGoalPrefab();
-        init.obstaclePrefab = CreateObstaclePrefab();
+        init.cubeAgentPrefab = CreateCubeAgentPrefab(init);
+        init.goalPrefab = CreateGoalPrefab(init);
+        init.obstaclePrefab = CreateObstaclePrefab(init);
 
-        TrainArenaDebugManager.Log("Cube training scene created. Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn.", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🎯 Cube training scene created with auto behavior switching and time scale monitoring!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     [MenuItem("Tools/ML Hack/Build Ragdoll Test Scene")]
@@ -61,41 +97,23 @@ public static class SceneBuilder
         light.type = LightType.Directional;
         light.intensity = 1.2f;
         lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
+        
+        // Enhanced lighting settings for better quality
+        light.shadows = LightShadows.Soft;
+        light.shadowStrength = 0.6f;
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium; // 1024x1024
 
         // Ground
-        var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        var ground = PrimitiveBuilder.CreateGround("Ground");
         ground.transform.localScale = Vector3.one;
-        ground.name = "Ground";
-        
-        // Unity 6.2 compatible ground material
-        Material groundMat = CreateCompatibleMaterial();
-        groundMat.color = Color.white;
-        groundMat.name = "GroundMaterial";
-        ground.GetComponent<Renderer>().material = groundMat;
 
         Debug.Log("Ragdoll test scene created. Build your ragdoll and add RagdollAgent + PDJointController components.");
     }
 
-    static GameObject CreateCubeAgentPrefab()
+    static GameObject CreateCubeAgentPrefab(EnvInitializer init)
     {
-        var agent = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Object.DestroyImmediate(agent.GetComponent<Collider>());
-        agent.name = "CubeAgent";
-        
-        // Set up material for the agent
-        var mr = agent.GetComponent<Renderer>();
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.blue;
-        mat.name = "AgentMaterial";
-        mr.material = mat;
-        
-        // Use BoxCollider to match cube shape perfectly
-        var col = agent.AddComponent<BoxCollider>();
-        col.center = Vector3.zero; // Centered on the cube
-        col.size = Vector3.one; // 1x1x1 cube
-
-        var rb = agent.AddComponent<Rigidbody>();
-        rb.mass = 1f;
+        // Use PrimitiveBuilder for consistent agent creation
+        var agent = PrimitiveBuilder.CreateAgent("CubeAgent");
 
         var cubeAgent = agent.AddComponent<CubeAgent>();
         // Set obstacle mask to everything for tag-based detection
@@ -106,7 +124,8 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorName = "CubeAgent";
-            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Use heuristic for testing without trainer
+            // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
@@ -127,122 +146,41 @@ public static class SceneBuilder
                 behaviorParams.BrainParameters.VectorObservationSize = totalObservations;
             }
             
+            string behaviorMode = behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.Default ? "ML Training" : "Editor Testing";
             TrainArenaDebugManager.Log($"Configured agent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
-                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts)", 
+                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts), Mode: {behaviorMode}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
-        
-        // Add simple face to show agent orientation
-        AddAgentFace(agent);
         
         // Add blinking animation for visual polish
         agent.AddComponent<EyeBlinker>();
         
         // Add debug info component for development
         agent.AddComponent<AgentDebugInfo>();
+        
+        // Add automatic behavior switching for seamless training/testing
+        var autoSwitcher = agent.AddComponent<AutoBehaviorSwitcher>();
+        autoSwitcher.enableAutoSwitching = true;
+        autoSwitcher.showDebugMessages = true;
+        
+        TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless training/testing mode switching", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
 
         return agent;
     }
 
-    static GameObject CreateGoalPrefab()
+    static GameObject CreateGoalPrefab(EnvInitializer init)
     {
-        var goal = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        goal.transform.localScale = Vector3.one * 0.6f;
-        var mr = goal.GetComponent<Renderer>();
-        
-        // Unity 6.2 compatible material creation
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.yellow;
-        mat.name = "GoalMaterial";
-        mr.material = mat;
-        
-        goal.name = "Goal";
-        return goal;
+        // Use PrimitiveBuilder for consistent goal creation
+        return PrimitiveBuilder.CreateGoal(init.ArenaHelper.GoalHeight);
     }
 
-    static GameObject CreateObstaclePrefab()
+    static GameObject CreateObstaclePrefab(EnvInitializer init)
     {
-        var obs = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        obs.transform.localScale = new Vector3(0.8f, 1.0f, 0.8f);
-        var mr = obs.GetComponent<Renderer>();
-        
-        // Unity 6.2 compatible material creation
-        Material mat = CreateCompatibleMaterial();
-        mat.color = Color.red;
-        mat.name = "ObstacleMaterial";
-        mr.material = mat; // Use instance material, not shared
-        
-        obs.name = "Obstacle";
-        
-        // Ensure Obstacle tag exists
-        EnsureTagExists("Obstacle");
-        obs.tag = "Obstacle";
-        
-        return obs;
+        // Use PrimitiveBuilder for consistent obstacle creation
+        PrimitiveBuilder.EnsureTagExists("Obstacle");
+        return PrimitiveBuilder.CreateObstacle(init.ArenaHelper.ObstacleHeight);
     }
     
-    /// <summary>
-    /// Creates a material compatible with Unity 6.2, handling URP/Built-in pipeline differences
-    /// </summary>
-    static Material CreateCompatibleMaterial()
-    {
-        // Try URP Lit shader first (Unity 6.2 default), fall back to Standard for Built-in
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null)
-        {
-            shader = Shader.Find("Standard");
-        }
-        if (shader == null)
-        {
-            // Final fallback to built-in unlit
-            shader = Shader.Find("Unlit/Color");
-        }
-        
-        return new Material(shader);
-    }
-    
-    /// <summary>
-    /// Ensures a tag exists in Unity's TagManager, Unity 6.2 compatible
-    /// </summary>
-    static void EnsureTagExists(string tagName)
-    {
-        // First check if tag already exists
-        if (UnityEditorInternal.InternalEditorUtility.tags.Contains(tagName))
-            return;
-            
-        // Add the tag using Unity's built-in method
-        UnityEditorInternal.InternalEditorUtility.AddTag(tagName);
-    }
-    
-    /// <summary>
-    /// Adds simple "eyes" to show agent forward direction
-    /// </summary>
-    static void AddAgentFace(GameObject agent)
-    {
-        // Create left eye - positioned ON the cube surface, not inside
-        var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        leftEye.name = "LeftEye";
-        leftEye.transform.parent = agent.transform;
-        leftEye.transform.localPosition = new Vector3(-0.2f, 0.2f, 0.51f); // Outside cube surface (0.5 + 0.01 margin)
-        leftEye.transform.localScale = Vector3.one * 0.15f; // Slightly larger for visibility
-        
-        // Create right eye  
-        var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        rightEye.name = "RightEye";
-        rightEye.transform.parent = agent.transform;
-        rightEye.transform.localPosition = new Vector3(0.2f, 0.2f, 0.51f); // Outside cube surface
-        rightEye.transform.localScale = Vector3.one * 0.15f;
-        
-        // Make eyes white/black for visibility
-        var eyeMaterial = CreateCompatibleMaterial();
-        eyeMaterial.color = Color.white;
-        eyeMaterial.name = "EyeMaterial";
-        
-        leftEye.GetComponent<Renderer>().material = eyeMaterial;
-        rightEye.GetComponent<Renderer>().material = eyeMaterial;
-        
-        // Remove colliders from eyes so they don't interfere with physics
-        Object.DestroyImmediate(leftEye.GetComponent<Collider>());
-        Object.DestroyImmediate(rightEye.GetComponent<Collider>());
-    }
+
 }
