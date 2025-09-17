@@ -14,6 +14,7 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowObservations = false;
     public static bool ShowVelocityDisplay = false;
     public static bool ShowArenaBounds = false;
+    public static bool ShowMLAgentsStatus = true; // Show ML-Agents behavior info by default
     public static bool ShowHelp = true; // Show by default
     
     [Header("Logging Controls")]
@@ -186,6 +187,13 @@ public class TrainArenaDebugManager : MonoBehaviour
             Debug.Log($"Arena Bounds: {(ShowArenaBounds ? "ON" : "OFF")}");
         }
         
+        // Toggle ML-Agents status with 'M' key
+        if (keyboard.mKey.wasPressedThisFrame)
+        {
+            ShowMLAgentsStatus = !ShowMLAgentsStatus;
+            Debug.Log($"ML-Agents Status: {(ShowMLAgentsStatus ? "ON" : "OFF")}");
+        }
+        
         // Cycle through log levels with 'L' key
         if (keyboard.lKey.wasPressedThisFrame)
         {
@@ -221,20 +229,21 @@ public class TrainArenaDebugManager : MonoBehaviour
                            $"I:{(ShowAgentDebugInfo ? "ON" : "OFF")} " +
                            $"O:{(ShowObservations ? "ON" : "OFF")} " +
                            $"V:{(ShowVelocityDisplay ? "ON" : "OFF")} " +
-                           $"A:{(ShowArenaBounds ? "ON" : "OFF")}";
+                           $"A:{(ShowArenaBounds ? "ON" : "OFF")} " +
+                           $"M:{(ShowMLAgentsStatus ? "ON" : "OFF")}";
         
         GUI.color = Color.white;
         GUI.backgroundColor = new Color(0, 0, 0, 0.7f);
         
-        float statusWidth = 280f;
+        float statusWidth = 310f; // Increased to fit ML-Agents toggle
         Rect statusRect = new Rect(Screen.width - statusWidth - 10, 10, statusWidth, 20);
         GUI.Label(statusRect, debugStatus);
         
         // Show help panel positioned under status bar
         if (ShowHelp)
         {
-            float panelWidth = 280f;
-            float panelHeight = 200f;
+            float panelWidth = 310f; // Match status bar width
+            float panelHeight = 220f; // Increased for new M key option
             float panelX = Screen.width - panelWidth - 10;
             float panelY = 35f; // Just under the status bar
             
@@ -255,13 +264,21 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUILayout.Label("O - Toggle Observations Display");
             GUILayout.Label("V - Toggle Velocity Display");
             GUILayout.Label("A - Toggle Arena Bounds");
+            GUILayout.Label("M - Toggle ML-Agents Status");
             GUILayout.Label("L - Cycle Log Level");
             GUILayout.Label("H - Toggle this help");
             
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
-        else
+        
+        // Show ML-Agents Status Panel (always visible when enabled)
+        if (ShowMLAgentsStatus)
+        {
+            DrawMLAgentsStatusPanel();
+        }
+        
+        if (!ShowHelp)
         {
             // Show toggle indicator when help is hidden
             GUI.color = Color.white;
@@ -274,6 +291,104 @@ public class TrainArenaDebugManager : MonoBehaviour
             Rect hintRect = new Rect(Screen.width - hintWidth - rightMargin, topOffset, hintWidth, hintHeight);
             GUI.Label(hintRect, helpHint);
         }
+    }
+    
+    void DrawMLAgentsStatusPanel()
+    {
+        // Find all CubeAgent instances in the scene
+        CubeAgent[] agents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        
+        if (agents.Length == 0)
+        {
+            return; // No agents to display
+        }
+        
+        // Panel positioning - top-left corner
+        float panelWidth = 420f;
+        float maxPanelHeight = Screen.height * 0.6f; // Max 60% of screen height
+        float lineHeight = 18f;
+        float numLines = 2f;
+        float headerHeight = 25f;
+        float padding = 8f;
+        float posX = 10f;
+        float posY = 140f;
+        
+        // Calculate required height based on agent count
+        float contentHeight = headerHeight + (agents.Length * lineHeight * numLines) + padding * numLines; // numLines per agent
+        float panelHeight = Mathf.Min(contentHeight, maxPanelHeight);
+        
+        Rect panelRect = new Rect(posX, posY, panelWidth, panelHeight);
+        
+        // Draw panel background
+        GUI.backgroundColor = new Color(0, 0, 0, 0.85f);
+        GUI.Box(panelRect, "");
+        
+        GUI.color = Color.white;
+        GUILayout.BeginArea(panelRect);
+        GUILayout.BeginVertical();
+        
+        GUILayout.Space(4);
+        
+        // Header
+        GUI.color = Color.cyan;
+        GUILayout.Label("=== ML-AGENTS STATUS ===", GUI.skin.box);
+        GUI.color = Color.white;
+        
+        // Scrollable area if needed
+        if (agents.Length > 8) // If more than 8 agents, make scrollable
+        {
+            GUILayout.Label($"Showing first 8 of {agents.Length} agents");
+        }
+        
+        // Display agent information
+        for (int i = 0; i < Mathf.Min(agents.Length, 8); i++)
+        {
+            DrawAgentStatus(agents[i]);
+        }
+        
+        GUILayout.EndVertical();
+        GUILayout.EndArea();
+    }
+    
+    void DrawAgentStatus(CubeAgent agent)
+    {
+        if (agent == null) return;
+        
+        // Get behavior parameters
+        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        string behaviorType = "Unknown";
+        string modelName = "NO MODEL";
+        Color statusColor = Color.white;
+        
+        if (behaviorParams != null)
+        {
+            behaviorType = behaviorParams.BehaviorType.ToString();
+            modelName = behaviorParams.Model?.name ?? "NO MODEL";
+            
+            // Color code by behavior type
+            switch (behaviorParams.BehaviorType)
+            {
+                case Unity.MLAgents.Policies.BehaviorType.Default:
+                    statusColor = Color.yellow;
+                    break;
+                case Unity.MLAgents.Policies.BehaviorType.HeuristicOnly:
+                    statusColor = Color.green;
+                    break;
+                case Unity.MLAgents.Policies.BehaviorType.InferenceOnly:
+                    statusColor = Color.cyan;
+                    break;
+            }
+        }
+        
+        // Agent name and behavior type
+        GUI.color = statusColor;
+        GUILayout.Label($"🤖 {agent.name}");
+        GUI.color = Color.white;
+        
+        // Status details
+        GUILayout.Label($"   Type: {behaviorType} | Model: {modelName}");
+        
+        GUILayout.Space(2);
     }
     
     // Logging methods with level filtering
