@@ -557,7 +557,7 @@ MonoBehaviour:
     VectorActionDescriptions: []
     VectorActionSpaceType: 1
     hasUpgradedBrainParametersWithActionSpec: 1
-  m_Model: {fileID: 5022602860645237092, guid: 4c1f153db825bcc4195e302b48f1ca80, type: 3}
+  m_Model: {fileID: 5022602860645237092, guid: fbe2a7e3c94033f4ba87a22ee9e5f6d7, type: 3}
   m_InferenceDevice: 0
   m_BehaviorType: 2
   m_BehaviorName: CubeAgent
