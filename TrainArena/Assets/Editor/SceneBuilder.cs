@@ -2,6 +2,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEditorInternal;
 using System.Linq;
+using Unity.MLAgents;
 
 public static class SceneBuilder
 {
@@ -86,28 +87,134 @@ public static class SceneBuilder
     public static void BuildRagdollScene()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
-        var cam = new GameObject("Main Camera");
-        cam.tag = "MainCamera";
-        cam.AddComponent<Camera>();
-        cam.transform.position = new Vector3(0, 3, -6);
-        cam.transform.LookAt(Vector3.zero);
 
+        // Camera with controller for navigation - same as cube scene
+        var cam = new GameObject("Main Camera");
+        var camera = cam.AddComponent<Camera>();
+        cam.tag = "MainCamera";
+        
+        // Position camera for single ragdoll testing
+        cam.transform.position = new Vector3(0, 4, -8);
+        cam.transform.LookAt(Vector3.zero);
+        
+        // Optimize for ragdoll testing
+        camera.aspect = 16f / 9f;
+        camera.fieldOfView = 60f;
+        camera.clearFlags = CameraClearFlags.Skybox;
+        
+        // Add camera controller for WASD navigation (same as cube scene)
+        cam.AddComponent<EditorCameraController>();
+        cam.AddComponent<CameraControlsUI>();
+        
+        // Add debug manager to scene (same as cube scene)
+        var debugManager = new GameObject("TrainArenaDebugManager");
+        debugManager.AddComponent<TrainArenaDebugManager>();
+        
+        // Add time scale manager for consistent behavior (same as cube scene)
+        var timeManager = new GameObject("TimeScaleManager");
+        timeManager.AddComponent<TimeScaleManager>();
+
+        // Light - Enhanced setup with soft shadows (same as cube scene)
         var lightGO = new GameObject("Directional Light");
         var light = lightGO.AddComponent<Light>();
         light.type = LightType.Directional;
         light.intensity = 1.2f;
         lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
-        
-        // Enhanced lighting settings for better quality
         light.shadows = LightShadows.Soft;
         light.shadowStrength = 0.6f;
-        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium; // 1024x1024
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
 
-        // Ground
-        var ground = PrimitiveBuilder.CreateGround("Ground");
-        ground.transform.localScale = Vector3.one;
+        // Manager - USE SAME PATTERN AS CUBE SCENE
+        var manager = new GameObject("RagdollEnvManager");
+        var init = manager.AddComponent<EnvInitializer>();
 
-        Debug.Log("Ragdoll test scene created. Build your ragdoll and add RagdollAgent + PDJointController components.");
+        // Configure for single ragdoll testing
+        init.ArenaHelper.ArenaSize = 15f; // Smaller arena for single ragdoll testing
+
+        // Prefabs - create ragdoll prefab using same pattern as cube scene
+        init.cubeAgentPrefab = CreateRagdollAgentPrefab(init);
+        init.goalPrefab = null; // No goals needed for balance testing
+        init.obstaclePrefab = null; // No obstacles for initial balance testing
+
+        // Ensure ML-Agents Academy is initialized (same as cube scene)
+        if (Academy.Instance == null)
+        {
+            var academy = Academy.Instance;
+            TrainArenaDebugManager.Log("✅ Academy initialized for ragdoll test scene", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        TrainArenaDebugManager.Log("🎭 Ragdoll test scene created with EnvInitializer infrastructure!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🎮 Usage: Press Play to test physics, 'H' for heuristic mode, or start training", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+
+    [MenuItem("Tools/ML Hack/Build Ragdoll Training Scene")]
+    public static void BuildRagdollTrainingScene()
+    {
+        var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
+
+        // Camera with controller for navigation - optimized for ragdoll training view
+        var cam = new GameObject("Main Camera");
+        var camera = cam.AddComponent<Camera>();
+        cam.tag = "MainCamera";
+        
+        // Position camera for 2x2 ragdoll grid (4 arenas) 
+        // Center of grid is at (4, 0, 4) - halfway between (0,0) and (8,8) 
+        cam.transform.position = new Vector3(4, 12, -8); // Higher and further back for ragdolls
+        cam.transform.LookAt(new Vector3(4, 0, 4)); // Look at center of 2x2 arena grid
+        
+        // Optimize camera settings for ragdoll observation
+        camera.aspect = 16f / 9f;
+        camera.fieldOfView = 50f; // Slightly narrower FOV for better ragdoll detail
+        camera.clearFlags = CameraClearFlags.Skybox;
+        
+        // Add camera controller for WASD navigation
+        cam.AddComponent<EditorCameraController>();
+        cam.AddComponent<CameraControlsUI>();
+        
+        // Add debug manager and time scale manager (same as cube scene)
+        var debugManager = new GameObject("TrainArenaDebugManager");
+        debugManager.AddComponent<TrainArenaDebugManager>();
+        
+        var timeManager = new GameObject("TimeScaleManager");
+        timeManager.AddComponent<TimeScaleManager>();
+
+        // Enhanced lighting setup (same as cube scene)
+        var lightGO = new GameObject("Directional Light");
+        var light = lightGO.AddComponent<Light>();
+        light.type = LightType.Directional;
+        light.intensity = 1.2f;
+        lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
+        light.shadows = LightShadows.Soft;
+        light.shadowStrength = 0.6f;
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
+
+        // Manager using same pattern as cube scene
+        var manager = new GameObject("RagdollEnvManager");
+        var init = manager.AddComponent<EnvInitializer>();
+
+        // Configure for ragdoll training using existing EnvInitializer structure
+        // EnvInitializer defaults to Training preset (2x2 grid), just configure arena size
+        init.ArenaHelper.ArenaSize = 12f; // Larger arenas for ragdoll movement
+
+        // Create ragdoll prefab using same pattern as cube
+        init.cubeAgentPrefab = CreateRagdollAgentPrefab(init);
+        init.goalPrefab = null; // Ragdolls don't need goals initially (balance focus)
+        init.obstaclePrefab = null; // No obstacles for initial balance training
+
+        // Ensure ML-Agents Academy is initialized (singleton pattern)
+        if (Academy.Instance == null)
+        {
+            // Academy.Instance automatically creates the Academy if it doesn't exist
+            var academy = Academy.Instance;
+            TrainArenaDebugManager.Log("✅ Academy initialized for ragdoll training scene", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        TrainArenaDebugManager.Log("🎭 Ragdoll training scene created with full infrastructure!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("🚀 Usage: Start training with: mlagents-learn Assets/ML-Agents/Configs/ragdoll_ppo.yaml --run-id=ragdoll_sprint --train", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     static GameObject CreateCubeAgentPrefab(EnvInitializer init)
@@ -180,6 +287,42 @@ public static class SceneBuilder
         // Use PrimitiveBuilder for consistent obstacle creation
         PrimitiveBuilder.EnsureTagExists("Obstacle");
         return PrimitiveBuilder.CreateObstacle(init.ArenaHelper.ObstacleHeight);
+    }
+
+    static GameObject CreateRagdollAgentPrefab(EnvInitializer init)
+    {
+        // Use PrimitiveBuilder for consistent ragdoll creation
+        var ragdoll = PrimitiveBuilder.CreateRagdoll("RagdollAgent");
+
+        // The ragdoll already has RagdollAgent and BehaviorParameters from PrimitiveBuilder
+        // Just need to configure behavior switching like cube agents
+        var ragdollAgent = ragdoll.GetComponentInChildren<RagdollAgent>();
+        var behaviorParams = ragdoll.GetComponentInChildren<Unity.MLAgents.Policies.BehaviorParameters>();
+        
+        if (behaviorParams != null)
+        {
+            // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+            behaviorParams.TeamId = 0;
+            behaviorParams.UseChildSensors = true;
+            
+            // Action space is already configured in PrimitiveBuilder (6 continuous actions)
+            // Observation space will be calculated dynamically by RagdollAgent
+            
+            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions " +
+                                     $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        // Add automatic behavior switching for seamless training/testing
+        var autoSwitcher = ragdoll.GetComponentInChildren<Transform>().gameObject.AddComponent<AutoBehaviorSwitcher>();
+        autoSwitcher.enableAutoSwitching = true;
+        autoSwitcher.showDebugMessages = true;
+        
+        TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless ragdoll training/testing mode switching", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
+
+        return ragdoll;
     }
     
 

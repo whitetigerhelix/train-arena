@@ -1,119 +1,152 @@
 # Ragdoll Locomotion - Hackathon Sprint Plan
 
-## 🎯 Mission: Ragdoll Walking in 3-4 Days
+## 🎯 Mission: Ragdoll Walking in 4 Days (UPDATED)
 
 **Timeline:** September 17-20, 2025  
-**Goal:** From standing balance to basic locomotion  
-**Success Metric:** Ragdoll walks 5+ meters forward consistently
+**Goal:** From zero to basic ragdoll locomotion  
+**Success Metric:** Ragdoll stands upright and attempts forward movement consistently
+
+### 🚨 **REALITY CHECK (Sept 17, 2025)**
+
+**Current State:**
+
+- ✅ Code foundation exists (`RagdollAgent.cs`, `PDJointController.cs`)
+- ✅ Training infrastructure ready (Python + ML-Agents working)
+- ❌ **NO ACTUAL RAGDOLL EXISTS** - need to build from scratch
+- ❌ No scene builder integration for ragdolls
+- ❌ No multi-arena training setup
+
+**Adjusted Expectations:**
+
+- Day 1-2: Build actual ragdoll + basic training setup
+- Day 3: Get standing balance working
+- Day 4: Attempt forward movement (stretch: short steps)
 
 ---
 
 ## 📅 Daily Sprint Breakdown
 
-### Day 1 (Sept 17) - Foundation & Standing
+### Day 1 (Sept 17) - **RAGDOLL CREATION + BASIC SETUP** ⚡
 
-**Target:** Get ragdoll standing upright for 10+ seconds
+**Target:** Build actual ragdoll and get training pipeline running
 
-- [ ] **Morning (2-3 hours)**
+- [ ] **Morning (2-3 hours) - BUILD THE RAGDOLL**
 
-  - [ ] Create basic ragdoll prefab (Unity Ragdoll Wizard)
-  - [ ] Build RagdollAgent class extending Agent
-  - [ ] Basic observation space (12-16 observations)
-  - [ ] Simple action space (6-8 joint targets)
+  - [ ] **Create ragdoll using Unity Ragdoll Wizard** (humanoid capsules)
+  - [ ] **Add ConfigurableJoints** to key body parts (6-8 joints max)
+  - [ ] **Integrate PDJointController** components on each joint
+  - [ ] **Wire up RagdollAgent** with joint references and pelvis transform
 
-- [ ] **Afternoon (2-3 hours)**
-  - [ ] Implement reward function (uprightness focus)
-  - [ ] Setup training config (ragdoll_ppo.yaml)
-  - [ ] First training run (balance only)
-  - [ ] Debug and iterate
+- [ ] **Afternoon (2-3 hours) - INTEGRATION**
+  - [ ] **Enhance SceneBuilder** with `CreateRagdoll()` method
+  - [ ] **Create RagdollAgent prefab** for reuse
+  - [ ] **Test heuristic mode** (manual wiggle) to verify joint control
+  - [ ] **First training attempt** - aim for "no crashes" not "good results"
 
-**Success Check:** Ragdoll attempts to balance, training runs without errors
+**Success Check:** Training starts without errors, ragdoll responds to actions
 
-### Day 2 (Sept 18) - Balance Mastery & First Steps
+### Day 2 (Sept 18) - **MULTI-ARENA + BALANCE FOCUS** 🏟️
 
-**Target:** Consistent standing + first forward movement
+**Target:** Scale training setup + focus on standing balance
 
-- [ ] **Morning (2-3 hours)**
+- [ ] **Morning (2-3 hours) - SCALING UP**
 
-  - [ ] Tune PD controller gains for stability
-  - [ ] Refine reward function based on Day 1 results
-  - [ ] Add forward velocity reward (small weight)
-  - [ ] Continue training from best checkpoint
+  - [ ] **Add ragdoll support to EnvInitializer** (multi-arena training)
+  - [ ] **Create ragdoll training scene builder** (4x4 or 2x2 arenas)
+  - [ ] **Optimize physics settings** for faster training iteration
+  - [ ] **Tune PD controller gains** based on Day 1 learnings
 
-- [ ] **Afternoon (2-3 hours)**
-  - [ ] Add basic curriculum (stand → shuffle → step)
-  - [ ] Implement episode termination on fall
-  - [ ] Test different training hyperparameters
-  - [ ] Document what's working vs not working
+- [ ] **Afternoon (2-3 hours) - REWARD ENGINEERING**
+  - [ ] **Focus reward function on balance only** (ignore forward movement)
+  - [ ] **Implement proper episode termination** (fall detection)
+  - [ ] **Start 2-4 hour training runs** with balance-only rewards
+  - [ ] **Monitor training with TensorBoard** and iterate
 
-**Success Check:** Ragdoll stands consistently, occasional forward steps
+**Success Check:** Training shows reward improvement, ragdoll attempts to stay upright
 
-### Day 3 (Sept 19) - Walking Locomotion
+### Day 3 (Sept 19) - **STANDING SUCCESS + MOVEMENT INTRODUCTION** 🧍
 
-**Target:** Coordinated walking gait for 5+ meters
+**Target:** Reliable standing + introduce forward movement rewards
 
-- [ ] **Morning (2-3 hours)**
+- [ ] **Morning (2-3 hours) - BALANCE MASTERY**
 
-  - [ ] Increase forward velocity reward weight
-  - [ ] Add gait smoothness rewards
-  - [ ] Implement domain randomization (mass, friction)
-  - [ ] Train with longer episodes (more steps)
+  - [ ] **Verify standing balance works reliably** (8/10 episodes)
+  - [ ] **Add curriculum progression**: standing → weight shifting
+  - [ ] **Introduce small forward velocity reward** (5% of total reward)
+  - [ ] **Continue training with mixed balance/movement rewards**
 
-- [ ] **Afternoon (2-3 hours)**
-  - [ ] Fine-tune reward balance (speed vs stability)
-  - [ ] Add perturbation resistance training
-  - [ ] Test multiple model checkpoints
-  - [ ] Create inference testing setup
+- [ ] **Afternoon (2-3 hours) - MOVEMENT EXPERIMENTS**
+  - [ ] **Gradually increase forward movement reward weight**
+  - [ ] **Monitor for balance vs movement tradeoffs**
+  - [ ] **Test different episode lengths** (extend if making progress)
+  - [ ] **Create inference testing setup** for model evaluation
 
-**Success Check:** Ragdoll walks forward 5+ meters without falling
+**Success Check:** Ragdoll maintains balance AND shows forward movement attempts
 
-### Day 4 (Sept 20) - Polish & Demo
+### Day 4 (Sept 20) - **DEMO + DOCUMENTATION** 🎬
 
-**Target:** Robust walking + compelling demo recording
+**Target:** Best possible demo + comprehensive documentation
 
-- [ ] **Morning (1-2 hours)**
+- [ ] **Morning (2-3 hours) - OPTIMIZATION & POLISH**
 
-  - [ ] Final training refinements
-  - [ ] Select best model checkpoint
-  - [ ] Add directional control (optional stretch goal)
-  - [ ] Optimize for demo recording
+  - [ ] **Select best performing model checkpoint**
+  - [ ] **Test inference mode** with trained models
+  - [ ] **Optimize ragdoll for demo recording** (visual improvements)
+  - [ ] **Compare multiple training approaches** if time permits
 
-- [ ] **Afternoon (2-3 hours)**
-  - [ ] Record demo videos (walking showcase)
-  - [ ] Create comparison: ragdoll vs cube agents
-  - [ ] Document lessons learned
-  - [ ] Prepare presentation/sharing content
+- [ ] **Afternoon (2-3 hours) - DEMO & SHARING**
+  - [ ] **Record demo videos** showing ragdoll progress (before/after training)
+  - [ ] **Create side-by-side comparison** (untrained vs trained ragdoll)
+  - [ ] **Document lessons learned** and training insights
+  - [ ] **Update project README** with ragdoll training guide
 
-**Success Check:** High-quality demo of ragdoll locomotion ready to share
+**Success Check:** Working ragdoll demo ready to share, even if just standing/balancing
 
 ---
 
-## 🔧 Technical Implementation (Compressed)
+## 🔧 Technical Implementation (UPDATED + REALISTIC)
 
-### Minimal Viable Ragdoll
+### **Day 1: Ragdoll Creation Checklist**
+
+1. **Unity Ragdoll Wizard Setup**
+
+   - Use Unity's built-in Ragdoll Wizard (Window → Ragdoll Wizard)
+   - Create simple humanoid with capsule colliders
+   - Focus on: pelvis, thighs, shins, feet (6 joints max initially)
+
+2. **Integration Tasks**
+   - Add `PDJointController` to each ConfigurableJoint
+   - Set up `RagdollAgent` on pelvis with joint references
+   - Create ragdoll prefab for reuse
+
+### Minimal Viable Ragdoll (EXISTING CODE ANALYSIS)
 
 ```csharp
+// ✅ RagdollAgent.cs ALREADY EXISTS - good foundation
 public class RagdollAgent : Agent
 {
-    // Simplified observations (12-16 total)
-    // - Pelvis velocity (3)
-    // - Pelvis orientation (4)
-    // - Key joint angles: hips, knees (6)
-    // - Ground contact (2-4)
+    // Current observations (4 + 2*joints total)
+    // ✅ Pelvis uprightness (1) - dot product with up vector
+    // ✅ Pelvis velocity (3) - transformed to local space
+    // ✅ Joint angles + angular velocities (2 per joint)
 
-    // Simplified actions (6-8 total)
-    // - Hip targets (2)
-    // - Knee targets (2)
-    // - Ankle targets (2)
-    // - Optional: spine/arms (2)
+    // Current actions (1 per joint)
+    // ✅ Joint target angles mapped from [-1,1] to joint limits
 
-    // Focused rewards
-    // - Upright bonus (high weight early)
-    // - Forward velocity (increase over time)
-    // - Energy penalty (prevent wild movements)
-    // - Fall penalty (episode termination)
+    // Current rewards (BALANCE-FOCUSED - GOOD!)
+    // ✅ Upright bonus (high weight) - (uprightness - 0.8) * 0.01
+    // ✅ Forward velocity (low weight) - clamped forward velocity * 0.02
+    // ✅ Energy penalty - sum of squared actions * 0.001
+    // ✅ Fall detection - uprightness < 0.4 or height < 0.2
 }
 ```
+
+### **Missing Implementation Tasks**
+
+1. **SceneBuilder Integration** - Add `CreateRagdoll()` method
+2. **EnvInitializer Support** - Multi-arena ragdoll training
+3. **Prefab Creation** - Reusable ragdoll with proper setup
+4. **Training Scene** - Ragdoll equivalent of cube training scene
 
 ### Accelerated Training Config
 
@@ -152,15 +185,15 @@ Episode 300k+:   Add smoothness + efficiency rewards
 
 ---
 
-## ⚡ Hackathon Optimizations
+## ⚡ Hackathon Optimizations (UPDATED REALITY)
 
 ### Time-Saving Strategies
 
-1. **Use Unity Ragdoll Wizard** - Don't build from scratch
-2. **Start Simple** - Fewer joints, basic rewards first
-3. **Parallel Training** - Multiple ragdolls per scene (4-8)
-4. **Quick Iterations** - 2-3 hour training cycles, not overnight
-5. **Leverage Cube Success** - Apply same debugging/monitoring approach
+1. **Use Unity Ragdoll Wizard** - Don't build from scratch ✅ **PRIORITY 1**
+2. **Start Simple** - 6 joints max (hips, knees, ankles), basic rewards first
+3. **Parallel Training** - Multiple ragdolls per scene (2x2 = 4 initially)
+4. **Quick Iterations** - 2-3 hour training cycles, not overnight ✅ **LEARNED FROM CUBES**
+5. **Leverage Cube Success** - Apply same SceneBuilder/EnvInitializer patterns
 
 ### Risk Mitigation (Compressed Timeline)
 
@@ -169,12 +202,16 @@ Episode 300k+:   Add smoothness + efficiency rewards
 3. **Complexity Creep** → Stick to walking goal, no fancy moves
 4. **Technical Debt** → Document as you go, don't over-engineer
 
-### Success Fallbacks
+### Success Fallbacks (REALISTIC EXPECTATIONS)
 
-- **Minimal Success:** Ragdoll stands and shuffles forward
-- **Good Success:** Ragdoll walks 5+ meters consistently
-- **Great Success:** Ragdoll walks + turns on command
-- **Amazing Success:** Multi-ragdoll scenarios
+- **Minimal Success:** Ragdoll created, training runs without crashing ✅ **Day 1 TARGET**
+- **Good Success:** Ragdoll stands upright for 5+ seconds consistently ✅ **Day 2-3 TARGET**
+- **Great Success:** Ragdoll shows forward movement attempts (shuffling/stepping)
+- **Amazing Success:** Ragdoll takes multiple coordinated steps forward
+
+### 🎯 **PRIMARY GOAL: Standing Balance**
+
+Getting a ragdoll to reliably stand upright is already a significant ML achievement. Walking is a stretch goal.
 
 ---
 

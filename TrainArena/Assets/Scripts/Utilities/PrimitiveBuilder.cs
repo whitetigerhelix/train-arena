@@ -230,4 +230,124 @@ public static class PrimitiveBuilder
         UnityEditorInternal.InternalEditorUtility.AddTag(tagName);
 #endif
     }
+
+    /// <summary>
+    /// Creates a simple ragdoll structure for ML-Agents training.
+    /// This creates a minimal humanoid with capsule colliders and configurable joints.
+    /// </summary>
+    public static GameObject CreateRagdoll(string name = "RagdollAgent", Vector3 position = default)
+    {
+        var root = new GameObject(name);
+        root.transform.position = position;
+
+        // Create pelvis (root body - no joint, has RagdollAgent) - more realistic proportions
+        var pelvis = CreateRagdollBodyPart("Pelvis", Vector3.zero, new Vector3(0.4f, 0.3f, 0.25f), root.transform);
+        
+        // Create legs with better spacing and proportions
+        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), leftThigh.transform);
+        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(0, -0.2f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), leftShin.transform);
+
+        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), rightThigh.transform);
+        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0, -0.2f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), rightShin.transform);
+
+        // Add joints to create ragdoll hierarchy with realistic human joint limits
+        AddRagdollJoint(leftThigh, pelvis, new Vector3(0, 0, 0), new Vector3(60, 0, 0));   // Hip: 60° forward/back
+        AddRagdollJoint(leftShin, leftThigh, new Vector3(0, 0, 0), new Vector3(120, 0, 0)); // Knee: 120° bend
+        AddRagdollJoint(leftFoot, leftShin, new Vector3(0, 0, 0), new Vector3(30, 0, 0));   // Ankle: 30° flex
+        
+        AddRagdollJoint(rightThigh, pelvis, new Vector3(0, 0, 0), new Vector3(60, 0, 0));   // Hip: 60° forward/back  
+        AddRagdollJoint(rightShin, rightThigh, new Vector3(0, 0, 0), new Vector3(120, 0, 0)); // Knee: 120° bend
+        AddRagdollJoint(rightFoot, rightShin, new Vector3(0, 0, 0), new Vector3(30, 0, 0));   // Ankle: 30° flex
+
+        // Add RagdollAgent to pelvis
+        var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
+        ragdollAgent.pelvis = pelvis.transform;
+        
+        // Add BehaviorParameters for ML-Agents
+        var behaviorParams = pelvis.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        behaviorParams.BehaviorName = "RagdollAgent";
+        behaviorParams.BrainParameters.VectorObservationSize = 4; // Will be calculated automatically
+        behaviorParams.BrainParameters.NumStackedVectorObservations = 1;
+        behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
+        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default;
+        
+        // Collect all PDJointControllers and assign to agent
+        var joints = new System.Collections.Generic.List<PDJointController>();
+        joints.AddRange(root.GetComponentsInChildren<PDJointController>());
+        ragdollAgent.joints = joints;
+
+        return root;
+    }
+
+    /// <summary>
+    /// Creates a single body part (capsule with rigidbody and collider)
+    /// </summary>
+    private static GameObject CreateRagdollBodyPart(string name, Vector3 localPosition, Vector3 size, Transform parent)
+    {
+        var bodyPart = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        bodyPart.name = name;
+        bodyPart.transform.parent = parent;
+        bodyPart.transform.localPosition = localPosition;
+        bodyPart.transform.localScale = size;
+        
+        // Add rigidbody with appropriate settings and realistic mass distribution
+        var rb = bodyPart.AddComponent<Rigidbody>();
+        rb.mass = name == "Pelvis" ? 20f : (name.Contains("Thigh") ? 10f : (name.Contains("Shin") ? 6f : 3f));
+        rb.linearDamping = 0.05f;        // Lower drag for more natural movement
+        rb.angularDamping = 5f;    // Higher angular drag for stability
+        
+        // Configure collider
+        var collider = bodyPart.GetComponent<CapsuleCollider>();
+        collider.material = CreatePhysicsMaterial();
+        
+        return bodyPart;
+    }
+
+    /// <summary>
+    /// Adds a ConfigurableJoint and PDJointController to connect two body parts
+    /// </summary>
+    private static void AddRagdollJoint(GameObject child, GameObject parent, Vector3 axis, Vector3 limits)
+    {
+        var joint = child.AddComponent<ConfigurableJoint>();
+        joint.connectedBody = parent.GetComponent<Rigidbody>();
+        
+        // Configure joint as hinge for simplicity
+        joint.xMotion = ConfigurableJointMotion.Locked;
+        joint.yMotion = ConfigurableJointMotion.Locked;
+        joint.zMotion = ConfigurableJointMotion.Locked;
+        joint.angularXMotion = ConfigurableJointMotion.Limited;
+        joint.angularYMotion = ConfigurableJointMotion.Locked;
+        joint.angularZMotion = ConfigurableJointMotion.Locked;
+        
+        // Set joint limits
+        var lowLimit = joint.lowAngularXLimit;
+        lowLimit.limit = -limits.x;
+        joint.lowAngularXLimit = lowLimit;
+
+        var highLimit = joint.highAngularXLimit;
+        highLimit.limit = limits.x;
+        joint.highAngularXLimit = highLimit;
+        
+        // Add PD controller
+        var pdController = child.AddComponent<PDJointController>();
+        pdController.joint = joint;
+        pdController.minAngle = -limits.x;
+        pdController.maxAngle = limits.x;
+        pdController.kp = 200f;
+        pdController.kd = 10f;
+    }
+
+    /// <summary>
+    /// Creates physics material for ragdoll parts
+    /// </summary>
+    private static PhysicsMaterial CreatePhysicsMaterial()
+    {
+        var material = new PhysicsMaterial("RagdollMaterial");
+        material.dynamicFriction = 0.6f;
+        material.staticFriction = 0.6f;
+        material.bounciness = 0.1f;
+        return material;
+    }
 }
