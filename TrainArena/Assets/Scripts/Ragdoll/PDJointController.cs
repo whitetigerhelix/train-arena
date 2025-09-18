@@ -24,6 +24,13 @@ public class PDJointController : MonoBehaviour
         float deg = Mathf.Lerp(minAngle, maxAngle, (t01 + 1f) * 0.5f);
         targetAngle = deg * Mathf.Deg2Rad;
         controlEnabled = true; // Enable control when setting target
+        
+        // CRITICAL DEBUG: Log target setting
+        if (Time.fixedTime % 2f < Time.fixedDeltaTime)
+        {
+            TrainArenaDebugManager.Log($"🔧 PDJoint {name}: t01={t01:F2} -> deg={deg:F1}° -> rad={targetAngle:F3}", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+        }
     }
     
     public void DisableControl()

@@ -265,13 +265,18 @@ public static class PrimitiveBuilder
         var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
         ragdollAgent.pelvis = pelvis.transform;
         
+        // Note: MaxStep is left at default (0 = infinite) to match cube agent behavior
+        
         // Add BehaviorParameters for ML-Agents
         var behaviorParams = pelvis.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
         behaviorParams.BehaviorName = "RagdollAgent";
         behaviorParams.BrainParameters.VectorObservationSize = 16; // 1 uprightness + 3 pelvis vel + (6 joints * 2 obs each)
         behaviorParams.BrainParameters.NumStackedVectorObservations = 1;
         behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
-        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default;
+        behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Start with heuristic, will be configured by SceneBuilder
+        
+        TrainArenaDebugManager.Log($"🎭 RAGDOLL CREATED: {ragdollAgent.name} - MaxStep={ragdollAgent.MaxStep}, BehaviorName='{behaviorParams.BehaviorName}', ActionSpec={behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
         
         // Collect all PDJointControllers and assign to agent
         var joints = new System.Collections.Generic.List<PDJointController>();

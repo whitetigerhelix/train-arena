@@ -60,6 +60,9 @@ public class TrainArenaDebugManager : MonoBehaviour
         }
     }
     
+    static float lastGCTime = 0f;
+    const float GC_INTERVAL = 120f; // Force GC every 2 minutes as safety net
+    
     void Update()
     {
         HandleInput();
@@ -74,6 +77,20 @@ public class TrainArenaDebugManager : MonoBehaviour
         if (Time.fixedTime % STATUS_REPORT_INTERVAL < Time.fixedDeltaTime)
         {
             LogTrainingStatus();
+        }
+        
+        // Memory management - force GC periodically to prevent OOM
+        if (Time.time - lastGCTime > GC_INTERVAL)
+        {
+            long memoryBefore = System.GC.GetTotalMemory(false);
+            System.GC.Collect();
+            System.GC.WaitForPendingFinalizers();
+            System.GC.Collect();
+            long memoryAfter = System.GC.GetTotalMemory(false);
+            
+            Log($"🧹 Periodic GC: Released {(memoryBefore - memoryAfter) / 1024 / 1024:F1} MB (mem: {memoryAfter / 1024 / 1024:F1} MB)", 
+                DebugLogLevel.Important);
+            lastGCTime = Time.time;
         }
     }
     
@@ -680,6 +697,23 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType behaviorType)
     {
+        // Check if trying to set InferenceOnly without any models
+        if (behaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly)
+        {
+            ITrainArenaAgent[] testAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+                .OfType<ITrainArenaAgent>()
+                .ToArray();
+            
+            bool hasAnyModel = testAgents.Any(agent => 
+                agent.BehaviorParameters != null && agent.BehaviorParameters.Model != null);
+            
+            if (!hasAnyModel)
+            {
+                Log("⚠️ Cannot set agents to Inference mode - no ML models found. Please load models first.", DebugLogLevel.Important);
+                return;
+            }
+        }
+        
         ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
             .OfType<ITrainArenaAgent>()
             .ToArray();
@@ -846,34 +880,44 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawArenaBounds()
     {
-        // Find ALL arena objects - not just the first one
+        // Find Ground objects as descendants of EnvManager for efficiency
         List<GameObject> arenas = new List<GameObject>();
         
-        // Find all objects with arena-like names
-        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-        foreach (var obj in allObjects)
+        // Look for EnvManager first
+        var envInitializer = FindFirstObjectByType<EnvInitializer>();
+        GameObject envManager = envInitializer?.gameObject;
+        if (envManager != null)
         {
-            string objName = obj.name.ToLower();
-            if (objName.Contains("arena") || objName.Contains("ground") || 
-                objName.Contains("platform") || objName.Contains("floor"))
+            // Search for Ground objects under EnvManager
+            Transform[] children = envManager.GetComponentsInChildren<Transform>();
+            foreach (var child in children)
             {
-                var collider = obj.GetComponent<Collider>();
-                if (collider != null && collider.bounds.size.magnitude > 5f) // Reasonable size threshold
+                if (child.name.Contains("Ground"))
                 {
-                    arenas.Add(obj);
+                    var collider = child.GetComponent<Collider>();
+                    if (collider != null)
+                    {
+                        arenas.Add(child.gameObject);
+                    }
                 }
             }
         }
         
-        // If no named arenas found, find large colliders
+        // Fallback: if no EnvManager or Ground objects found, use previous method
         if (arenas.Count == 0)
         {
-            var colliders = FindObjectsByType<Collider>(FindObjectsSortMode.None);
-            foreach (var col in colliders)
+            GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            foreach (var obj in allObjects)
             {
-                if (col.bounds.size.magnitude > 10f)
+                string objName = obj.name.ToLower();
+                if (objName.Contains("arena") || objName.Contains("ground") || 
+                    objName.Contains("platform") || objName.Contains("floor"))
                 {
-                    arenas.Add(col.gameObject);
+                    var collider = obj.GetComponent<Collider>();
+                    if (collider != null && collider.bounds.size.magnitude > 5f)
+                    {
+                        arenas.Add(obj);
+                    }
                 }
             }
         }

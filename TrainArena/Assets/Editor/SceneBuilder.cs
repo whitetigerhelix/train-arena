@@ -325,6 +325,13 @@ public static class SceneBuilder
                 TrainArenaDebugManager.Log("Fixed VectorObservationSize to 16 for RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
             }
             
+            // CRITICAL: Ensure ActionSpec is correctly configured for 6 continuous actions
+            if (behaviorParams.BrainParameters.ActionSpec.NumContinuousActions != 6)
+            {
+                behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6);
+                TrainArenaDebugManager.Log($"FIXED ActionSpec: Set to 6 continuous actions (was {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions})", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            
             TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, " +
                                      $"{behaviorParams.BrainParameters.VectorObservationSize} observations " +
                                      $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 

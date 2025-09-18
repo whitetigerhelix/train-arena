@@ -2,24 +2,25 @@ behaviors:
   RagdollAgent:
     trainer_type: ppo
     hyperparameters:
-      batch_size: 2048
-      buffer_size: 81920
-      learning_rate: 3.0e-4
-      beta: 0.008
-      epsilon: 0.2
-      lambd: 0.95
-      num_epoch: 4
-      gamma: 0.99
+      batch_size: 2048 # Larger batch for ragdoll complexity
+      buffer_size: 40960 # Reduced from 81920 for better memory efficiency
+      learning_rate: 3.0e-4 # Standard learning rate
+      beta: 0.01 # Slightly higher entropy for exploration (was 0.008)
+      epsilon: 0.2 # Standard PPO clipping
+      lambd: 0.95 # Standard GAE parameter
+      num_epoch: 3 # Reduced from 4 to match cube config (faster training)
+      gamma: 0.99 # Standard discount factor
     network_settings:
-      normalize: true
-      hidden_units: 256
-      num_layers: 3
-    max_steps: 1.0e7
-    time_horizon: 256
-    summary_freq: 10000
-    keep_checkpoints: 5
-    checkpoint_interval: 500000
-    threaded: true
+      normalize: true # Essential for ragdoll observations
+      hidden_units: 256 # Good size for ragdoll complexity
+      num_layers: 3 # Deep network for complex physics
+      activation: relu # Explicit activation function
+    max_steps: 2.0e6 # More reasonable training steps (was 1.0e7)
+    time_horizon: 512 # Longer horizon for ragdoll episodes (was 256)
+    summary_freq: 5000 # More frequent summaries (was 10000)
+    keep_checkpoints: 5 # Keep multiple checkpoints
+    checkpoint_interval: 100000 # More frequent checkpoints (was 500000)
+    threaded: true # Enable threading for performance
     reward_signals:
       extrinsic:
         strength: 1.0
