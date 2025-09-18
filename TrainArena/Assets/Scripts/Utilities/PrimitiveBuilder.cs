@@ -252,14 +252,14 @@ public static class PrimitiveBuilder
         var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0.15f, -0.8f, 0), new Vector3(0.15f, 0.35f, 0.15f), root.transform);
         var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0.15f, -1.15f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), root.transform);
 
-        // Add joints with proper anchors to connect body parts at their ends
-        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0, -0.15f, 0), 60f);   // Hip
-        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 120f); // Knee
-        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.15f), new Vector3(0, -0.175f, 0), 30f); // Ankle
+        // Add joints with carefully positioned anchors for stability
+        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.15f, 0), new Vector3(-0.15f, -0.15f, 0), 45f);   // Hip - reduced range
+        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.15f, 0), new Vector3(0, -0.15f, 0), 90f);      // Knee - reduced range
+        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.15f, 0), 20f);   // Ankle - tight range
         
-        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0, -0.15f, 0), 60f);   // Hip
-        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 120f); // Knee
-        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.15f), new Vector3(0, -0.175f, 0), 30f); // Ankle
+        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.15f, 0), new Vector3(0.15f, -0.15f, 0), 45f);   // Hip - reduced range
+        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.15f, 0), new Vector3(0, -0.15f, 0), 90f);    // Knee - reduced range
+        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.15f, 0), 20f); // Ankle - tight range
 
         // Add RagdollAgent to pelvis
         var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
@@ -295,11 +295,12 @@ public static class PrimitiveBuilder
         bodyPart.transform.localPosition = localPosition;
         bodyPart.transform.localScale = size;
         
-        // Add rigidbody with appropriate settings and realistic mass distribution
+        // Add rigidbody with balanced mass distribution for stability
         var rb = bodyPart.AddComponent<Rigidbody>();
-        rb.mass = name == "Pelvis" ? 20f : (name.Contains("Thigh") ? 10f : (name.Contains("Shin") ? 6f : 3f));
-        rb.linearDamping = 0.05f;        // Lower drag for more natural movement
-        rb.angularDamping = 5f;    // Higher angular drag for stability
+        rb.mass = name == "Pelvis" ? 8f : (name.Contains("Thigh") ? 6f : (name.Contains("Shin") ? 4f : 2f));
+        rb.linearDamping = 0.1f;         // Moderate drag for stability
+        rb.angularDamping = 8f;          // Higher angular drag for stability
+        rb.interpolation = RigidbodyInterpolation.Interpolate; // Smooth movement
         
         // Configure collider
         var collider = bodyPart.GetComponent<CapsuleCollider>();
@@ -328,22 +329,31 @@ public static class PrimitiveBuilder
         joint.angularYMotion = ConfigurableJointMotion.Locked;
         joint.angularZMotion = ConfigurableJointMotion.Locked;
         
-        // Set joint limits
+        // Set joint limits with spring for stability
         var lowLimit = joint.lowAngularXLimit;
         lowLimit.limit = -limitDegrees;
+        lowLimit.bounciness = 0.1f;
         joint.lowAngularXLimit = lowLimit;
 
         var highLimit = joint.highAngularXLimit;
-        highLimit.limit = limitDegrees;
+        highLimit.limit = limitDegrees; 
+        highLimit.bounciness = 0.1f;
         joint.highAngularXLimit = highLimit;
         
-        // Add PD controller
+        // Configure joint drive for stability
+        var drive = joint.angularXDrive;
+        drive.positionSpring = 500f;      // Stronger spring
+        drive.positionDamper = 50f;       // Higher damping
+        drive.maximumForce = 1000f;       // Force limit
+        joint.angularXDrive = drive;
+        
+        // Add PD controller with stronger gains
         var pdController = child.AddComponent<PDJointController>();
         pdController.joint = joint;
         pdController.minAngle = -limitDegrees;
         pdController.maxAngle = limitDegrees;
-        pdController.kp = 200f;
-        pdController.kd = 10f;
+        pdController.kp = 800f;           // Much stronger proportional gain
+        pdController.kd = 40f;            // Higher derivative gain
     }
 
     /// <summary>

@@ -25,6 +25,19 @@ public static class SceneBuilder
     [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
     public static void BuildCubeScene()
     {
+        BuildCubeSceneInternal(SceneType.Training);
+    }
+    
+    [MenuItem("Tools/ML Hack/Build Cube Test Scene")]
+    public static void BuildCubeTestScene()
+    {
+        BuildCubeSceneInternal(SceneType.Testing);
+    }
+    
+    enum SceneType { Training, Testing }
+    
+    static void BuildCubeSceneInternal(SceneType sceneType)
+    {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
 
         // Camera with controller for navigation - optimized for 16:9 and isometric view
@@ -72,8 +85,18 @@ public static class SceneBuilder
         var manager = new GameObject("EnvManager");
         var init = manager.AddComponent<EnvInitializer>();
 
+        // Configure based on scene type
+        if (sceneType == SceneType.Testing)
+        {
+            // Test scene configuration: 2x2 grid with more obstacles
+            init.EnvCountX = 2;
+            init.EnvCountZ = 2;
+            init.ObstaclesPerArena = 6;
+        }
+        // Training scene uses default settings (configured in EnvInitializer)
+
         // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
-        init.cubeAgentPrefab = CreateCubeAgentPrefab(init);
+        init.cubeAgentPrefab = CreateCubeAgentPrefab(init, sceneType);
         init.goalPrefab = CreateGoalPrefab(init);
         init.obstaclePrefab = CreateObstaclePrefab(init);
 
@@ -237,7 +260,7 @@ public static class SceneBuilder
         TrainArenaDebugManager.Log("🚀 Usage: Start training with: mlagents-learn Assets/ML-Agents/Configs/ragdoll_ppo.yaml --run-id=ragdoll_sprint --train", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
-    static GameObject CreateCubeAgentPrefab(EnvInitializer init)
+    static GameObject CreateCubeAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
     {
         // Use PrimitiveBuilder for consistent agent creation
         var agent = PrimitiveBuilder.CreateAgent("CubeAgent");
@@ -251,8 +274,17 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorName = "CubeAgent";
-            // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
-            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+            // Configure behavior type based on scene type
+            if (sceneType == SceneType.Testing)
+            {
+                // Test scene: InferenceOnly for AI model testing
+                behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
+            }
+            else
+            {
+                // Training scene: Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
+                behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+            }
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
@@ -285,13 +317,21 @@ public static class SceneBuilder
         // Add debug info component for development
         agent.AddComponent<AgentDebugInfo>();
         
-        // Add automatic behavior switching for seamless training/testing
-        var autoSwitcher = agent.AddComponent<AutoBehaviorSwitcher>();
-        autoSwitcher.enableAutoSwitching = true;
-        autoSwitcher.showDebugMessages = true;
-        
-        TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless training/testing mode switching", 
-                                 TrainArenaDebugManager.DebugLogLevel.Important);
+        // Add automatic behavior switching only for training scenes
+        if (sceneType == SceneType.Training)
+        {
+            var autoSwitcher = agent.AddComponent<AutoBehaviorSwitcher>();
+            autoSwitcher.enableAutoSwitching = true;
+            autoSwitcher.showDebugMessages = true;
+            
+            TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless training/testing mode switching", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        else
+        {
+            TrainArenaDebugManager.Log("Test scene: No AutoBehaviorSwitcher (InferenceOnly mode for AI model testing)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
 
         return agent;
     }
@@ -350,7 +390,7 @@ public static class SceneBuilder
         // Add debug UI components (same as cube agents)
         var pelvis = ragdoll.GetComponentInChildren<RagdollAgent>().gameObject;
         pelvis.AddComponent<AgentDebugInfo>();
-        pelvis.AddComponent<EyeBlinker>(); // Visual feedback component
+        // Note: No EyeBlinker for ragdolls - they don't have eyes
         
         // Add domain randomization for physics testing (random mass, friction, etc.)
         var domainRandomizer = ragdoll.AddComponent<DomainRandomizer>();

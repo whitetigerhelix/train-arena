@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -395,13 +396,14 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawMLAgentsStatusPanel(bool isTraining)
     {
-        // Find all CubeAgent instances in the scene
-        CubeAgent[] agents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        // Find all Agent instances in the scene (both CubeAgent and RagdollAgent)
+        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
         
-        if (agents.Length == 0)
-        {
-            return; // No agents to display
-        }
+        // Always show panel even if no agents found (for debugging)
+        bool hasAgents = cubeAgents.Length > 0 || ragdollAgents.Length > 0;
+        
+        int totalAgents = cubeAgents.Length + ragdollAgents.Length;
         
         // Panel positioning - top-left corner
         float panelWidth = 650f; // Wider for better button layout
@@ -419,7 +421,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         int maxVisibleAgents = Mathf.FloorToInt(availableScrollHeight / agentHeight);
         
         // Always use maximum available space but ensure scroll works when needed
-        float contentHeight = headerHeight + agentLabelHeight + (Mathf.Min(agents.Length, maxVisibleAgents) * agentHeight) + 40f;
+        float contentHeight = headerHeight + agentLabelHeight + (Mathf.Min(totalAgents, maxVisibleAgents) * agentHeight) + 40f;
         float panelHeight = Mathf.Min(contentHeight, maxPanelHeight);
         
         Rect panelRect = new Rect(posX, posY, panelWidth, panelHeight);
@@ -450,7 +452,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         // Global behavior type switching (disabled during training)
         GUI.enabled = !isTraining;
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"All Agents ({agents.Length}):", GUILayout.Width(110));
+        GUILayout.Label($"All Agents ({totalAgents} - {cubeAgents.Length}🧊 {ragdollAgents.Length}🎭):", GUILayout.Width(180));
         
         GUI.backgroundColor = new Color(0f, 0.8f, 1f, isTraining ? 0.3f : 0.8f); // Dimmed when training
         if (GUILayout.Button("🎯 Training", GUILayout.Width(100)))
@@ -503,31 +505,53 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUI.enabled = true; // Re-enable GUI
         
         GUILayout.Space(6);
-        GUI.color = Color.gray;
-        GUILayout.Label($"Agent Status ({agents.Length} total):", GUI.skin.label);
-        GUI.color = Color.white;
-        
-        // Scroll view for agent controls with proper sizing
-        float scrollHeight = panelHeight - headerHeight - 50f; // Account for spacing and label
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, 
-                                                 GUILayout.Width(panelWidth - 20), 
-                                                 GUILayout.Height(scrollHeight),
-                                                 GUILayout.ExpandHeight(false));
-        
-        // Display ALL agents with compact layout - no artificial limit
-        for (int i = 0; i < agents.Length; i++)
+        if (!hasAgents)
         {
-            DrawAgentStatus(agents[i], isTraining);
+            GUILayout.Space(6);
+            GUI.color = Color.yellow;
+            GUILayout.Label("⚠️ No agents found in scene", GUI.skin.box);
+            GUI.color = Color.gray;
+            GUILayout.Label("• Load a scene with CubeAgent or RagdollAgent");
+            GUILayout.Label("• Check that agents have proper ML-Agents components");
+            GUI.color = Color.white;
+        }
+        else
+        {
+            GUI.color = Color.gray;
+            GUILayout.Label($"Agent Status ({totalAgents} total - {cubeAgents.Length} cubes, {ragdollAgents.Length} ragdolls):", GUI.skin.label);
+            GUI.color = Color.white;
         }
         
-        GUILayout.EndScrollView();
+        // Only show scroll view if we have agents
+        if (hasAgents)
+        {
+            // Scroll view for agent controls with proper sizing
+            float scrollHeight = panelHeight - headerHeight - 50f; // Account for spacing and label
+            scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, 
+                                                     GUILayout.Width(panelWidth - 20), 
+                                                     GUILayout.Height(scrollHeight),
+                                                     GUILayout.ExpandHeight(false));
+            
+            // Display ALL agents with compact layout - no artificial limit
+            for (int i = 0; i < cubeAgents.Length; i++)
+            {
+                DrawCubeAgentStatus(cubeAgents[i], isTraining);
+            }
+        
+            for (int i = 0; i < ragdollAgents.Length; i++)
+            {
+                DrawRagdollAgentStatus(ragdollAgents[i], isTraining);
+            }
+            
+            GUILayout.EndScrollView();
+        }
         GUILayout.Space(16);
         
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
     
-    void DrawAgentStatus(CubeAgent agent, bool isTraining)
+    void DrawCubeAgentStatus(CubeAgent agent, bool isTraining)
     {
         if (agent == null) return;
         
@@ -634,27 +658,147 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUILayout.Space(3); // Better spacing between agents for readability and scroll accuracy
     }
     
+    void DrawRagdollAgentStatus(RagdollAgent agent, bool isTraining)
+    {
+        if (agent == null) return;
+        
+        // Get behavior parameters
+        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        string behaviorType = "Unknown";
+        string modelName = "NO MODEL";
+        Color statusColor = Color.white;
+        string behaviorEmoji = "❓";
+        
+        if (behaviorParams != null)
+        {
+            behaviorType = behaviorParams.BehaviorType.ToString();
+            modelName = behaviorParams.Model?.name ?? "NO MODEL";
+            
+            // Color code and emoji by behavior type
+            switch (behaviorParams.BehaviorType)
+            {
+                case Unity.MLAgents.Policies.BehaviorType.Default:
+                    statusColor = Color.orange;
+                    behaviorEmoji = "🎯";
+                    behaviorType = "Training";
+                    break;
+                case Unity.MLAgents.Policies.BehaviorType.HeuristicOnly:
+                    statusColor = Color.cyan;
+                    behaviorEmoji = "🤷";
+                    behaviorType = "Heuristic";
+                    break;
+                case Unity.MLAgents.Policies.BehaviorType.InferenceOnly:
+                    statusColor = Color.yellow;
+                    behaviorEmoji = "🧠";
+                    behaviorType = "AI Model: ";
+                    break;
+            }
+        }
+        
+        // Ragdolls don't have the same AgentActivity as CubeAgent, so check if active
+        bool isActive = agent.gameObject.activeInHierarchy && agent.enabled;
+        string activityEmoji = isActive ? "🟢" : "⚫";
+        string activityStatus = isActive ? "Active" : "Inactive";
+        
+        // Display ragdoll agent with 🎭 emoji to distinguish from cubes
+        GUILayout.BeginHorizontal();
+        
+        GUI.color = statusColor;
+        string agentDisplay = $"{activityEmoji} 🎭 {behaviorEmoji} {agent.name}";
+        
+        if (behaviorParams != null && behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly && !string.IsNullOrEmpty(modelName) && modelName != "NO MODEL")
+        {
+            string shortModel = modelName.Length > 30 ? modelName.Substring(0, 27) + "..." : modelName;
+            agentDisplay += $" ({behaviorType} {shortModel})";
+        }
+        else
+        {
+            agentDisplay += $" ({behaviorType})";
+        }
+        
+        float agentDescriptionWidth = 425f;
+        GUILayout.Label(agentDisplay, GUILayout.Width(agentDescriptionWidth));
+        GUI.color = Color.white;
+        
+        GUILayout.FlexibleSpace();
+        
+        // Activity toggle (simpler for ragdolls)
+        if (isActive)
+        {
+            GUI.backgroundColor = new Color(0f, 0.8f, 0.2f, 0.8f);
+            if (GUILayout.Button("🟢", GUILayout.Width(25)))
+            {
+                agent.gameObject.SetActive(false);
+            }
+        }
+        else
+        {
+            GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.8f);
+            if (GUILayout.Button("⚫", GUILayout.Width(25)))
+            {
+                agent.gameObject.SetActive(true);
+            }
+        }
+        
+        // Individual behavior type buttons
+        GUI.backgroundColor = new Color(0f, 0.8f, 1f, 0.6f);
+        if (GUILayout.Button("🎯", GUILayout.Width(25)))
+        {
+            SetRagdollAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.Default);
+        }
+        
+        if (GUILayout.Button("🤷", GUILayout.Width(25)))
+        {
+            SetRagdollAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.HeuristicOnly);
+        }
+        
+        if (GUILayout.Button("🧠", GUILayout.Width(25)))
+        {
+            SetRagdollAgentBehaviorType(agent, Unity.MLAgents.Policies.BehaviorType.InferenceOnly);
+        }
+        
+        GUI.backgroundColor = new Color(0, 0, 0, 0.85f);
+        GUILayout.EndHorizontal();
+        
+        GUILayout.Space(3);
+    }
+    
     void SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType behaviorType)
     {
         var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        var ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        int totalSet = 0;
+        
         foreach (var agent in cubeAgents)
         {
             var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
             if (behaviorParams != null)
             {
                 behaviorParams.BehaviorType = behaviorType;
+                totalSet++;
+            }
+        }
+        
+        foreach (var agent in ragdollAgents)
+        {
+            var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+            if (behaviorParams != null)
+            {
+                behaviorParams.BehaviorType = behaviorType;
+                totalSet++;
             }
         }
         
         string behaviorName = behaviorType switch
         {
             Unity.MLAgents.Policies.BehaviorType.Default => "Training",
-            Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+            Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Heuristic",
             Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
             _ => behaviorType.ToString()
         };
         
-        Log($"Set all {cubeAgents.Length} agents to {behaviorName} behavior type");
+        Log($"Set all {totalSet} agents ({cubeAgents.Length} cubes, {ragdollAgents.Length} ragdolls) to {behaviorName} behavior type");
     }
     
     void SetAgentBehaviorType(CubeAgent agent, Unity.MLAgents.Policies.BehaviorType behaviorType)
@@ -667,7 +811,26 @@ public class TrainArenaDebugManager : MonoBehaviour
             string behaviorName = behaviorType switch
             {
                 Unity.MLAgents.Policies.BehaviorType.Default => "Training",
-                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Heuristic",
+                Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
+                _ => behaviorType.ToString()
+            };
+            
+            Log($"Set {agent.name} to {behaviorName} behavior type");
+        }
+    }
+    
+    void SetRagdollAgentBehaviorType(RagdollAgent agent, Unity.MLAgents.Policies.BehaviorType behaviorType)
+    {
+        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        if (behaviorParams != null)
+        {
+            behaviorParams.BehaviorType = behaviorType;
+            
+            string behaviorName = behaviorType switch
+            {
+                Unity.MLAgents.Policies.BehaviorType.Default => "Training",
+                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Heuristic",
                 Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
                 _ => behaviorType.ToString()
             };
@@ -679,37 +842,62 @@ public class TrainArenaDebugManager : MonoBehaviour
     void ToggleAllAgentsActivity()
     {
         var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        if (cubeAgents.Length == 0)
+        var ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        if (cubeAgents.Length == 0 && ragdollAgents.Length == 0)
         {
             Log("No agents found to toggle activity");
             return;
         }
         
-        // Determine current state by checking first agent
-        AgentActivity newActivity = cubeAgents[0].agentActivity == AgentActivity.Active ? 
-                                   AgentActivity.Inactive : AgentActivity.Active;
+        // Determine current state - check if any agent is active
+        bool anyActive = false;
+        if (cubeAgents.Length > 0)
+        {
+            anyActive = cubeAgents[0].agentActivity == AgentActivity.Active;
+        }
+        else if (ragdollAgents.Length > 0)
+        {
+            anyActive = ragdollAgents[0].gameObject.activeInHierarchy;
+        }
         
+        bool newActiveState = !anyActive;
         int toggledCount = 0;
+        
         foreach (var agent in cubeAgents)
         {
-            agent.agentActivity = newActivity;
+            agent.agentActivity = newActiveState ? AgentActivity.Active : AgentActivity.Inactive;
             toggledCount++;
         }
         
-        string activityName = newActivity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
-        Log($"Toggled {toggledCount} agents to {activityName} (press Z to toggle)", DebugLogLevel.Important);
+        foreach (var agent in ragdollAgents)
+        {
+            agent.gameObject.SetActive(newActiveState);
+            toggledCount++;
+        }
+        
+        string activityName = newActiveState ? "🟢 ACTIVE" : "⚫ INACTIVE";
+        Log($"Toggled {toggledCount} agents ({cubeAgents.Length} cubes, {ragdollAgents.Length} ragdolls) to {activityName} (press Z to toggle)", DebugLogLevel.Important);
     }
     
     void SetAllAgentsActivity(AgentActivity activity)
     {
         var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        var ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
         foreach (var agent in cubeAgents)
         {
             agent.agentActivity = activity;
         }
         
+        bool ragdollActive = activity == AgentActivity.Active;
+        foreach (var agent in ragdollAgents)
+        {
+            agent.gameObject.SetActive(ragdollActive);
+        }
+        
         string activityName = activity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
-        Log($"Set all {cubeAgents.Length} agents to {activityName}");
+        Log($"Set all {cubeAgents.Length + ragdollAgents.Length} agents ({cubeAgents.Length} cubes, {ragdollAgents.Length} ragdolls) to {activityName}");
     }
     
     void SetAgentActivity(CubeAgent agent, AgentActivity activity)
@@ -743,5 +931,192 @@ public class TrainArenaDebugManager : MonoBehaviour
         {
             Debug.LogError($"[TrainArena] {message}");
         }
+    }
+
+    // Visual debug rendering with Gizmos
+    void OnDrawGizmos()
+    {
+        if (ShowArenaBounds)
+        {
+            DrawArenaBounds();
+        }
+        
+        if (ShowVelocityDisplay)
+        {
+            DrawVelocityVectors();
+        }
+        
+        if (ShowRaycastVisualization)
+        {
+            DrawRaycastVisualization();
+        }
+        
+        if (ShowObservations)
+        {
+            DrawObservationVisuals();
+        }
+    }
+    
+    void DrawArenaBounds()
+    {
+        // Find arena bounds from SceneBuilder or use default
+        var arena = GameObject.Find("Arena");
+        if (arena != null)
+        {
+            var bounds = arena.GetComponent<Collider>();
+            if (bounds != null)
+            {
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireCube(bounds.bounds.center, bounds.bounds.size);
+            }
+        }
+        else
+        {
+            // Default arena bounds (20x20x20)
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireCube(Vector3.zero, new Vector3(20, 20, 20));
+        }
+    }
+    
+    void DrawVelocityVectors()
+    {
+        // Show velocity vectors for all agents
+        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        // Draw cube agent velocities
+        foreach (var agent in cubeAgents)
+        {
+            var rb = agent.GetComponent<Rigidbody>();
+            if (rb != null && rb.linearVelocity.magnitude > 0.1f)
+            {
+                Gizmos.color = Color.yellow;
+                Vector3 start = agent.transform.position;
+                Vector3 end = start + rb.linearVelocity;
+                Gizmos.DrawLine(start, end);
+                Gizmos.DrawWireSphere(end, 0.1f);
+            }
+        }
+        
+        // Draw ragdoll agent velocities (pelvis)
+        foreach (var agent in ragdollAgents)
+        {
+            if (agent.pelvis != null)
+            {
+                var rb = agent.pelvis.GetComponent<Rigidbody>();
+                if (rb != null && rb.linearVelocity.magnitude > 0.1f)
+                {
+                    Gizmos.color = Color.magenta;
+                    Vector3 start = agent.pelvis.position;
+                    Vector3 end = start + rb.linearVelocity;
+                    Gizmos.DrawLine(start, end);
+                    Gizmos.DrawWireSphere(end, 0.1f);
+                }
+            }
+        }
+    }
+    
+    void DrawRaycastVisualization()
+    {
+        // Show raycasts for agents with raycast sensors
+        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        // Draw cube agent raycasts
+        foreach (var agent in cubeAgents)
+        {
+            var sensors = agent.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
+            foreach (var sensor in sensors)
+            {
+                DrawRaycastSensor(sensor);
+            }
+        }
+        
+        // Draw ragdoll agent raycasts
+        foreach (var agent in ragdollAgents)
+        {
+            var sensors = agent.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
+            foreach (var sensor in sensors)
+            {
+                DrawRaycastSensor(sensor);
+            }
+        }
+    }
+    
+    void DrawRaycastSensor(Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D sensor)
+    {
+        if (sensor == null) return;
+
+        // Use the sensor's own method to get ray perception input with proper angles
+        var rayInput = sensor.GetRayPerceptionInput();
+        var transform = sensor.transform;
+
+        // Draw each ray using the angles from the ray input
+        for (int i = 0; i < rayInput.Angles.Count; i++)
+        {
+            float angle = rayInput.Angles[i];
+            Vector3 direction = Quaternion.AngleAxis(angle, transform.up) * transform.forward;
+            Vector3 start = transform.position + Vector3.up * sensor.GetStartVerticalOffset();
+            Vector3 end = start + direction * rayInput.RayLength;
+
+            // Use different colors based on what the ray hits
+            RaycastHit hit;
+            if (Physics.Raycast(start, direction, out hit, rayInput.RayLength, rayInput.LayerMask))
+            {
+                // Check if the hit object has a tag that's in the detectable tags list
+                bool isDetectable = rayInput.DetectableTags.Contains(hit.collider.tag);
+                Gizmos.color = isDetectable ? Color.green : Color.red;
+                Gizmos.DrawLine(start, hit.point);
+                Gizmos.DrawWireSphere(hit.point, 0.1f);
+            }
+            else
+            {
+                Gizmos.color = Color.white;
+                Gizmos.DrawLine(start, end);
+            }
+        }
+    }
+    
+    void DrawObservationVisuals()
+    {
+        // Visual indicators for agent observations
+        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        // Show cube agent observation sphere
+        foreach (var agent in cubeAgents)
+        {
+            Gizmos.color = new Color(0, 1, 1, 0.2f); // Transparent cyan
+            Gizmos.DrawWireSphere(agent.transform.position, 2f); // Observation range
+        }
+        
+        // Show ragdoll agent observation sphere (around pelvis)
+        foreach (var agent in ragdollAgents)
+        {
+            if (agent.pelvis != null)
+            {
+                Gizmos.color = new Color(1, 0, 1, 0.2f); // Transparent magenta
+                Gizmos.DrawWireSphere(agent.pelvis.position, 2f); // Observation range
+            }
+        }
+    }
+
+    private static float[] GetRayAngles(int raysPerDirection, float maxRayDegrees)
+    {
+        // This is a simplified version of the ML-Agents internal method.
+        // It generates evenly spaced angles from -maxRayDegrees to +maxRayDegrees.
+        int numRays = raysPerDirection * 2 + 1;
+        float[] angles = new float[numRays];
+        if (numRays == 1)
+        {
+            angles[0] = 0f;
+            return angles;
+        }
+        float delta = (maxRayDegrees * 2f) / (numRays - 1);
+        for (int i = 0; i < numRays; i++)
+        {
+            angles[i] = -maxRayDegrees + delta * i;
+        }
+        return angles;
     }
 }

@@ -72,7 +72,7 @@ public class DomainRandomizationUI : MonoBehaviour
         textGO.transform.SetParent(tgo.transform, false);
         var txt = textGO.GetComponent<Text>();
         txt.text = label;
-        txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         txt.alignment = TextAnchor.MiddleLeft;
         txt.rectTransform.anchorMin = new Vector2(0.2f, 0);
         txt.rectTransform.anchorMax = new Vector2(1,1);

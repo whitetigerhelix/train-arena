@@ -9,17 +9,40 @@ public class EnvInitializer : MonoBehaviour
 
     [Header("Layout Configuration")]
     [SerializeField] private EnvPreset preset = EnvPreset.Training;
+    public EnvPreset Preset
+    {
+        get => preset;
+        set
+        {
+            preset = value;
+            ApplyPreset();
+        }
+    }
     [Space]
-    
+
     [Header("Manual Configuration (when preset = Custom)")]
     [SerializeField] private int envCountX = 4;
     [SerializeField] private int envCountZ = 4;
     [SerializeField] private int obstaclesPerArena = 6;
-    
+
+    public int EnvCountX
+    {
+        get => envCountX;
+        set => envCountX = Mathf.Max(1, value); // Ensure at least 1
+    }
+    public int EnvCountZ
+    {
+        get => envCountZ;
+        set => envCountZ = Mathf.Max(1, value); // Ensure at least 1
+    }
+    public int ObstaclesPerArena
+    {
+        get => obstaclesPerArena;
+        set => obstaclesPerArena = Mathf.Max(0, value); // Ensure non-negative
+    }
+
     [Header("Arena Configuration")]
     [SerializeField] private ArenaHelper arenaHelper = new ArenaHelper();
-    
-    // Expose ArenaHelper for CubeAgent access
     public ArenaHelper ArenaHelper => arenaHelper;
     
     public enum EnvPreset
