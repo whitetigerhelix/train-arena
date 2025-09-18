@@ -61,7 +61,7 @@ public class EnvInitializer : MonoBehaviour
                 envCountX = 1;
                 envCountZ = 1;
                 arenaHelper.ArenaSize = 20f;
-                obstaclesPerArena = 3; // Fewer obstacles for testing
+                obstaclesPerArena = 5; // Fewer obstacles for testing
                 TrainArenaDebugManager.Log("📋 Applied SingleArena preset: 1x1 grid for testing", TrainArenaDebugManager.DebugLogLevel.Important);
                 break;
                 
@@ -69,7 +69,7 @@ public class EnvInitializer : MonoBehaviour
                 envCountX = 2;
                 envCountZ = 2;
                 arenaHelper.ArenaSize = 20f;
-                obstaclesPerArena = 2; // Minimal obstacles for maximum performance
+                obstaclesPerArena = 6; // Minimal obstacles for maximum performance
                 TrainArenaDebugManager.Log("📋 Applied Training preset: 2x2 grid for maximum performance", TrainArenaDebugManager.DebugLogLevel.Important);
                 break;
                 

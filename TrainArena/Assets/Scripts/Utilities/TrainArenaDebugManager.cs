@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -20,9 +21,9 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowTimeScale = true; // Show TimeScale UI by default
     public static bool ShowHelp = true; // Show by default
     public static bool ShowDomainRandomization = false; // Show Domain Randomization UI
-    
+
     [Header("Logging Controls")]
-    public static DebugLogLevel LogLevel = DebugLogLevel.Important;  // Show important info by default
+    public static DebugLogLevel LogLevel = DebugLogLevel.Verbose;//TODO: Important;  // Show important info by default
     
     [Header("Auto-Adjust Log Level")]
     public static bool autoAdjustLogLevel = false;  // Don't auto-spam with verbose logs
@@ -845,43 +846,55 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawArenaBounds()
     {
-        // Find arena bounds from various sources
-        GameObject arena = GameObject.Find("Arena");
+        // Find ALL arena objects - not just the first one
+        List<GameObject> arenas = new List<GameObject>();
         
-        // Try alternative names for arena objects
-        if (arena == null) arena = GameObject.Find("Ground");
-        if (arena == null) arena = GameObject.Find("Platform");
-        if (arena == null) arena = GameObject.Find("Floor");
-        
-        // Try finding any large collider that might be the arena
-        if (arena == null)
+        // Find all objects with arena-like names
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+        foreach (var obj in allObjects)
         {
-            var colliders = FindObjectsByType<Collider>(FindObjectsSortMode.None);
-            foreach (var col in colliders)
+            string objName = obj.name.ToLower();
+            if (objName.Contains("arena") || objName.Contains("ground") || 
+                objName.Contains("platform") || objName.Contains("floor"))
             {
-                if (col.bounds.size.magnitude > 10f && col.gameObject.name.ToLower().Contains("ground"))
+                var collider = obj.GetComponent<Collider>();
+                if (collider != null && collider.bounds.size.magnitude > 5f) // Reasonable size threshold
                 {
-                    arena = col.gameObject;
-                    break;
+                    arenas.Add(obj);
                 }
             }
         }
         
-        if (arena != null)
+        // If no named arenas found, find large colliders
+        if (arenas.Count == 0)
+        {
+            var colliders = FindObjectsByType<Collider>(FindObjectsSortMode.None);
+            foreach (var col in colliders)
+            {
+                if (col.bounds.size.magnitude > 10f)
+                {
+                    arenas.Add(col.gameObject);
+                }
+            }
+        }
+        
+        // Draw bounds for all found arenas
+        foreach (var arena in arenas)
         {
             var bounds = arena.GetComponent<Collider>();
             if (bounds != null)
             {
+                // Draw arena bounds
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawWireCube(bounds.bounds.center, bounds.bounds.size);
                 
-                // Also draw a grid on the ground for reference
+                // Draw grid on the ground for reference
                 Gizmos.color = new Color(0, 1, 1, 0.3f); // Transparent cyan
                 Vector3 center = bounds.bounds.center;
                 Vector3 size = bounds.bounds.size;
                 
-                // Draw grid lines
-                int gridLines = 10;
+                // Draw grid lines (fewer lines for multiple arenas to avoid clutter)
+                int gridLines = 5;
                 for (int i = -gridLines; i <= gridLines; i++)
                 {
                     float x = center.x + (i * size.x / (gridLines * 2));
@@ -894,7 +907,9 @@ public class TrainArenaDebugManager : MonoBehaviour
                 }
             }
         }
-        else
+        
+        // If still no arenas found, draw default
+        if (arenas.Count == 0)
         {
             // Default arena bounds (20x20x20) with grid
             Gizmos.color = Color.cyan;

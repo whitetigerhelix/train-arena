@@ -273,9 +273,6 @@ public static class PrimitiveBuilder
         behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
         behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default;
         
-        // Add AutoBehaviorSwitcher for training vs inference mode switching
-        var behaviorSwitcher = pelvis.AddComponent<AutoBehaviorSwitcher>();
-        
         // Collect all PDJointControllers and assign to agent
         var joints = new System.Collections.Generic.List<PDJointController>();
         joints.AddRange(root.GetComponentsInChildren<PDJointController>());

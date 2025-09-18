@@ -87,9 +87,19 @@ namespace TrainArena.Core
         /// </summary>
         public override sealed void OnActionReceived(ActionBuffers actions)
         {
+            // Debug logging for activity state issues
+            if (Time.fixedTime % 5f < Time.fixedDeltaTime) // Log every 5 seconds
+            {
+                TrainArenaDebugManager.Log($"🤖 {name}: AgentActivity={AgentActivity}, OnActionReceived called", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+            
             // Check if agent is inactive - if so, don't respond to actions (for demos)
             if (AgentActivity == AgentActivity.Inactive)
             {
+                TrainArenaDebugManager.Log($"⚫ {name}: Actions skipped - AgentActivity is Inactive", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
+                HandleInactiveState(); // Allow derived classes to handle inactive state
                 return; // Skip all actions but keep agent in scene
             }
             
@@ -103,9 +113,18 @@ namespace TrainArena.Core
         /// </summary>
         public override sealed void Heuristic(in ActionBuffers actionsOut)
         {
+            // Debug logging for heuristic state issues
+            if (Time.fixedTime % 5f < Time.fixedDeltaTime) // Log every 5 seconds
+            {
+                TrainArenaDebugManager.Log($"🧠 {name}: AgentActivity={AgentActivity}, Heuristic called", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+            
             // Check if agent is inactive - if so, don't provide heuristic actions
             if (AgentActivity == AgentActivity.Inactive)
             {
+                TrainArenaDebugManager.Log($"⚫ {name}: Heuristic skipped - AgentActivity is Inactive", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
                 // Zero out all actions when inactive
                 var ca = actionsOut.ContinuousActions;
                 for (int i = 0; i < ca.Length; i++)
@@ -126,6 +145,14 @@ namespace TrainArena.Core
         /// Handle heuristic actions when agent is active - implement in derived classes
         /// </summary>
         protected abstract void HandleActiveHeuristic(in ActionBuffers actionsOut);
+        
+        /// <summary>
+        /// Handle state when agent is inactive - override in derived classes if needed
+        /// </summary>
+        protected virtual void HandleInactiveState()
+        {
+            // Default implementation does nothing - derived classes can override
+        }
         
         /// <summary>
         /// Logging utility for consistent agent messaging

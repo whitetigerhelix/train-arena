@@ -11,6 +11,7 @@ public class PDJointController : MonoBehaviour
     public float maxAngle = 45f;
 
     float targetAngle; // radians
+    bool controlEnabled = true; // Control if PD controller is active
 
     void Reset()
     {
@@ -22,11 +23,18 @@ public class PDJointController : MonoBehaviour
         // map [-1,1] to [min,max] degrees
         float deg = Mathf.Lerp(minAngle, maxAngle, (t01 + 1f) * 0.5f);
         targetAngle = deg * Mathf.Deg2Rad;
+        controlEnabled = true; // Enable control when setting target
+    }
+    
+    public void DisableControl()
+    {
+        // Completely disable PD control for natural physics
+        controlEnabled = false;
     }
 
     void FixedUpdate()
     {
-        if (joint == null) return;
+        if (joint == null || !controlEnabled) return;
 
         // Assume hinge around joint's local X for simplicity
         // Compute current angle using joint's local rotation
@@ -39,7 +47,7 @@ public class PDJointController : MonoBehaviour
         // Diagnostic logging for joint behavior (sample first joint occasionally)
         if (name.Contains("0") && Time.fixedTime % 3f < Time.fixedDeltaTime) // Log joint "0" every 3 seconds
         {
-            TrainArenaDebugManager.Log($"🔧 Joint {name}: target={targetAngle * Mathf.Rad2Deg:F1}°, current={current * Mathf.Rad2Deg:F1}°, error={error * Mathf.Rad2Deg:F1}°, torque={torque:F1}", 
+            TrainArenaDebugManager.Log($"🔧 Joint {name}: enabled={controlEnabled}, target={targetAngle * Mathf.Rad2Deg:F1}°, current={current * Mathf.Rad2Deg:F1}°, error={error * Mathf.Rad2Deg:F1}°, torque={torque:F1}", 
                 TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
 

@@ -28,6 +28,10 @@ public class RagdollAgent : BaseTrainArenaAgent
         if (pelvis == null && transform != null) pelvis = transform;
         startPos = pelvis.position;
         startRot = pelvis.rotation;
+        
+        // Debug logging for initialization
+        TrainArenaDebugManager.Log($"🎭 {name}: Initialized - AgentActivity={AgentActivity}, BehaviorType={BehaviorParameters?.BehaviorType}, Joints={joints.Count}", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     public override void OnEpisodeBegin()
@@ -65,6 +69,13 @@ public class RagdollAgent : BaseTrainArenaAgent
 
     protected override void HandleActiveActions(ActionBuffers actions)
     {
+        // Debug logging to track action execution
+        if (Time.fixedTime % 3f < Time.fixedDeltaTime) // Log every 3 seconds
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: HandleActiveActions called - received {actions.ContinuousActions.Length} actions", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
         // Map actions [-1,1] to joint target angles
         var ca = actions.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca.Length; i++)
@@ -103,8 +114,24 @@ public class RagdollAgent : BaseTrainArenaAgent
             EndEpisode();
     }
 
+    protected override void HandleInactiveState()
+    {
+        // When inactive, disable joint control to allow natural physics
+        foreach (var joint in joints)
+        {
+            joint.DisableControl();
+        }
+    }
+
     protected override void HandleActiveHeuristic(in ActionBuffers actionsOut)
     {
+        // Debug logging to track heuristic execution
+        if (Time.fixedTime % 3f < Time.fixedDeltaTime) // Log every 3 seconds
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: HandleActiveHeuristic called - generating {joints.Count} actions", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
         // More pronounced manual wiggle when active for better visibility
         var ca2 = actionsOut.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca2.Length; i++)

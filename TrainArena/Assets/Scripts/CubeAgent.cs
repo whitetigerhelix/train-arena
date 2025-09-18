@@ -489,6 +489,12 @@ public class CubeAgent : BaseTrainArenaAgent
             Random.Range(-1f, 1f)
         );
     }
+    
+    protected override void HandleInactiveState()
+    {
+        // Cube agent doesn't need special handling when inactive
+        // Physics will naturally handle the cube without applied forces
+    }
 
     private void OnCollisionEnter(Collision collision)
     {
