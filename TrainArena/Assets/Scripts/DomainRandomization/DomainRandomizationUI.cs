@@ -54,7 +54,7 @@ public class DomainRandomizationUI : MonoBehaviour
         var txt = txtGO.GetComponent<Text>();
         txt.text = "Apply Randomization";
         txt.alignment = TextAnchor.MiddleCenter;
-        txt.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         txt.color = Color.white;
         txt.rectTransform.anchorMin = new Vector2(0,0);
         txt.rectTransform.anchorMax = new Vector2(1,1);

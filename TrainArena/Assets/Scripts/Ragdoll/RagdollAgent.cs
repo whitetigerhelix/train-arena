@@ -40,6 +40,9 @@ public class RagdollAgent : BaseTrainArenaAgent
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
+        
+        // Debug logging for ragdoll configuration
+        TrainArenaDebugManager.Log($"🎭 {name} Episode Begin - Joints: {joints.Count}, Pelvis Y: {pelvis.position.y:F2}", TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
 
     public override void CollectObservations(VectorSensor sensor)
@@ -66,6 +69,23 @@ public class RagdollAgent : BaseTrainArenaAgent
         var ca = actions.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca.Length; i++)
             joints[i].SetTarget01(Mathf.Clamp(ca[i], -1f, 1f));
+
+        // Diagnostic logging for ragdoll behavior
+        if (Time.fixedTime % 2f < Time.fixedDeltaTime) // Log every 2 seconds
+        {
+            var rbPelvis = pelvis.GetComponent<Rigidbody>();
+            float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
+            TrainArenaDebugManager.Log($"🎭 {name}: Upright={uprightness:F2}, Vel={rbPelvis.linearVelocity.magnitude:F2}, Y={pelvis.position.y:F2}, Actions=[{string.Join(",", System.Array.ConvertAll(ca.Array, x => x.ToString("F1")))}]", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
+            
+            // Log joint forces for first joint as sample
+            if (joints.Count > 0)
+            {
+                var joint0 = joints[0];
+                TrainArenaDebugManager.Log($"🎭 {name}: Joint0 kp={joint0.kp}, kd={joint0.kd}, target range=[{joint0.minAngle:F0}°, {joint0.maxAngle:F0}°]", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+        }
 
         // Rewards
         float forward = Vector3.Dot(pelvis.GetComponent<Rigidbody>().linearVelocity, transform.forward);

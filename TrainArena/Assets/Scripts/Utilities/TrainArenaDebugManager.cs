@@ -845,8 +845,28 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawArenaBounds()
     {
-        // Find arena bounds from SceneBuilder or use default
-        var arena = GameObject.Find("Arena");
+        // Find arena bounds from various sources
+        GameObject arena = GameObject.Find("Arena");
+        
+        // Try alternative names for arena objects
+        if (arena == null) arena = GameObject.Find("Ground");
+        if (arena == null) arena = GameObject.Find("Platform");
+        if (arena == null) arena = GameObject.Find("Floor");
+        
+        // Try finding any large collider that might be the arena
+        if (arena == null)
+        {
+            var colliders = FindObjectsByType<Collider>(FindObjectsSortMode.None);
+            foreach (var col in colliders)
+            {
+                if (col.bounds.size.magnitude > 10f && col.gameObject.name.ToLower().Contains("ground"))
+                {
+                    arena = col.gameObject;
+                    break;
+                }
+            }
+        }
+        
         if (arena != null)
         {
             var bounds = arena.GetComponent<Collider>();
@@ -854,74 +874,81 @@ public class TrainArenaDebugManager : MonoBehaviour
             {
                 Gizmos.color = Color.cyan;
                 Gizmos.DrawWireCube(bounds.bounds.center, bounds.bounds.size);
+                
+                // Also draw a grid on the ground for reference
+                Gizmos.color = new Color(0, 1, 1, 0.3f); // Transparent cyan
+                Vector3 center = bounds.bounds.center;
+                Vector3 size = bounds.bounds.size;
+                
+                // Draw grid lines
+                int gridLines = 10;
+                for (int i = -gridLines; i <= gridLines; i++)
+                {
+                    float x = center.x + (i * size.x / (gridLines * 2));
+                    Gizmos.DrawLine(new Vector3(x, center.y, center.z - size.z/2), 
+                                   new Vector3(x, center.y, center.z + size.z/2));
+                    
+                    float z = center.z + (i * size.z / (gridLines * 2));
+                    Gizmos.DrawLine(new Vector3(center.x - size.x/2, center.y, z), 
+                                   new Vector3(center.x + size.x/2, center.y, z));
+                }
             }
         }
         else
         {
-            // Default arena bounds (20x20x20)
+            // Default arena bounds (20x20x20) with grid
             Gizmos.color = Color.cyan;
             Gizmos.DrawWireCube(Vector3.zero, new Vector3(20, 20, 20));
+            
+            // Default grid
+            Gizmos.color = new Color(0, 1, 1, 0.3f);
+            for (int i = -5; i <= 5; i++)
+            {
+                Gizmos.DrawLine(new Vector3(i * 2f, 0, -10), new Vector3(i * 2f, 0, 10));
+                Gizmos.DrawLine(new Vector3(-10, 0, i * 2f), new Vector3(10, 0, i * 2f));
+            }
         }
     }
     
     void DrawVelocityVectors()
     {
-        // Show velocity vectors for all agents
-        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        // Show velocity vectors for all agents using polymorphic approach
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
         
-        // Draw cube agent velocities
-        foreach (var agent in cubeAgents)
+        foreach (var agent in allAgents)
         {
-            var rb = agent.GetComponent<Rigidbody>();
-            if (rb != null && rb.linearVelocity.magnitude > 0.1f)
+            if (agent.MainRigidbody != null && agent.MainRigidbody.linearVelocity.magnitude > 0.1f)
             {
-                Gizmos.color = Color.yellow;
-                Vector3 start = agent.transform.position;
-                Vector3 end = start + rb.linearVelocity;
+                // Color by agent type
+                Gizmos.color = agent.AgentTypeIcon == "🧊" ? Color.yellow : Color.magenta;
+                
+                Vector3 start = agent.MainTransform.position;
+                Vector3 end = start + agent.MainRigidbody.linearVelocity;
                 Gizmos.DrawLine(start, end);
                 Gizmos.DrawWireSphere(end, 0.1f);
-            }
-        }
-        
-        // Draw ragdoll agent velocities (pelvis)
-        foreach (var agent in ragdollAgents)
-        {
-            if (agent.pelvis != null)
-            {
-                var rb = agent.pelvis.GetComponent<Rigidbody>();
-                if (rb != null && rb.linearVelocity.magnitude > 0.1f)
-                {
-                    Gizmos.color = Color.magenta;
-                    Vector3 start = agent.pelvis.position;
-                    Vector3 end = start + rb.linearVelocity;
-                    Gizmos.DrawLine(start, end);
-                    Gizmos.DrawWireSphere(end, 0.1f);
-                }
+                
+                // Draw speed indicator
+                float speed = agent.MainRigidbody.linearVelocity.magnitude;
+                Gizmos.color = Color.white;
+                Gizmos.DrawWireCube(start + Vector3.up * 0.5f, Vector3.one * (0.1f + speed * 0.1f));
             }
         }
     }
     
     void DrawRaycastVisualization()
     {
-        // Show raycasts for agents with raycast sensors
-        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        // Show raycasts for all agents with raycast sensors using polymorphic approach
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
         
-        // Draw cube agent raycasts
-        foreach (var agent in cubeAgents)
+        foreach (var agent in allAgents)
         {
-            var sensors = agent.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
-            foreach (var sensor in sensors)
-            {
-                DrawRaycastSensor(sensor);
-            }
-        }
-        
-        // Draw ragdoll agent raycasts
-        foreach (var agent in ragdollAgents)
-        {
-            var sensors = agent.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
+            // Find raycast sensors on the agent or its children
+            var agentMono = (MonoBehaviour)agent;
+            var sensors = agentMono.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
             foreach (var sensor in sensors)
             {
                 DrawRaycastSensor(sensor);

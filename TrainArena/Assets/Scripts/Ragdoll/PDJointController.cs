@@ -4,8 +4,8 @@ public class PDJointController : MonoBehaviour
 {
     public ConfigurableJoint joint;
     [Header("PD Gains")]
-    public float kp = 200f;
-    public float kd = 10f;
+    public float kp = 50f;  // Reduced from 200f for more natural movement
+    public float kd = 3f;   // Reduced from 10f for less damping
     [Header("Limits (deg)")]
     public float minAngle = -45f;
     public float maxAngle = 45f;
@@ -35,6 +35,13 @@ public class PDJointController : MonoBehaviour
 
         float error = Mathf.DeltaAngle(localRot.eulerAngles.x, targetAngle * Mathf.Rad2Deg) * Mathf.Deg2Rad;
         float torque = kp * error - kd * (GetAngularVelocity().x);
+
+        // Diagnostic logging for joint behavior (sample first joint occasionally)
+        if (name.Contains("0") && Time.fixedTime % 3f < Time.fixedDeltaTime) // Log joint "0" every 3 seconds
+        {
+            TrainArenaDebugManager.Log($"🔧 Joint {name}: target={targetAngle * Mathf.Rad2Deg:F1}°, current={current * Mathf.Rad2Deg:F1}°, error={error * Mathf.Rad2Deg:F1}°, torque={torque:F1}", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
 
         GetComponent<Rigidbody>().AddTorque(transform.right * torque, ForceMode.Acceleration);
     }
