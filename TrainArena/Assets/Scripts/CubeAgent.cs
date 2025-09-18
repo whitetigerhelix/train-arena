@@ -4,19 +4,10 @@ using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
 using UnityEngine.InputSystem;
-
-/// <summary>
-/// Agent activity state for demo control
-/// This is separate from ML-Agents BehaviorType and controls whether agents respond to actions
-/// </summary>
-public enum AgentActivity
-{
-    Active,     // Agent responds normally to all actions
-    Inactive    // Agent ignores all actions and remains stationary (for demos)
-}
+using TrainArena.Core;
 
 [RequireComponent(typeof(Rigidbody))]
-public class CubeAgent : Agent
+public class CubeAgent : BaseTrainArenaAgent
 {
     [Header("Scene Refs")]
     public Transform goal;
@@ -31,8 +22,7 @@ public class CubeAgent : Agent
     public int maxEpisodeSteps = 500;               // Balanced episode length: visible navigation + performance
     public float episodeTimeLimit = 30f;            // 30 seconds: enough time to navigate, better performance
     
-    [Header("Demo Control")]
-    public AgentActivity agentActivity = AgentActivity.Active;  // Controls whether agent responds to actions
+    // AgentActivity is now inherited from BaseTrainArenaAgent
     
     // Episode tracking
     private int episodeStepCount;
@@ -81,6 +71,16 @@ public class CubeAgent : Agent
     // Add these fields to your class
     private List<Collision> activeCollisions = new List<Collision>();
     private List<ContactPoint> currentContacts = new List<ContactPoint>();
+    
+    // BaseTrainArenaAgent abstract property implementations
+    public override Transform MainTransform => transform;
+    public override Rigidbody MainRigidbody => rb;
+    public override string AgentTypeIcon => "🧊";
+    
+    public override float GetObservationRange()
+    {
+        return rayLength; // Use raycast length as observation range
+    }
     
     /// <summary>
     /// Calculate total observation count based on configuration
@@ -291,14 +291,8 @@ public class CubeAgent : Agent
         }
     }
 
-    public override void OnActionReceived(ActionBuffers actions)
+    protected override void HandleActiveActions(ActionBuffers actions)
     {
-        // If agent is inactive, ignore all actions (for demo purposes)
-        if (agentActivity == AgentActivity.Inactive)
-        {
-            return;
-        }
-        
         float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
         float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
         
@@ -436,17 +430,9 @@ public class CubeAgent : Agent
         // Removed emergency stuck reset - let agents have time to navigate properly
     }
 
-    public override void Heuristic(in ActionBuffers actionsOut)
+    protected override void HandleActiveHeuristic(in ActionBuffers actionsOut)
     {
         var ca = actionsOut.ContinuousActions;
-        
-        // If agent is inactive, return zero actions (agent will not move)
-        if (agentActivity == AgentActivity.Inactive)
-        {
-            ca[0] = 0f;
-            ca[1] = 0f;
-            return;
-        }
         
         // Use new Input System for Unity 6.2 compatibility
         var keyboard = UnityEngine.InputSystem.Keyboard.current;

@@ -3,18 +3,9 @@ using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
+using TrainArena.Core;
 
-/// <summary>
-/// Agent activity state - controls whether agents respond to actions
-/// This is separate from ML-Agents BehaviorType and controls whether agents respond to actions
-/// </summary>
-public enum AgentActivity
-{
-    Active,     // Agent responds normally to all actions
-    Inactive    // Agent ignores all actions and remains stationary (for demos)
-}
-
-public class RagdollAgent : Agent
+public class RagdollAgent : BaseTrainArenaAgent
 {
     [Header("Joints (order = action ordering)")]
     public List<PDJointController> joints = new List<PDJointController>();
@@ -22,11 +13,15 @@ public class RagdollAgent : Agent
     public float targetSpeed = 1.0f;
     public float uprightBonus = 0.5f;
     
-    [Header("Agent Activity Control")]
-    public AgentActivity agentActivity = AgentActivity.Active;  // Controls whether agent responds to actions
-
+    // AgentActivity is now inherited from BaseTrainArenaAgent
+    
     Vector3 startPos;
     Quaternion startRot;
+    
+    // BaseTrainArenaAgent abstract property implementations
+    public override Transform MainTransform => pelvis;
+    public override Rigidbody MainRigidbody => pelvis?.GetComponent<Rigidbody>();
+    public override string AgentTypeIcon => "🎭";
 
     public override void Initialize()
     {
@@ -65,14 +60,8 @@ public class RagdollAgent : Agent
         }
     }
 
-    public override void OnActionReceived(ActionBuffers actions)
+    protected override void HandleActiveActions(ActionBuffers actions)
     {
-        // Check if agent is inactive - if so, don't respond to actions (for demos)
-        if (agentActivity == AgentActivity.Inactive)
-        {
-            return; // Skip all actions but keep agent in scene
-        }
-        
         // Map actions [-1,1] to joint target angles
         var ca = actions.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca.Length; i++)
@@ -94,18 +83,8 @@ public class RagdollAgent : Agent
             EndEpisode();
     }
 
-    public override void Heuristic(in ActionBuffers actionsOut)
+    protected override void HandleActiveHeuristic(in ActionBuffers actionsOut)
     {
-        // Check if agent is inactive - if so, don't provide heuristic actions
-        if (agentActivity == AgentActivity.Inactive)
-        {
-            // Zero out all actions when inactive
-            var ca = actionsOut.ContinuousActions;
-            for (int i = 0; i < ca.Length; i++)
-                ca[i] = 0f;
-            return;
-        }
-        
         // More pronounced manual wiggle when active for better visibility
         var ca2 = actionsOut.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca2.Length; i++)
