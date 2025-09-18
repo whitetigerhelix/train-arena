@@ -347,13 +347,13 @@ public static class PrimitiveBuilder
         drive.maximumForce = 1000f;       // Force limit
         joint.angularXDrive = drive;
         
-        // Add PD controller with stronger gains
+        // Add PD controller with balanced gains for responsiveness
         var pdController = child.AddComponent<PDJointController>();
         pdController.joint = joint;
         pdController.minAngle = -limitDegrees;
         pdController.maxAngle = limitDegrees;
-        pdController.kp = 800f;           // Much stronger proportional gain
-        pdController.kd = 40f;            // Higher derivative gain
+        pdController.kp = 300f;           // Balanced proportional gain for responsiveness
+        pdController.kd = 20f;            // Moderate derivative gain
     }
 
     /// <summary>

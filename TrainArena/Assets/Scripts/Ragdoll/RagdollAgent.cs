@@ -4,6 +4,16 @@ using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
 
+/// <summary>
+/// Agent activity state - controls whether agents respond to actions
+/// This is separate from ML-Agents BehaviorType and controls whether agents respond to actions
+/// </summary>
+public enum AgentActivity
+{
+    Active,     // Agent responds normally to all actions
+    Inactive    // Agent ignores all actions and remains stationary (for demos)
+}
+
 public class RagdollAgent : Agent
 {
     [Header("Joints (order = action ordering)")]
@@ -11,6 +21,9 @@ public class RagdollAgent : Agent
     public Transform pelvis;
     public float targetSpeed = 1.0f;
     public float uprightBonus = 0.5f;
+    
+    [Header("Agent Activity Control")]
+    public AgentActivity agentActivity = AgentActivity.Active;  // Controls whether agent responds to actions
 
     Vector3 startPos;
     Quaternion startRot;
@@ -54,6 +67,12 @@ public class RagdollAgent : Agent
 
     public override void OnActionReceived(ActionBuffers actions)
     {
+        // Check if agent is inactive - if so, don't respond to actions (for demos)
+        if (agentActivity == AgentActivity.Inactive)
+        {
+            return; // Skip all actions but keep agent in scene
+        }
+        
         // Map actions [-1,1] to joint target angles
         var ca = actions.ContinuousActions;
         for (int i = 0; i < joints.Count && i < ca.Length; i++)
@@ -77,9 +96,24 @@ public class RagdollAgent : Agent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        // simple manual wiggle
-        var ca = actionsOut.ContinuousActions;
-        for (int i = 0; i < joints.Count && i < ca.Length; i++)
-            ca[i] = Mathf.Sin(Time.time * 2f + i * 0.5f);
+        // Check if agent is inactive - if so, don't provide heuristic actions
+        if (agentActivity == AgentActivity.Inactive)
+        {
+            // Zero out all actions when inactive
+            var ca = actionsOut.ContinuousActions;
+            for (int i = 0; i < ca.Length; i++)
+                ca[i] = 0f;
+            return;
+        }
+        
+        // More pronounced manual wiggle when active for better visibility
+        var ca2 = actionsOut.ContinuousActions;
+        for (int i = 0; i < joints.Count && i < ca2.Length; i++)
+        {
+            // Use larger amplitude and different frequencies for each joint
+            float amplitude = 0.8f; // Increased from implicit 1.0f to make movement more pronounced
+            float frequency = 1.5f + i * 0.3f; // Different frequency per joint
+            ca2[i] = amplitude * Mathf.Sin(Time.time * frequency + i * 0.8f);
+        }
     }
 }

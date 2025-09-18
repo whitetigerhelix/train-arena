@@ -4,6 +4,7 @@ using UnityEngine.UI;
 public class DomainRandomizationUI : MonoBehaviour
 {
     public DomainRandomizer randomizer;
+    private GameObject panel; // Reference to panel for visibility control
 
     void Start()
     {
@@ -23,10 +24,14 @@ public class DomainRandomizationUI : MonoBehaviour
         var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
         panel.transform.SetParent(canvasGO.transform, false);
         var rt = panel.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.7f, 0.02f);
-        rt.anchorMax = new Vector2(0.98f, 0.28f);
+        // Move to left side to avoid clipping with debug UI on right
+        rt.anchorMin = new Vector2(0.02f, 0.02f);
+        rt.anchorMax = new Vector2(0.30f, 0.28f);
         rt.offsetMin = rt.offsetMax = Vector2.zero;
         panel.GetComponent<Image>().color = new Color(0,0,0,0.35f);
+        
+        // Store panel reference for visibility control
+        this.panel = panel;
 
         AddToggle(panel.transform, "Mass", new Vector2(0.05f, 0.65f), v => randomizer.randomizeMass = v, randomizer.randomizeMass);
         AddToggle(panel.transform, "Friction", new Vector2(0.05f, 0.45f), v => randomizer.randomizeFriction = v, randomizer.randomizeFriction);
@@ -77,5 +82,15 @@ public class DomainRandomizationUI : MonoBehaviour
         txt.rectTransform.anchorMin = new Vector2(0.2f, 0);
         txt.rectTransform.anchorMax = new Vector2(1,1);
         txt.rectTransform.offsetMin = txt.rectTransform.offsetMax = Vector2.zero;
+    }
+    
+    void Update()
+    {
+        // Control visibility based on debug setting
+        if (panel != null)
+        {
+            bool shouldShow = TrainArenaDebugManager.ShowDomainRandomization;
+            panel.SetActive(shouldShow);
+        }
     }
 }
