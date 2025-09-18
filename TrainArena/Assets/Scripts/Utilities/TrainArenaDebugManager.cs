@@ -5,8 +5,19 @@ using UnityEngine.InputSystem;
 using TrainArena.Core;
 
 /// <summary>
-/// Global debug settings manager for TrainArena
-/// Controls visualization and logging levels across all components
+/// Centralized debug system for TrainArena ML-Agents training environment
+/// 
+/// Features:
+/// - Real-time visualization toggles (R/I/O/V/B/M/T/N keys)
+/// - Hierarchical logging system (None/Errors/Warnings/Important/Verbose)
+/// - ML-Agents status monitoring and training progress tracking
+/// - Memory management and performance monitoring
+/// - Agent activity control and debugging utilities
+/// 
+/// Key Controls:
+/// - R: Raycast visualization, I: Agent info, O: Observations, V: Velocity vectors
+/// - M: ML-Agents status panel, T: TimeScale UI, L: Cycle log levels, H: Help
+/// - Z: Toggle all agent activity (useful for demos and testing)
 /// </summary>
 public class TrainArenaDebugManager : MonoBehaviour
 {
@@ -22,11 +33,11 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowHelp = true; // Show by default
     public static bool ShowDomainRandomization = false; // Show Domain Randomization UI
 
-    [Header("Logging Controls")]
-    public static DebugLogLevel LogLevel = DebugLogLevel.Verbose;//TODO: Important;  // Show important info by default
+    [Header("Logging Controls")]  
+    public static DebugLogLevel LogLevel = DebugLogLevel.Important; // Show important info by default, verbose for troubleshooting
     
     [Header("Auto-Adjust Log Level")]
-    public static bool autoAdjustLogLevel = false;  // Don't auto-spam with verbose logs
+    public static bool autoAdjustLogLevel = false;  // Automatically increase verbosity during ML-Agents training
     
     [Header("Timing Constants")]
     private const float LOG_LEVEL_CHECK_INTERVAL = 10f;     // Check log level every 10 seconds  

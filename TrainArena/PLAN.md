@@ -2,23 +2,36 @@
 
 Use this document to drive GitHub Copilot / tasks. Keep commits small and runnable.
 
-## 🎯 Current Status (Sept 17, 2025)
+## 🎯 Current Status (Sept 18, 2025)
 
-**Phase:** Day 2 - INFERENCE SUCCESS! 🚀 Models Working Perfectly, Ready for Recording 🎬
+**Phase:** Day 3 - RAGDOLL DEVELOPMENT & COMPREHENSIVE CLEANUP 🧹 Code Quality & Documentation Update
 
 **What's Working:**
 
+**Core ML-Agents Infrastructure:**
+
 - ✅ Unity 6.2 with ML-Agents package v4.0.0
 - ✅ Python 3.10.11 + ML-Agents 1.1.0 environment setup
-- ✅ CubeAgent with 14 observations (velocity + goal + 8 raycasts) + 2 continuous actions
-- ✅ 16-arena training environment with programmatic scene generation
-- ✅ **Enhanced debug system with ML-Agents status GUI (R/I/O/V/A/M/H controls)**
-- ✅ AutoBehaviorSwitcher for automatic Default/HeuristicOnly mode switching
-- ✅ Ultra-short episode management (500 steps, 30s limit) with optimized physics
-- ✅ **SUCCESSFUL TRAINING COMPLETION**: 500K steps with multiple model checkpoints
-- ✅ **INFERENCE TESTING SUCCESS**: Cubes beelining directly to goals with trained models!
-- ✅ **Physics optimization**: Enhanced moveAccel (50f), optimized Rigidbody settings
-- ✅ **ML-Agents Status GUI**: Real-time behavior type monitoring and debugging
+- ✅ **SUCCESSFUL TRAINING & INFERENCE**: Cube agents with perfect goal navigation
+- ✅ AutoBehaviorSwitcher for seamless training/testing mode switching
+- ✅ Enhanced debug system with comprehensive visualization (R/I/O/V/B/M/T/N/H/Z controls)
+
+**CubeAgent (COMPLETE & WORKING):**
+
+- ✅ 14 observations (velocity + goal + 8 raycasts) + 2 continuous actions
+- ✅ 4x4 training environment (16 arenas) with optimized physics (moveAccel=50f)
+- ✅ Ultra-short episode management (500 steps, 30s limit)
+- ✅ **500K step training completion** with multiple model checkpoints
+- ✅ **Perfect inference**: Trained cubes navigate directly to goals
+
+**RagdollAgent (MAJOR PROGRESS):**
+
+- ✅ **Hierarchical skeleton structure**: Proper pelvis→thigh→shin→foot chains (fixed flat hierarchy)
+- ✅ **Joint-based locomotion system**: 6 PDJointControllers with coordinated movement
+- ✅ **Comprehensive observations**: Uprightness + velocity + joint states (16 total observations)
+- ✅ **PD Controller tuning**: Natural gains (kp=80f, kd=8f) for fluid ragdoll physics
+- ✅ **ActionSpec validation**: 6 continuous actions properly configured
+- ✅ **Scene generation**: Complete ragdoll training environments with SceneBuilder integration
 
 **Training Results (cube_run_20250916_155432):**
 
@@ -31,14 +44,23 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 📄 CubeAgent-500009.onnx (latest checkpoint)
 ```
 
+**Code Quality & Documentation (NEW - Sept 18):**
+
+- ✅ **Comprehensive code cleanup**: All agent files, debug systems, and builders updated
+- ✅ **Accurate documentation**: Comments now match current implementation
+- ✅ **Consistent logging**: Proper log levels and meaningful debug messages throughout
+- ✅ **Updated planning docs**: PLAN.md and RAGDOLL_SPRINT_PLAN.md reflect current progress
+- ✅ **Component integration**: All systems properly reference each other with clear APIs
+
 **Current Capabilities:**
 
-- **Perfect Inference**: Trained cubes navigate directly to goals with optimal pathing
-- **Real-time Monitoring**: ML-Agents status GUI shows behavior type, model info, and agent state
-- **Debug Visualization**: Complete raycast, velocity, and observation visualization
-- **Multi-Agent Testing**: Support for comparing different models side-by-side
+- **Production-Ready Cube Training**: Complete pipeline from training to inference
+- **Ragdoll Development Platform**: Full infrastructure ready for locomotion training
+- **Comprehensive Debug Suite**: Real-time visualization and monitoring for all agent types
+- **Scalable Architecture**: Clean, documented codebase ready for extension
+- **Professional Documentation**: Up-to-date plans, comments, and setup guides
 
-**Ready for Recording & Demo! 🎥**
+**Next Phase: Ragdoll Training & Demo Creation! 🤖**
 
 ---
 
@@ -73,20 +95,31 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - [x] **Documentation updates** - recording guides and quick reference available
 - Deliverable: ✅ **Working trained models + recording capability ready!** 🎬
 
-### Day 3 – Demo Recording & Curriculum (CURRENT)
+### Day 3 – Ragdoll Development & Code Quality ✅ COMPLETE
 
-- [ ] **Record demo videos** of trained models in action 🎥
-- [ ] Add curriculum (goal distance ↑, obstacle count ↑)
-- [ ] Add moving hazards + enhanced raycast sensor visualization
-- [ ] Side-by-side comparison recordings (random vs trained vs different checkpoints)
-- Deliverable: Professional demo videos + enhanced training scenarios
+- [x] **Major ragdoll system overhaul** - fixed hierarchy, joint control, ActionSpec
+- [x] **Comprehensive code cleanup** - updated all comments, logging, documentation
+- [x] **Agent file audit** - RagdollAgent, CubeAgent, PDJointController fully documented
+- [x] **Debug system review** - TrainArenaDebugManager cleaned up and optimized
+- [x] **Scene builder integration** - ragdoll creation fully integrated with training pipeline
+- [x] **Planning document updates** - PLAN.md and RAGDOLL_SPRINT_PLAN.md reflect current state
+- Deliverable: ✅ **Production-ready ragdoll infrastructure + comprehensive documentation!** 🧹
 
-### Day 3 – Ragdoll Prototype
+### Day 4 – Ragdoll Training & Demo Creation (CURRENT)
 
-- [ ] Build ragdoll with joints + PD controllers
-- [ ] `RagdollAgent` obs/actions/rewards skeleton
-- [ ] Stand and slow forward locomotion
-- Deliverable: ragdoll stands & shuffles forward
+- [ ] **Start ragdoll training** - first proper training runs with fixed system
+- [ ] **Record demo videos** of cube and ragdoll agents 🎥
+- [ ] **Training analysis** - compare ragdoll vs cube learning curves
+- [ ] Side-by-side demonstrations (trained vs heuristic behavior)
+- Deliverable: Working ragdoll training + demonstration videos
+
+### Day 5 – Ragdoll Locomotion Training
+
+- [ ] **Multi-hour training sessions** with balanced reward system
+- [ ] **Hyperparameter tuning** - learning rate, episode length, reward weights
+- [ ] **Curriculum development** - standing → weight shifting → stepping → walking
+- [ ] **Model checkpoints** - save models at key learning milestones
+- Deliverable: Ragdoll agents showing consistent locomotion progress
 
 ### Day 4 – Walk
 

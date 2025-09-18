@@ -1,5 +1,21 @@
 using UnityEngine;
 
+/// <summary>
+/// Multi-arena environment generator for ML-Agents training
+/// 
+/// Features:
+/// - Configurable grid layouts (1x1 to 6x6 arenas)
+/// - Preset configurations for different training scenarios
+/// - Dynamic obstacle generation and goal placement
+/// - Support for both cube and ragdoll agent types
+/// - Arena spacing and size management through ArenaHelper
+/// 
+/// Presets:
+/// - SingleArena: 1x1 for testing and debugging
+/// - Training: 2x2 optimized for performance and learning speed
+/// - LargeTraining: 6x6 for extensive training and robustness
+/// - Custom: Manual configuration of all parameters
+/// </summary>
 public class EnvInitializer : MonoBehaviour
 {
     [Header("Prefabs")]

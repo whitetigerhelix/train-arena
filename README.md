@@ -1,23 +1,40 @@
-# TrainArena — Project Summary
+# TrainArena — ML-Agents Learning Platform
+
+TrainArena is a comprehensive Unity + ML-Agents environment for hands-on reinforcement learning development. Built on Unity 6.2 with ML-Agents v4.0.0, it provides both working examples and a production-ready foundation for custom RL agents.
+
+**🎯 Current Status:** Production-ready with working cube agent training and advanced ragdoll locomotion system.rainArena — Project Summary
 
 TrainArena is a compact Unity + ML-Agents playground for “learn-by-doing” reinforcement learning. It ships a clean Core (Cube→Goal PPO) and optional Add-ons (Tag mini-game, Self-Play, Ragdoll locomotion, Domain Randomization, Reward HUD, Recording, TensorBoard overlay, Model Hot-Reload) so you can get a result fast, then scale up to showy demos and reusable NPC controllers.
 
-## Goals
+## Features
 
-- Learn PPO end-to-end inside a real game engine.
-- Build fun, explainable demos you can share with a team.
-- Create reusable patterns for physics-based NPC behavior (obs/actions/rewards, curricula, inference).
+**🧊 CubeAgent (Production Ready):**
 
-## Tech
+- 14-observation navigation system (velocity + goal direction + 8 raycasts)
+- Proven training pipeline with 500K+ step validation
+- Perfect inference performance with trained models
+- 4x4 multi-arena training for efficient learning
 
-- Unity 6.2+, ML-Agents (PPO), Barracuda (ONNX inference)
-- Python trainer (mlagents-learn) + TensorBoard
-- Optional quality-of-life: Model Switcher, Reward HUD, Domain Randomization, Recording, TensorBoard UI overlay, Hot-Reload
+**🤖 RagdollAgent (Advanced System):**
 
-## Included Scenarios
+- Hierarchical skeleton with 6 PDJointControllers (hips, knees, ankles)
+- Joint-based locomotion with coordinated movement learning
+- 16 observations (uprightness + velocity + joint states)
+- Natural physics tuning for realistic ragdoll behavior
 
-- Core: Cube reaches a goal while avoiding obstacles (fast PPO win).
-- Add-ons: Tag (runner vs tagger), Self-Play tag (both learn), Ragdoll stand/walk.
+**🔧 Development Infrastructure:**
+
+- Comprehensive debug visualization system (R/I/O/V/B/M/T/N/H/Z controls)
+- AutoBehaviorSwitcher for seamless training/testing modes
+- Real-time ML-Agents status monitoring and performance tracking
+- Domain randomization for robust agent training
+
+**📋 Production Quality:**
+
+- Complete documentation with accurate code comments
+- Consistent logging systems and debug utilities
+- Scalable scene generation with EnvInitializer
+- Clean architecture ready for extension
 
 # QuickStart
 

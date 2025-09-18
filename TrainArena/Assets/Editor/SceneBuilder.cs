@@ -5,6 +5,22 @@ using UnityEditorInternal;
 using UnityEngine;
 using static Codice.Client.Common.WebApi.WebApiEndpoints;
 
+/// <summary>
+/// Unity Editor tools for generating complete ML-Agents training scenes
+/// 
+/// Features:
+/// - Automated scene creation for cube and ragdoll agents
+/// - ML-Agents integration with behavior switching and time scale management
+/// - Camera setup with navigation controls and optimal viewing angles
+/// - Debug system integration with comprehensive visualization tools
+/// - Separate training/testing scene configurations
+/// 
+/// Menu Items:
+/// - Tools/ML Hack/Build Cube Training Scene: 4x4 cube agent training environment
+/// - Tools/ML Hack/Build Cube Test Scene: 2x2 cube agent testing environment  
+/// - Tools/ML Hack/Build Ragdoll Training Scene: 2x2 ragdoll agent training environment
+/// - Tools/ML Hack/Build Ragdoll Test Scene: 1x1 ragdoll agent testing environment
+/// </summary>
 public static class SceneBuilder
 {
     /// <summary>

@@ -240,26 +240,32 @@ public static class PrimitiveBuilder
         var root = new GameObject(name);
         root.transform.position = position;
 
-        // Create pelvis (root body - no joint, has RagdollAgent) 
+        // Create pelvis as the main body (contains RagdollAgent component)
         var pelvis = CreateRagdollBodyPart("Pelvis", Vector3.zero, new Vector3(0.4f, 0.3f, 0.25f), root.transform);
         
-        // Create legs with proper world positioning (not relative to parents)
-        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), root.transform);
-        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(-0.15f, -0.8f, 0), new Vector3(0.15f, 0.35f, 0.15f), root.transform);
-        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(-0.15f, -1.15f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), root.transform);
+        // Create hierarchical skeleton: Pelvis -> Thigh -> Shin -> Foot
+        // Left leg chain
+        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), leftThigh.transform);
+        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(0, -0.35f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), leftShin.transform);
 
-        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), root.transform);
-        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0.15f, -0.8f, 0), new Vector3(0.15f, 0.35f, 0.15f), root.transform);
-        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0.15f, -1.15f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), root.transform);
+        // Right leg chain  
+        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), rightThigh.transform);
+        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0, -0.35f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), rightShin.transform);
 
-        // Add joints with carefully positioned anchors for stability
-        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.15f, 0), new Vector3(-0.15f, -0.15f, 0), 45f);   // Hip - reduced range
-        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.15f, 0), new Vector3(0, -0.15f, 0), 90f);      // Knee - reduced range
-        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.15f, 0), 20f);   // Ankle - tight range
+        // Add joints connecting the skeletal hierarchy
+        // Hips: Connect thighs to pelvis
+        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(-0.15f, -0.15f, 0), 45f);
+        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0.15f, -0.15f, 0), 45f);
         
-        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.15f, 0), new Vector3(0.15f, -0.15f, 0), 45f);   // Hip - reduced range
-        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.15f, 0), new Vector3(0, -0.15f, 0), 90f);    // Knee - reduced range
-        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.15f, 0), 20f); // Ankle - tight range
+        // Knees: Connect shins to thighs  
+        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 90f);
+        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 90f);
+        
+        // Ankles: Connect feet to shins
+        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.175f, 0), 30f);
+        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.175f, 0), 30f);
 
         // Add RagdollAgent to pelvis
         var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
@@ -275,7 +281,7 @@ public static class PrimitiveBuilder
         behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
         behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly; // Start with heuristic, will be configured by SceneBuilder
         
-        TrainArenaDebugManager.Log($"🎭 RAGDOLL CREATED: {ragdollAgent.name} - MaxStep={ragdollAgent.MaxStep}, BehaviorName='{behaviorParams.BehaviorName}', ActionSpec={behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions", 
+        TrainArenaDebugManager.Log($"🎭 Ragdoll created: {name} with hierarchical skeleton - 6 joints, {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions", 
             TrainArenaDebugManager.DebugLogLevel.Important);
         
         // Collect all PDJointControllers and assign to agent
@@ -342,20 +348,20 @@ public static class PrimitiveBuilder
         highLimit.bounciness = 0.1f;
         joint.highAngularXLimit = highLimit;
         
-        // Configure joint drive for stability
+        // Configure joint drive for natural ragdoll physics
         var drive = joint.angularXDrive;
-        drive.positionSpring = 500f;      // Stronger spring
-        drive.positionDamper = 50f;       // Higher damping
-        drive.maximumForce = 1000f;       // Force limit
+        drive.positionSpring = 150f;      // Reduced spring for flexibility
+        drive.positionDamper = 15f;       // Light damping for natural movement
+        drive.maximumForce = 300f;        // Lower force limit for smoother motion
         joint.angularXDrive = drive;
         
-        // Add PD controller with balanced gains for responsiveness
+        // Add PD controller with natural gains for locomotion
         var pdController = child.AddComponent<PDJointController>();
         pdController.joint = joint;
         pdController.minAngle = -limitDegrees;
         pdController.maxAngle = limitDegrees;
-        pdController.kp = 300f;           // Balanced proportional gain for responsiveness
-        pdController.kd = 20f;            // Moderate derivative gain
+        pdController.kp = 80f;            // Moderate strength for natural movement  
+        pdController.kd = 8f;             // Light damping for fluid motion
     }
 
     /// <summary>
