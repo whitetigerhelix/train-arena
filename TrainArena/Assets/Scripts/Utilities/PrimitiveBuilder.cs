@@ -240,26 +240,26 @@ public static class PrimitiveBuilder
         var root = new GameObject(name);
         root.transform.position = position;
 
-        // Create pelvis (root body - no joint, has RagdollAgent) - more realistic proportions
+        // Create pelvis (root body - no joint, has RagdollAgent) 
         var pelvis = CreateRagdollBodyPart("Pelvis", Vector3.zero, new Vector3(0.4f, 0.3f, 0.25f), root.transform);
         
-        // Create legs with better spacing and proportions
-        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
-        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), leftThigh.transform);
-        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(0, -0.2f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), leftShin.transform);
+        // Create legs with proper world positioning (not relative to parents)
+        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), root.transform);
+        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(-0.15f, -0.8f, 0), new Vector3(0.15f, 0.35f, 0.15f), root.transform);
+        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(-0.15f, -1.15f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), root.transform);
 
-        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
-        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), rightThigh.transform);
-        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0, -0.2f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), rightShin.transform);
+        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), root.transform);
+        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0.15f, -0.8f, 0), new Vector3(0.15f, 0.35f, 0.15f), root.transform);
+        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0.15f, -1.15f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), root.transform);
 
-        // Add joints to create ragdoll hierarchy with realistic human joint limits
-        AddRagdollJoint(leftThigh, pelvis, new Vector3(0, 0, 0), new Vector3(60, 0, 0));   // Hip: 60° forward/back
-        AddRagdollJoint(leftShin, leftThigh, new Vector3(0, 0, 0), new Vector3(120, 0, 0)); // Knee: 120° bend
-        AddRagdollJoint(leftFoot, leftShin, new Vector3(0, 0, 0), new Vector3(30, 0, 0));   // Ankle: 30° flex
+        // Add joints with proper anchors to connect body parts at their ends
+        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0, -0.15f, 0), 60f);   // Hip
+        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 120f); // Knee
+        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.15f), new Vector3(0, -0.175f, 0), 30f); // Ankle
         
-        AddRagdollJoint(rightThigh, pelvis, new Vector3(0, 0, 0), new Vector3(60, 0, 0));   // Hip: 60° forward/back  
-        AddRagdollJoint(rightShin, rightThigh, new Vector3(0, 0, 0), new Vector3(120, 0, 0)); // Knee: 120° bend
-        AddRagdollJoint(rightFoot, rightShin, new Vector3(0, 0, 0), new Vector3(30, 0, 0));   // Ankle: 30° flex
+        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0, -0.15f, 0), 60f);   // Hip
+        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 120f); // Knee
+        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.15f), new Vector3(0, -0.175f, 0), 30f); // Ankle
 
         // Add RagdollAgent to pelvis
         var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
@@ -268,10 +268,13 @@ public static class PrimitiveBuilder
         // Add BehaviorParameters for ML-Agents
         var behaviorParams = pelvis.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
         behaviorParams.BehaviorName = "RagdollAgent";
-        behaviorParams.BrainParameters.VectorObservationSize = 4; // Will be calculated automatically
+        behaviorParams.BrainParameters.VectorObservationSize = 16; // 1 uprightness + 3 pelvis vel + (6 joints * 2 obs each)
         behaviorParams.BrainParameters.NumStackedVectorObservations = 1;
         behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
         behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default;
+        
+        // Add AutoBehaviorSwitcher for training vs inference mode switching
+        var behaviorSwitcher = pelvis.AddComponent<AutoBehaviorSwitcher>();
         
         // Collect all PDJointControllers and assign to agent
         var joints = new System.Collections.Generic.List<PDJointController>();
@@ -306,12 +309,16 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Adds a ConfigurableJoint and PDJointController to connect two body parts
+    /// Adds a ConfigurableJoint and PDJointController with proper anchors to connect two body parts
     /// </summary>
-    private static void AddRagdollJoint(GameObject child, GameObject parent, Vector3 axis, Vector3 limits)
+    private static void AddRagdollJointWithAnchors(GameObject child, GameObject parent, Vector3 childAnchor, Vector3 parentAnchor, float limitDegrees)
     {
         var joint = child.AddComponent<ConfigurableJoint>();
         joint.connectedBody = parent.GetComponent<Rigidbody>();
+        
+        // Set anchors - where on each body part the joint connects
+        joint.anchor = childAnchor;
+        joint.connectedAnchor = parentAnchor;
         
         // Configure joint as hinge for simplicity
         joint.xMotion = ConfigurableJointMotion.Locked;
@@ -323,18 +330,18 @@ public static class PrimitiveBuilder
         
         // Set joint limits
         var lowLimit = joint.lowAngularXLimit;
-        lowLimit.limit = -limits.x;
+        lowLimit.limit = -limitDegrees;
         joint.lowAngularXLimit = lowLimit;
 
         var highLimit = joint.highAngularXLimit;
-        highLimit.limit = limits.x;
+        highLimit.limit = limitDegrees;
         joint.highAngularXLimit = highLimit;
         
         // Add PD controller
         var pdController = child.AddComponent<PDJointController>();
         pdController.joint = joint;
-        pdController.minAngle = -limits.x;
-        pdController.maxAngle = limits.x;
+        pdController.minAngle = -limitDegrees;
+        pdController.maxAngle = limitDegrees;
         pdController.kp = 200f;
         pdController.kd = 10f;
     }

@@ -113,6 +113,10 @@ public static class SceneBuilder
         // Add time scale manager for consistent behavior (same as cube scene)
         var timeManager = new GameObject("TimeScaleManager");
         timeManager.AddComponent<TimeScaleManager>();
+        
+        // Add Domain Randomization UI for ragdoll physics testing
+        var domainUI = new GameObject("DomainRandomizationUI");
+        domainUI.AddComponent<DomainRandomizationUI>();
 
         // Light - Enhanced setup with soft shadows (same as cube scene)
         var lightGO = new GameObject("Directional Light");
@@ -130,11 +134,17 @@ public static class SceneBuilder
 
         // Configure for single ragdoll testing
         init.ArenaHelper.ArenaSize = 15f; // Smaller arena for single ragdoll testing
+        init.ArenaHelper.AgentSpawnHeight = 0.75f; // Ragdolls are taller than cubes
 
-        // Prefabs - create ragdoll prefab using same pattern as cube scene
+        // Prefabs - create ragdoll and supporting prefabs
         init.cubeAgentPrefab = CreateRagdollAgentPrefab(init);
-        init.goalPrefab = null; // No goals needed for balance testing
-        init.obstaclePrefab = null; // No obstacles for initial balance testing
+        
+        // Create goal and obstacle prefabs for EnvInitializer consistency
+        var goalPrefab = PrimitiveBuilder.CreateGoal(1f, "Goal");
+        var obstaclePrefab = PrimitiveBuilder.CreateObstacle(1.5f, 0.8f, 0.8f, "Obstacle");
+        
+        init.goalPrefab = goalPrefab;
+        init.obstaclePrefab = obstaclePrefab;
 
         // Ensure ML-Agents Academy is initialized (same as cube scene)
         if (Academy.Instance == null)
@@ -179,6 +189,10 @@ public static class SceneBuilder
         
         var timeManager = new GameObject("TimeScaleManager");
         timeManager.AddComponent<TimeScaleManager>();
+        
+        // Add Domain Randomization UI for ragdoll physics testing
+        var domainUI = new GameObject("DomainRandomizationUI");
+        domainUI.AddComponent<DomainRandomizationUI>();
 
         // Enhanced lighting setup (same as cube scene)
         var lightGO = new GameObject("Directional Light");
@@ -197,11 +211,17 @@ public static class SceneBuilder
         // Configure for ragdoll training using existing EnvInitializer structure
         // EnvInitializer defaults to Training preset (2x2 grid), just configure arena size
         init.ArenaHelper.ArenaSize = 12f; // Larger arenas for ragdoll movement
+        init.ArenaHelper.AgentSpawnHeight = 0.75f; // Ragdolls are taller than cubes
 
-        // Create ragdoll prefab using same pattern as cube
+        // Create ragdoll and supporting prefabs
         init.cubeAgentPrefab = CreateRagdollAgentPrefab(init);
-        init.goalPrefab = null; // Ragdolls don't need goals initially (balance focus)
-        init.obstaclePrefab = null; // No obstacles for initial balance training
+        
+        // Create goal and obstacle prefabs for EnvInitializer consistency
+        var goalPrefab = PrimitiveBuilder.CreateGoal(1f, "Goal");
+        var obstaclePrefab = PrimitiveBuilder.CreateObstacle(1.5f, 0.8f, 0.8f, "Obstacle");
+        
+        init.goalPrefab = goalPrefab;
+        init.obstaclePrefab = obstaclePrefab;
 
         // Ensure ML-Agents Academy is initialized (singleton pattern)
         if (Academy.Instance == null)
@@ -306,19 +326,40 @@ public static class SceneBuilder
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
-            // Action space is already configured in PrimitiveBuilder (6 continuous actions)
-            // Observation space will be calculated dynamically by RagdollAgent
+            // Ensure observation space is correct (16 observations for ragdoll)
+            if (behaviorParams.BrainParameters.VectorObservationSize != 16)
+            {
+                behaviorParams.BrainParameters.VectorObservationSize = 16;
+                TrainArenaDebugManager.Log("Fixed VectorObservationSize to 16 for RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
             
-            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions " +
+            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, " +
+                                     $"{behaviorParams.BrainParameters.VectorObservationSize} observations " +
                                      $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
-        // Add automatic behavior switching for seamless training/testing
-        var autoSwitcher = ragdoll.GetComponentInChildren<Transform>().gameObject.AddComponent<AutoBehaviorSwitcher>();
-        autoSwitcher.enableAutoSwitching = true;
-        autoSwitcher.showDebugMessages = true;
+        // Configure existing AutoBehaviorSwitcher (already added by PrimitiveBuilder)
+        var autoSwitcher = ragdoll.GetComponentInChildren<AutoBehaviorSwitcher>();
+        if (autoSwitcher != null)
+        {
+            autoSwitcher.enableAutoSwitching = true;
+            autoSwitcher.showDebugMessages = true;
+        }
         
+        // Add debug UI components (same as cube agents)
+        var pelvis = ragdoll.GetComponentInChildren<RagdollAgent>().gameObject;
+        pelvis.AddComponent<AgentDebugInfo>();
+        pelvis.AddComponent<EyeBlinker>(); // Visual feedback component
+        
+        // Add domain randomization for physics testing (random mass, friction, etc.)
+        var domainRandomizer = ragdoll.AddComponent<DomainRandomizer>();
+        domainRandomizer.randomizeMass = true;
+        domainRandomizer.randomizeFriction = true;
+        domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
+        
+        TrainArenaDebugManager.Log("Added debug components: AgentDebugInfo, EyeBlinker, DomainRandomizer", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
         TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless ragdoll training/testing mode switching", 
                                  TrainArenaDebugManager.DebugLogLevel.Important);
 

@@ -90,6 +90,7 @@ public class EnvInitializer : MonoBehaviour
     {
         TrainArenaDebugManager.Log("Cleaning up prefab instances from scene hierarchy", TrainArenaDebugManager.DebugLogLevel.Important);
         
+        //TODO: This should just be agentPrefab - it's not limited to CubeAgents
         if (cubeAgentPrefab != null)
         {
             cubeAgentPrefab.SetActive(false);
@@ -130,6 +131,7 @@ public class EnvInitializer : MonoBehaviour
 
         // Agent - use ArenaHelper for initial positioning (will be overridden in OnEpisodeBegin)
         var agentPosition = center + Vector3.up * 0.5f; // Initial position at center
+        agentPosition.y += arenaHelper.AgentSpawnHeight;
         var agentGO = Instantiate(cubeAgentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
         agentGO.name = $"CubeAgent_Arena_{arenaIndex}";
         var agent = agentGO.GetComponent<CubeAgent>();

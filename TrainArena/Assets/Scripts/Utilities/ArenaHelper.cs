@@ -16,7 +16,11 @@ public class ArenaHelper
 
     [Header("Height Settings")]
     [SerializeField] private float agentSpawnHeight = 0.5f; // Half cube height above ground
-    public float AgentSpawnHeight => agentSpawnHeight;
+    public float AgentSpawnHeight
+    {
+        get => agentSpawnHeight;
+        set => agentSpawnHeight = value;
+    }
     [SerializeField] private float goalHeight = 1.0f;       // Goal height above ground
     public float GoalHeight => goalHeight;
     [SerializeField] private float obstacleHeight = 1.0f;   // Obstacle height above ground
