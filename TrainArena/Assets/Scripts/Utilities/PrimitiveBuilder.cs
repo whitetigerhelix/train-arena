@@ -110,19 +110,6 @@ public static class PrimitiveBuilder
             
             TrainArenaDebugManager.Log($"Added BehaviorParameters with {ragdollAgent.joints.Count} continuous actions", TrainArenaDebugManager.DebugLogLevel.Important);
         }
-        
-        // Add AutoBehaviorSwitcher if not present
-        if (pelvis.GetComponent<AutoBehaviorSwitcher>() == null)
-        {
-            pelvis.AddComponent<AutoBehaviorSwitcher>();
-        }
-        
-        // Add blinking eyes to head if not already present
-        var head = ragdoll.transform.Find("Head")?.gameObject;
-        if (head != null && head.GetComponent<EyeBlinkAnimator>() == null)
-        {
-            AddBlinkingEyes(head);
-        }
     }
 
     // Unity Editor menu items for ragdoll creation
@@ -356,49 +343,6 @@ public static class PrimitiveBuilder
         Object.DestroyImmediate(rightEye.GetComponent<Collider>());
     }
 
-    /// <summary>
-    /// Adds animated blinking eyes to the head sphere
-    /// </summary>
-    private static void AddBlinkingEyes(GameObject head)
-    {
-        // Create left eye
-        var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        leftEye.name = "LeftEye";
-        leftEye.transform.parent = head.transform;
-        leftEye.transform.localPosition = new Vector3(-0.15f, 0.1f, 0.4f);
-        leftEye.transform.localScale = new Vector3(0.15f, 0.15f, 0.1f);
-
-        // Remove collider from eye (decorative only)
-        Object.DestroyImmediate(leftEye.GetComponent<Collider>());
-
-        // Make eye black
-        var leftEyeMat = CreateURPMaterial(smoothness: 0.9f, metallic: 0.0f);
-        leftEyeMat.color = Color.black;
-        leftEyeMat.name = "LeftEyeMaterial";
-        leftEye.GetComponent<Renderer>().sharedMaterial = leftEyeMat;
-
-        // Create right eye
-        var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        rightEye.name = "RightEye";
-        rightEye.transform.parent = head.transform;
-        rightEye.transform.localPosition = new Vector3(0.15f, 0.1f, 0.4f);
-        rightEye.transform.localScale = new Vector3(0.15f, 0.15f, 0.1f);
-
-        // Remove collider from eye (decorative only)
-        Object.DestroyImmediate(rightEye.GetComponent<Collider>());
-
-        // Make eye black
-        var rightEyeMat = CreateURPMaterial(smoothness: 0.9f, metallic: 0.0f);
-        rightEyeMat.color = Color.black;
-        rightEyeMat.name = "RightEyeMaterial";
-        rightEye.GetComponent<Renderer>().sharedMaterial = rightEyeMat;
-
-        // Add blinking animation component
-        var blinkAnimator = head.AddComponent<EyeBlinkAnimator>();
-        blinkAnimator.leftEye = leftEye.transform;
-        blinkAnimator.rightEye = rightEye.transform;
-    }
-
     #endregion Polish and Effects
 
     #region Utilities and Helpers
@@ -419,92 +363,4 @@ public static class PrimitiveBuilder
     }
 
     #endregion Utilities and Helpers
-}
-
-/// <summary>
-/// Simple eye blinking animation component for ragdoll heads
-/// </summary>
-public class EyeBlinkAnimator : MonoBehaviour
-{
-    [Header("Eye References")]
-    public Transform leftEye;
-    public Transform rightEye;
-    
-    [Header("Blink Settings")]
-    public float blinkInterval = 3.0f;      // Time between blinks
-    public float blinkDuration = 0.15f;     // How long each blink lasts
-    public float blinkVariation = 1.5f;     // Random variation in blink timing
-    
-    private Vector3 leftEyeOriginalScale;
-    private Vector3 rightEyeOriginalScale;
-    private bool isBlinking = false;
-    
-    void Start()
-    {
-        if (leftEye != null) leftEyeOriginalScale = leftEye.localScale;
-        if (rightEye != null) rightEyeOriginalScale = rightEye.localScale;
-        
-        StartCoroutine(BlinkRoutine());
-    }
-    
-    IEnumerator BlinkRoutine()
-    {
-        while (true)
-        {
-            // Wait for random interval before next blink
-            float waitTime = blinkInterval + Random.Range(-blinkVariation, blinkVariation);
-            yield return new WaitForSeconds(waitTime);
-            
-            // Perform blink
-            if (!isBlinking)
-            {
-                StartCoroutine(PerformBlink());
-            }
-        }
-    }
-    
-    IEnumerator PerformBlink()
-    {
-        isBlinking = true;
-        
-        float halfDuration = blinkDuration * 0.5f;
-        
-        // Blink close (scale Y to 0)
-        float elapsedTime = 0;
-        while (elapsedTime < halfDuration)
-        {
-            float t = elapsedTime / halfDuration;
-            float scaleY = Mathf.Lerp(1f, 0.05f, t); // Almost close, not completely flat
-            
-            if (leftEye != null)
-                leftEye.localScale = new Vector3(leftEyeOriginalScale.x, leftEyeOriginalScale.y * scaleY, leftEyeOriginalScale.z);
-            if (rightEye != null)
-                rightEye.localScale = new Vector3(rightEyeOriginalScale.x, rightEyeOriginalScale.y * scaleY, rightEyeOriginalScale.z);
-            
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        
-        // Blink open (scale Y back to 1)
-        elapsedTime = 0;
-        while (elapsedTime < halfDuration)
-        {
-            float t = elapsedTime / halfDuration;
-            float scaleY = Mathf.Lerp(0.05f, 1f, t);
-            
-            if (leftEye != null)
-                leftEye.localScale = new Vector3(leftEyeOriginalScale.x, leftEyeOriginalScale.y * scaleY, leftEyeOriginalScale.z);
-            if (rightEye != null)
-                rightEye.localScale = new Vector3(rightEyeOriginalScale.x, rightEyeOriginalScale.y * scaleY, rightEyeOriginalScale.z);
-            
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        
-        // Ensure eyes are fully open
-        if (leftEye != null) leftEye.localScale = leftEyeOriginalScale;
-        if (rightEye != null) rightEye.localScale = rightEyeOriginalScale;
-        
-        isBlinking = false;
-    }
 }

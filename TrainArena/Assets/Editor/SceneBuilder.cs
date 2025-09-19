@@ -23,6 +23,9 @@ using static Codice.Client.Common.WebApi.WebApiEndpoints;
 /// </summary>
 public static class SceneBuilder
 {
+    public enum SceneType { Training, Testing }
+    public enum AgentType { Cube, Ragdoll }
+
     /// <summary>
     /// Detects if ML-Agents training is active by checking for Academy communication port
     /// This allows automatic switching between training and testing modes
@@ -39,21 +42,7 @@ public static class SceneBuilder
         return false;
     }
 
-    [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
-    public static void BuildCubeTrainingScene()
-    {
-        BuildCubeSceneInternal(SceneType.Training);
-    }
-    
-    [MenuItem("Tools/ML Hack/Build Cube Test Scene")]
-    public static void BuildCubeTestScene()
-    {
-        BuildCubeSceneInternal(SceneType.Testing);
-    }
-    
-    public enum SceneType { Training, Testing }
-    
-    static void BuildCubeSceneInternal(SceneType sceneType)
+    static void BuildSceneInternal(SceneType sceneType, AgentType agentType)
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
 
@@ -62,20 +51,31 @@ public static class SceneBuilder
         var camera = cam.AddComponent<Camera>();
         cam.tag = "MainCamera";
         
-        // Position camera with slight isometric angle for better arena framing
-        // Center of grid is at (30, 0, 30) - halfway between (0,0) and (60,60)
-        cam.transform.position = new Vector3(30, 50, -15); // Higher and closer for better framing
-        cam.transform.LookAt(new Vector3(30, 0, 30)); // Look at center of 4x4 arena grid
+        //TODO: Don't hardcode camera and lights (and any other magic numbers we're using), make them configurable or use constants/properties
+        //TODO: Cleanup camera tuning, align both types of agents, etc
+        if (agentType == AgentType.Cube)
+        {
+            // Position camera with slight isometric angle for better arena framing
+            // Center of grid is at (30, 0, 30) - halfway between (0,0) and (60,60)
+            cam.transform.position = new Vector3(30, 50, -15); // Higher and closer for better framing
+            cam.transform.LookAt(new Vector3(30, 0, 30)); // Look at center of 4x4 arena grid
+        }
+        else
+        {   
+            // Position camera for 2x2 ragdoll grid (4 arenas) 
+            // Center of grid is at (4, 0, 4) - halfway between (0,0) and (8,8) 
+            cam.transform.position = new Vector3(4, 12, -8); // Higher and further back for ragdolls
+            cam.transform.LookAt(new Vector3(4, 0, 4)); // Look at center of 2x2 arena grid
+        }
         
         // Optimize for 16:9 aspect ratio
         camera.aspect = 16f / 9f;
         camera.fieldOfView = 60f; // Slightly wider FOV to frame all arenas tightly
+        //TODO: camera.fieldOfView = 50f; // Slightly narrower FOV for better ragdoll detail
         camera.clearFlags = CameraClearFlags.Skybox;
         
         // Add camera controller for WASD navigation
         cam.AddComponent<EditorCameraController>();
-        
-        // Add camera controls UI (positioned to not conflict with TimeScaleManager)
         cam.AddComponent<CameraControlsUI>();
         
         // Add debug manager to scene
@@ -85,6 +85,13 @@ public static class SceneBuilder
         // Add time scale manager for training speed monitoring
         var timeManager = new GameObject("TimeScaleManager");
         timeManager.AddComponent<TimeScaleManager>();
+
+        if (agentType == AgentType.Ragdoll)
+        {
+            // Add Domain Randomization UI for ragdoll physics testing
+            var domainUI = new GameObject("DomainRandomizationUI");
+            domainUI.AddComponent<DomainRandomizationUI>();
+        }
 
         // Light - Enhanced setup with soft shadows
         var lightGO = new GameObject("Directional Light");
@@ -99,7 +106,10 @@ public static class SceneBuilder
         light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium; // 1024x1024
 
         // Manager
-        var manager = new GameObject("EnvManager");
+        var agentTypeStr = agentType == AgentType.Cube ? "Cube" : "Ragdoll";
+        var sceneTypeStr = sceneType == SceneType.Training ? "Training" : "Test";
+        var envManagerName = $"{agentTypeStr}{sceneTypeStr}EnvManager";
+        var manager = new GameObject(envManagerName);
         var init = manager.AddComponent<EnvInitializer>();
 
         // Configure based on scene type
@@ -109,136 +119,74 @@ public static class SceneBuilder
             init.EnvCountX = 2;
             init.EnvCountZ = 2;
             init.ObstaclesPerArena = 6;
+
+            if (agentType == AgentType.Ragdoll)
+            {
+                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are a lot taller than cubes
+            }
         }
         // Training scene uses default settings (configured in EnvInitializer)
 
         // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
-        init.cubeAgentPrefab = CreateCubeAgentPrefab(init, sceneType);
-        init.goalPrefab = CreateGoalPrefab(init);
-        init.obstaclePrefab = CreateObstaclePrefab(init);
-
-        // Apply scene enhancements (post-processing, skybox, lighting, camera settings)
-        SceneEnhancer.EnhanceScene(camera, isRagdollScene: false);
-        SceneEnhancer.ApplyCameraPrefabSettings(camera);
-        
-        // Auto-apply newest cube model if available
-        ModelManager.ApplyNewestModelToAgents("Cube");
-
-        TrainArenaDebugManager.Log("🎯 Cube training scene created with comprehensive enhancements!", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("✅ Features: Auto behavior switching, time scale monitoring, post-processing, enhanced lighting", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-
-
-    [MenuItem("Tools/ML Hack/Build Ragdoll Training Scene")]
-    public static void BuildRagdollTrainingScene()
-    {
-        BuildRagdollSceneInternal(SceneType.Training);
-    }
-    
-    [MenuItem("Tools/ML Hack/Build Ragdoll Test Scene")]
-    public static void BuildRagdollTestScene()
-    {
-        BuildRagdollSceneInternal(SceneType.Testing);
-    }
-    
-    static void BuildRagdollSceneInternal(SceneType sceneType)
-    {
-        var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
-
-        // Camera with controller for navigation - optimized for ragdoll training view
-        var cam = new GameObject("Main Camera");
-        var camera = cam.AddComponent<Camera>();
-        cam.tag = "MainCamera";
-        
-        // Position camera for 2x2 ragdoll grid (4 arenas) 
-        // Center of grid is at (4, 0, 4) - halfway between (0,0) and (8,8) 
-        cam.transform.position = new Vector3(4, 12, -8); // Higher and further back for ragdolls
-        cam.transform.LookAt(new Vector3(4, 0, 4)); // Look at center of 2x2 arena grid
-        
-        // Optimize camera settings for ragdoll observation
-        camera.aspect = 16f / 9f;
-        camera.fieldOfView = 50f; // Slightly narrower FOV for better ragdoll detail
-        camera.clearFlags = CameraClearFlags.Skybox;
-        
-        // Add camera controller for WASD navigation
-        cam.AddComponent<EditorCameraController>();
-        cam.AddComponent<CameraControlsUI>();
-        
-        // Add debug manager and time scale manager (same as cube scene)
-        var debugManager = new GameObject("TrainArenaDebugManager");
-        debugManager.AddComponent<TrainArenaDebugManager>();
-        
-        var timeManager = new GameObject("TimeScaleManager");
-        timeManager.AddComponent<TimeScaleManager>();
-        
-        // Add Domain Randomization UI for ragdoll physics testing
-        var domainUI = new GameObject("DomainRandomizationUI");
-        domainUI.AddComponent<DomainRandomizationUI>();
-
-        // Enhanced lighting setup (same as cube scene)
-        var lightGO = new GameObject("Directional Light");
-        var light = lightGO.AddComponent<Light>();
-        light.type = LightType.Directional;
-        light.intensity = 1.2f;
-        lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
-        light.shadows = LightShadows.Soft;
-        light.shadowStrength = 0.6f;
-        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
-
-        // Manager using same pattern as cube scene
-        var manager = new GameObject("RagdollEnvManager");
-        var init = manager.AddComponent<EnvInitializer>();
-
-        // Configure based on scene type
-        if (sceneType == SceneType.Testing)
+        if (agentType == AgentType.Cube)
         {
-            // Test scene configuration: 2x2 grid with more obstacles
-            init.EnvCountX = 2;
-            init.EnvCountZ = 2;
-            init.ObstaclesPerArena = 6;
-            init.ArenaHelper.ArenaSize = 15f; // Larger arenas for ragdoll movement for testing
-            init.ArenaHelper.AgentSpawnHeight = 0.75f; // Ragdolls are taller than cubes
+            init.cubeAgentPrefab = CreateCubeAgentPrefab(init, sceneType);
         }
-        // Training scene uses default settings (configured in EnvInitializer)
-		else
-		{
-            // Configure for ragdoll using existing EnvInitializer structure
-            //init.ArenaHelper.ArenaSize = 12f; // Smaller arena for single ragdoll training
-			init.ArenaHelper.ArenaSize = 15f; //TODO: Make the same as testing - any reason they should be different sizes?
+        else
+        {
+            init.ragdollAgentPrefab = CreateRagdollAgentPrefab(init, sceneType);
         }
-        init.ArenaHelper.AgentSpawnHeight = 0.75f; // Ragdolls are taller than cubes
-
-        // Create ragdoll and supporting prefabs
-        init.cubeAgentPrefab = CreateRagdollAgentPrefab(init, sceneType);
-        
-        // Create goal and obstacle prefabs for EnvInitializer consistency
-        var goalPrefab = PrimitiveBuilder.CreateGoal(1f, "Goal");
-        var obstaclePrefab = PrimitiveBuilder.CreateObstacle(1.5f, 0.8f, 0.8f, "Obstacle");
-        
-        init.goalPrefab = goalPrefab;
-        init.obstaclePrefab = obstaclePrefab;
+        init.goalPrefab = PrimitiveBuilder.CreateGoalPrefab(init.ArenaHelper.GoalHeight);
+        init.obstaclePrefab = PrimitiveBuilder.CreateObstaclePrefab(init.ArenaHelper.ObstacleHeight);
 
         // Ensure ML-Agents Academy is initialized (singleton pattern)
         if (Academy.Instance == null)
         {
             // Academy.Instance automatically creates the Academy if it doesn't exist
             var academy = Academy.Instance;
-            TrainArenaDebugManager.Log("✅ Academy initialized for ragdoll training scene", TrainArenaDebugManager.DebugLogLevel.Important);
+            TrainArenaDebugManager.Log("✅ Academy initialized for scene", TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
         // Apply scene enhancements (post-processing, skybox, lighting, camera settings)
-        SceneEnhancer.EnhanceScene(camera, isRagdollScene: true);
+        SceneEnhancer.EnhanceScene(camera, isRagdollScene: agentType == AgentType.Ragdoll);
         SceneEnhancer.ApplyCameraPrefabSettings(camera);
         
-        // Auto-apply newest ragdoll model if available
-        ModelManager.ApplyNewestModelToAgents("Ragdoll");
+        // Auto-apply newest cube model if available
+        ModelManager.ApplyNewestModelToAgents(agentTypeStr);
 
-        TrainArenaDebugManager.Log("🎭 Ragdoll training scene created with comprehensive enhancements!", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("✅ Features: Auto behavior switching, enhanced lighting for ragdoll visibility, post-processing", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log($"🎯 {agentTypeStr} {sceneTypeStr} created with comprehensive enhancements!", TrainArenaDebugManager.DebugLogLevel.Important);
         TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
     }
+
+    #region Scene Builder Menu Functions
+
+    [MenuItem("Tools/ML Hack/SceneBuilder/Build Cube Training Scene")]
+    public static void BuildCubeTrainingScene()
+    {
+        BuildSceneInternal(SceneType.Training, AgentType.Cube);
+    }
+    
+    [MenuItem("Tools/ML Hack/SceneBuilder/Build Cube Test Scene")]
+    public static void BuildCubeTestScene()
+    {
+        BuildSceneInternal(SceneType.Testing, AgentType.Cube);
+    }
+
+    [MenuItem("Tools/ML Hack/SceneBuilder/Build Ragdoll Training Scene")]
+    public static void BuildRagdollTrainingScene()
+    {
+        BuildSceneInternal(SceneType.Training, AgentType.Ragdoll);
+    }
+    
+    [MenuItem("Tools/ML Hack/SceneBuilder/Build Ragdoll Test Scene")]
+    public static void BuildRagdollTestScene()
+    {
+        BuildSceneInternal(SceneType.Testing, AgentType.Ragdoll);
+    }
+
+    #endregion Scene Builder Menu Functions
+
+    #region Create Agent Prefabs
 
     static GameObject CreateCubeAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
     {
@@ -324,19 +272,6 @@ public static class SceneBuilder
         return agent;
     }
 
-    static GameObject CreateGoalPrefab(EnvInitializer init)
-    {
-        // Use PrimitiveBuilder for consistent goal creation
-        return PrimitiveBuilder.CreateGoal(init.ArenaHelper.GoalHeight);
-    }
-
-    static GameObject CreateObstaclePrefab(EnvInitializer init)
-    {
-        // Use PrimitiveBuilder for consistent obstacle creation
-        PrimitiveBuilder.EnsureTagExists("Obstacle");
-        return PrimitiveBuilder.CreateObstacle(init.ArenaHelper.ObstacleHeight);
-    }
-
     static GameObject CreateRagdollAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
     {
         // Use PrimitiveBuilder for consistent ragdoll creation
@@ -350,7 +285,7 @@ public static class SceneBuilder
         if (behaviorParams != null)
         {
             // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
-            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+            behaviorParams.BehaviorType = sceneType == SceneType.Training ? Unity.MLAgents.Policies.BehaviorType.HeuristicOnly : Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
@@ -376,11 +311,22 @@ public static class SceneBuilder
         
         // Add debug UI components (same as cube agents)
         var pelvis = ragdoll.GetComponentInChildren<RagdollAgent>().gameObject;
+        
+        // Add blinking animation for visual polish
+        var headVisualObject = ragdoll.transform.Find("Head")?.transform.Find("Visual")?.gameObject;
+        if (headVisualObject != null)
+        {
+            headVisualObject.AddComponent<EyeBlinker>();
+        }
+        else
+        {
+            TrainArenaDebugManager.LogWarning("Failed to find head visual object for the eyes!");
+        }
+
         pelvis.AddComponent<AgentDebugInfo>();
-        // Note: Ragdolls now have blinking eyes on their heads!
         
         // Add domain randomization for physics testing (random mass, friction, etc.)
-        var domainRandomizer = pelvis.AddComponent<DomainRandomizer>(); //TODO: Or add to root ragdoll object?
+        var domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
         domainRandomizer.randomizeMass = true;
         domainRandomizer.randomizeFriction = true;
         domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
@@ -406,6 +352,4 @@ public static class SceneBuilder
 
         return ragdoll;
     }
-    
-
 }
