@@ -48,7 +48,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         public float separation = 0.004f; // small gap to avoid initial penetration
     }
 
-    [MenuItem("Tools/ML Hack/Build Reference Ragdoll")]
+    [MenuItem("TrainArena/Ragdoll/Build Reference Ragdoll")]
     static void BuildMenu()
     {
         var root = Build(Vector3.zero, new Cfg());

@@ -380,16 +380,16 @@ public static class SceneEnhancer
     /// <summary>
     /// Menu items for visual preset switching
     /// </summary>
-    [MenuItem("Tools/ML Hack/Visual Presets/Polished Cool (Default)")]
+    [MenuItem("TrainArena/Scenes/Visual Presets/Polished Cool (Default)")]
     public static void MenuSetPolishedCool() => SetPolishedCoolPreset();
     
-    [MenuItem("Tools/ML Hack/Visual Presets/Warm Cinematic")]
+    [MenuItem("TrainArena/Scenes/Visual Presets/Warm Cinematic")]
     public static void MenuSetWarmCinematic() => SetWarmCinematicPreset();
     
-    [MenuItem("Tools/ML Hack/Visual Presets/Minimal Clean")]  
+    [MenuItem("TrainArena/Scenes/Visual Presets/Minimal Clean")]  
     public static void MenuSetMinimalClean() => SetMinimalCleanPreset();
-    
-    [MenuItem("Tools/ML Hack/Visual Presets/Re-apply Current Scene Enhancement")]
+
+    [MenuItem("TrainArena/Scenes/Visual Presets/Re-apply Current Scene Enhancement")]
     public static void MenuReapplyEnhancement()
     {
         var camera = Object.FindFirstObjectByType<Camera>();

@@ -202,19 +202,19 @@ public static class ModelManager
     /// <summary>
     /// Menu items for quick model operations
     /// </summary>
-    [MenuItem("Tools/ML Hack/Models/Apply Newest Cube Model")]
+    [MenuItem("TrainArena/Models/Apply Newest Cube Model")]
     public static void ApplyNewestCubeModel()
     {
         ApplyNewestModelToAgents("Cube");
     }
     
-    [MenuItem("Tools/ML Hack/Models/Apply Newest Ragdoll Model")]
+    [MenuItem("TrainArena/Models/Apply Newest Ragdoll Model")]
     public static void ApplyNewestRagdollModel()
     {
         ApplyNewestModelToAgents("Ragdoll");
     }
     
-    [MenuItem("Tools/ML Hack/Models/Open Models Folder")]
+    [MenuItem("TrainArena/Models/Open Models Folder")]
     public static void OpenModelsFolder()
     {
         if (!Directory.Exists(MODELS_FOLDER))
@@ -225,7 +225,7 @@ public static class ModelManager
         EditorUtility.RevealInFinder(MODELS_FOLDER);
     }
     
-    [MenuItem("Tools/ML Hack/Models/Show Model Selection Window")]
+    [MenuItem("TrainArena/Models/Show Model Selection Window")]
     public static void ShowModelSelectionWindow()
     {
         ModelSelectionWindow.ShowWindow();

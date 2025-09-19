@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 using static Codice.Client.Common.WebApi.WebApiEndpoints;
+using static PrimitiveBuilder;
 
 /// <summary>
 /// Unity Editor tools for generating complete ML-Agents training scenes
@@ -18,10 +19,10 @@ using static Codice.Client.Common.WebApi.WebApiEndpoints;
 /// - Separate training/testing scene configurations
 /// 
 /// Menu Items:
-/// - Tools/ML Hack/Build Cube Training Scene: 4x4 cube agent training environment
-/// - Tools/ML Hack/Build Cube Test Scene: 2x2 cube agent testing environment  
-/// - Tools/ML Hack/Build Ragdoll Training Scene: 2x2 ragdoll agent training environment
-/// - Tools/ML Hack/Build Ragdoll Test Scene: 1x1 ragdoll agent testing environment
+/// - TrainArena/Scenes/Build Cube Training Scene: 4x4 cube agent training environment
+/// - TrainArena/Scenes/Build Cube Test Scene: 2x2 cube agent testing environment  
+/// - TrainArena/Scenes/Build Ragdoll Training Scene: 2x2 ragdoll agent training environment
+/// - TrainArena/Scenes/Build Ragdoll Test Scene: 1x1 ragdoll agent testing environment
 /// </summary>
 public static class SceneBuilder
 {
@@ -120,7 +121,7 @@ public static class SceneBuilder
             {
                 init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTestingX;
                 init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTestingZ;
-                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
+                init.ArenaHelper.AgentSpawnHeight = 1.0f; // Ragdolls are taller than cubes
             }
             init.ObstaclesPerArena = 6;
         }
@@ -136,7 +137,7 @@ public static class SceneBuilder
             {
                 init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTrainingX;
                 init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTrainingZ;
-                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
+                init.ArenaHelper.AgentSpawnHeight = 1.0f; // Ragdolls are taller than cubes
             }
         }
 
@@ -173,25 +174,25 @@ public static class SceneBuilder
 
     #region Scene Builder Menu Functions
 
-    [MenuItem("Tools/ML Hack/SceneBuilder/Build Cube Training Scene")]
+    [MenuItem("TrainArena/Scenes/Build Cube Training Scene")]
     public static void BuildCubeTrainingScene()
     {
         BuildSceneInternal(SceneType.Training, AgentType.Cube);
     }
     
-    [MenuItem("Tools/ML Hack/SceneBuilder/Build Cube Test Scene")]
+    [MenuItem("TrainArena/Scenes/Build Cube Test Scene")]
     public static void BuildCubeTestScene()
     {
         BuildSceneInternal(SceneType.Testing, AgentType.Cube);
     }
 
-    [MenuItem("Tools/ML Hack/SceneBuilder/Build Ragdoll Training Scene")]
+    [MenuItem("TrainArena/Scenes/Build Ragdoll Training Scene")]
     public static void BuildRagdollTrainingScene()
     {
         BuildSceneInternal(SceneType.Training, AgentType.Ragdoll);
     }
     
-    [MenuItem("Tools/ML Hack/SceneBuilder/Build Ragdoll Test Scene")]
+    [MenuItem("TrainArena/Scenes/Build Ragdoll Test Scene")]
     public static void BuildRagdollTestScene()
     {
         BuildSceneInternal(SceneType.Testing, AgentType.Ragdoll);

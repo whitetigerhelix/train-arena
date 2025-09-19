@@ -4,7 +4,7 @@ using UnityEngine;
 // Utility to quickly set a simple skybox for the scene
 public static class QuickSkybox
 {
-    [MenuItem("Tools/ML Hack/Quick Skybox/Procedural Blue")]
+    [MenuItem("TrainArena/Utilities/Procedural Blue Skybox")]
     static void ApplyProcedural()
     {
         var mat = new Material(Shader.Find("Skybox/Procedural"));
@@ -17,7 +17,7 @@ public static class QuickSkybox
         DynamicGI.UpdateEnvironment();
     }
 
-    /*[MenuItem("Tools/ML Hack/Quick Skybox/Simple Gradient")]
+    /*[MenuItem("TrainArena/Quick Skybox/Simple Gradient")]
     static void ApplyGradient()
     {
         var mat = new Material(Shader.Find("Skybox/Gradient"));

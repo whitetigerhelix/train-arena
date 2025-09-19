@@ -10,7 +10,7 @@ public class ModelHotReloadWindow : EditorWindow
     string resultsDir = "results";
     string destAssetPath = "Assets/Models/TrainArena/latest.onnx";
 
-    [MenuItem("Tools/ML Hack/Model Hot-Reload")]
+    [MenuItem("TrainArena/Models/Model Hot-Reload")]
     public static void Open() => GetWindow<ModelHotReloadWindow>("Model Hot-Reload");
 
     void OnGUI()

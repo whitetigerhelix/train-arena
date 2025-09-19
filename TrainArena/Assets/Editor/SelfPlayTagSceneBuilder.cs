@@ -4,7 +4,7 @@ using Unity.MLAgents.Policies;
 
 public static class SelfPlayTagSceneBuilder
 {
-    [MenuItem("Tools/ML Hack/Build Self-Play Tag Scene")]
+    [MenuItem("TrainArena/Scenes/Build Self-Play Tag Scene")]
     public static void Build()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);

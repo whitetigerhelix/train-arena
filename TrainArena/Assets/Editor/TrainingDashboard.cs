@@ -23,7 +23,7 @@ public class TrainingDashboard : EditorWindow
     private int ragdollArenaCount = 4;
     private bool includeCameraPrefab = true;
     
-    [MenuItem("Tools/ML Hack/Training Dashboard")]
+    [MenuItem("TrainArena/Dashboard/Training Dashboard")]
     public static void ShowWindow()
     {
         var window = GetWindow<TrainingDashboard>("ML Training Dashboard");

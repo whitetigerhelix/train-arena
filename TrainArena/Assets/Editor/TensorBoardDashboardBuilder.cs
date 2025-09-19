@@ -5,7 +5,7 @@ using TrainArena.Dashboard;
 
 public static class TensorBoardDashboardBuilder
 {
-    [MenuItem("Tools/ML Hack/Build TensorBoard Dashboard")]
+    [MenuItem("TrainArena/Dashboard/Build TensorBoard Dashboard")]
     public static void Build()
     {
         var canvasGO = new GameObject("TB Dashboard", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));

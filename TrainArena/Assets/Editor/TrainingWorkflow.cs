@@ -144,7 +144,7 @@ public static class TrainingWorkflow
     /// <summary>
     /// Menu items for training workflow
     /// </summary>
-    [MenuItem("Tools/ML Hack/Training/Prepare Cube Training Run")]
+    [MenuItem("TrainArena/Training/Prepare Cube Training Run")]
     public static void PrepareCubeTrainingRun()
     {
         var runId = PrepareTrainingRun("CubeAgent", out var configPath, out var resultsPath);
@@ -153,7 +153,7 @@ public static class TrainingWorkflow
         EditorUtility.RevealInFinder(TRAINING_RUNS_FOLDER);
     }
     
-    [MenuItem("Tools/ML Hack/Training/Prepare Ragdoll Training Run")]
+    [MenuItem("TrainArena/Training/Prepare Ragdoll Training Run")]
     public static void PrepareRagdollTrainingRun()
     {
         var runId = PrepareTrainingRun("RagdollAgent", out var configPath, out var resultsPath);
@@ -162,7 +162,7 @@ public static class TrainingWorkflow
         EditorUtility.RevealInFinder(TRAINING_RUNS_FOLDER);
     }
     
-    [MenuItem("Tools/ML Hack/Training/Open Training Runs Folder")]
+    [MenuItem("TrainArena/Training/Open Training Runs Folder")]
     public static void OpenTrainingRunsFolder()
     {
         Directory.CreateDirectory(TRAINING_RUNS_FOLDER);

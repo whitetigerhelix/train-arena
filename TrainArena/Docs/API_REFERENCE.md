@@ -192,7 +192,7 @@ public static class SceneBuilder
     private const float GroundSize = 200f;            // Ground plane dimensions
 
     // Menu integration
-    [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
+    [MenuItem("TrainArena/Scenes/Build Cube Training Scene")]
     public static void BuildCubeTrainingScene()
     {
         // Create new scene

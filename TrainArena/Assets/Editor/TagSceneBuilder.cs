@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class TagSceneBuilder
 {
-    [MenuItem("Tools/ML Hack/Build Tag Arena Scene")]
+    [MenuItem("TrainArena/Scenes/Build Tag Arena Scene")]
     public static void BuildTagScene()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
