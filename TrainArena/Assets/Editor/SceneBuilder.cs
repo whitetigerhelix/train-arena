@@ -25,9 +25,6 @@ using static Codice.Client.Common.WebApi.WebApiEndpoints;
 /// </summary>
 public static class SceneBuilder
 {
-    public enum SceneType { Training, Testing }
-    public enum AgentType { Cube, Ragdoll }
-
     /// <summary>
     /// Detects if ML-Agents training is active by checking for Academy communication port
     /// This allows automatic switching between training and testing modes

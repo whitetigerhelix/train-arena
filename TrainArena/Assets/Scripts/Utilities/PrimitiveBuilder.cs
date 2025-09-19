@@ -12,6 +12,9 @@ using TrainArena.Configuration;
 /// </summary>
 public static class PrimitiveBuilder
 {
+    public enum SceneType { Training, Testing }
+    public enum AgentType { Cube, Ragdoll }
+
     #region Ragdoll
 
     /// <summary>
@@ -55,6 +58,55 @@ public static class PrimitiveBuilder
             }
             return null;
         }
+
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis)?.gameObject;  // Pelvis is guaranteed because we just validated ragdoll structure above
+
+        // Add visual polish components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
+        try
+        {
+            // Add blinking animation for visual polish
+            var headVisualObject = AgentVisuals.RagdollStructure.FindHeadVisual(pelvis.transform);
+            if (headVisualObject != null)
+            {
+                AddAgentFace(headVisualObject, AgentType.Ragdoll);
+            }
+            else
+            {
+                TrainArenaDebugManager.LogWarning("⚠️ Could not find Head/Visual object for eye blinking animation");
+            }
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add EyeBlinker: {e.Message}");
+        }
+
+        // Add debug and development components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
+        try
+        {
+            // Add debug info component for development
+            if (pelvis.GetComponent<AgentDebugInfo>() == null)
+            {
+                pelvis.AddComponent<AgentDebugInfo>();
+                TrainArenaDebugManager.Log($"✅ Added AgentDebugInfo component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+
+            // Add domain randomization for physics testing
+            var domainRandomizer = pelvis.GetComponent<DomainRandomizer>();
+            if (domainRandomizer == null)
+            {
+                domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
+                domainRandomizer.randomizeMass = true;
+                domainRandomizer.randomizeFriction = true;
+                domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
+                TrainArenaDebugManager.Log($"✅ Added DomainRandomizer component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add optional components: {e.Message}");
+        }
         
         // Add ML-Agents components if not already present
         try
@@ -65,7 +117,7 @@ public static class PrimitiveBuilder
         {
             TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to add ML-Agents components to ragdoll '{name}': {e.Message}");
             TrainArenaDebugManager.LogError($"Stack trace: {e.StackTrace}");
-            
+
             // Don't destroy the ragdoll since the structure might still be usable
             TrainArenaDebugManager.LogWarning($"⚠️ Ragdoll '{name}' created but ML-Agents integration may not work properly");
         }
@@ -101,10 +153,10 @@ public static class PrimitiveBuilder
         }
         
         // Check for pelvis
-        var pelvis = ragdoll.transform.Find("Pelvis");
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis);
         if (pelvis == null)
         {
-            TrainArenaDebugManager.LogError($"❌ Ragdoll '{ragdoll.name}' missing required Pelvis bone");
+            TrainArenaDebugManager.LogError($"❌ Ragdoll '{ragdoll.name}' missing required {RagdollJointNames.Pelvis} bone");
             return false;
         }
         
@@ -149,10 +201,10 @@ public static class PrimitiveBuilder
             return;
         }
         
-        var pelvis = ragdoll.transform.Find("Pelvis")?.gameObject;
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis)?.gameObject;
         if (pelvis == null)
         {
-            TrainArenaDebugManager.LogError($"❌ CRITICAL: No Pelvis found in blockman ragdoll '{ragdoll.name}'! ML-Agents components cannot be added. Ragdoll structure is invalid.");
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No {RagdollJointNames.Pelvis} found in blockman ragdoll '{ragdoll.name}'! ML-Agents components cannot be added. Ragdoll structure is invalid.");
             
             // Log available children for debugging
             TrainArenaDebugManager.Log($"Available children in '{ragdoll.name}':", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -344,64 +396,13 @@ public static class PrimitiveBuilder
                 behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(expectedActions);
             }
         }
-
-        // Add visual polish components with error handling
-        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
-        try
-        {
-            // Add blinking animation for visual polish
-            var headVisualObject = pelvis.transform.Find("Chest")?.Find("Head")?.Find("Visual")?.gameObject;
-            if (headVisualObject != null)
-            {
-                if (headVisualObject.GetComponent<EyeBlinker>() == null)
-                {
-                    headVisualObject.AddComponent<EyeBlinker>();
-                    TrainArenaDebugManager.Log($"✅ Added EyeBlinker to head visual", TrainArenaDebugManager.DebugLogLevel.Verbose);
-                }
-            }
-            else
-            {
-                TrainArenaDebugManager.LogWarning("⚠️ Could not find Head/Visual object for eye blinking animation");
-            }
-        }
-        catch (System.Exception e)
-        {
-            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add EyeBlinker: {e.Message}");
-        }
-
-        // Add debug and development components with error handling
-        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
-        try
-        {
-            // Add debug info component for development
-            if (pelvis.GetComponent<AgentDebugInfo>() == null)
-            {
-                pelvis.AddComponent<AgentDebugInfo>();
-                TrainArenaDebugManager.Log($"✅ Added AgentDebugInfo component", TrainArenaDebugManager.DebugLogLevel.Verbose);
-            }
-
-            // Add domain randomization for physics testing
-            var domainRandomizer = pelvis.GetComponent<DomainRandomizer>();
-            if (domainRandomizer == null)
-            {
-                domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
-                domainRandomizer.randomizeMass = true;
-                domainRandomizer.randomizeFriction = true;
-                domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
-                TrainArenaDebugManager.Log($"✅ Added DomainRandomizer component", TrainArenaDebugManager.DebugLogLevel.Verbose);
-            }
-        }
-        catch (System.Exception e)
-        {
-            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add optional components: {e.Message}");
-        }
         
         TrainArenaDebugManager.Log($"🎭 Successfully configured ragdoll '{ragdoll.name}' for ML-Agents training with {ragdollAgent.joints.Count} action joints", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
     // Unity Editor menu items for ragdoll creation
 #if UNITY_EDITOR
-    [UnityEditor.MenuItem("Tools/ML Hack/Create Test Ragdoll")]
+    [UnityEditor.MenuItem("TrainArena/Ragdoll/Create Test Ragdoll")]
     public static void CreateTestRagdoll()
     {
         var ragdoll = CreateRagdoll("TestRagdoll", Vector3.zero);
@@ -491,7 +492,7 @@ public static class PrimitiveBuilder
         AddTrail(agent);
         
         // Add simple face to show agent orientation
-        AddAgentFace(agent);
+        AddAgentFace(agent, AgentType.Cube);
 
         // Add CubeAgent component
         var cubeAgent = agent.AddComponent<CubeAgent>();
@@ -541,17 +542,10 @@ public static class PrimitiveBuilder
             }
         }
 
-        // Add visual and debug components with error handling
+        // Add debug components with error handling
         //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
         try
         {
-            // Add blinking animation for visual polish
-            if (agent.GetComponent<EyeBlinker>() == null)
-            {
-                agent.AddComponent<EyeBlinker>();
-                TrainArenaDebugManager.Log($"✅ Added EyeBlinker component", TrainArenaDebugManager.DebugLogLevel.Verbose);
-            }
-
             // Add debug info component for development
             if (agent.GetComponent<AgentDebugInfo>() == null)
             {
@@ -682,37 +676,69 @@ public static class PrimitiveBuilder
         
         TrainArenaDebugManager.Log($"Added trail to {agent.name}", TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
-    
+
     /// <summary>
     /// Adds simple "eyes" to show agent forward direction
     /// </summary>
-    public static void AddAgentFace(GameObject agent)
+    public static void AddAgentFace(GameObject agent, AgentType agentType)
     {
-        // Create left eye - positioned ON the cube surface, not inside
+        // Get eye configuration based on agent type
+        Vector3 leftEyePos, rightEyePos, eyeScale;
+        
+        switch (agentType)
+        {
+            case AgentType.Cube:
+                leftEyePos = AgentVisuals.EyeConfiguration.Cube.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Cube.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Cube.EyeScale;
+                break;
+                
+            case AgentType.Ragdoll:
+                leftEyePos = AgentVisuals.EyeConfiguration.Ragdoll.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Ragdoll.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Ragdoll.EyeScale;
+                break;
+                
+            default:
+                TrainArenaDebugManager.LogWarning($"⚠️ Unknown agent type '{agentType}' for face configuration, using cube defaults");
+                leftEyePos = AgentVisuals.EyeConfiguration.Cube.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Cube.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Cube.EyeScale;
+                break;
+        }
+
+        // Create left eye
         var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         leftEye.name = "LeftEye";
         leftEye.transform.parent = agent.transform;
-        leftEye.transform.localPosition = new Vector3(-0.2f, 0.2f, 0.51f); // Outside cube surface (0.5 + 0.01 margin)
-        leftEye.transform.localScale = Vector3.one * 0.15f; // Slightly larger for visibility
-        
+        leftEye.transform.localPosition = leftEyePos;
+        leftEye.transform.localScale = eyeScale;
+
         // Create right eye  
         var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         rightEye.name = "RightEye";
         rightEye.transform.parent = agent.transform;
-        rightEye.transform.localPosition = new Vector3(0.2f, 0.2f, 0.51f); // Outside cube surface
-        rightEye.transform.localScale = Vector3.one * 0.15f;
-        
+        rightEye.transform.localPosition = rightEyePos;
+        rightEye.transform.localScale = eyeScale;
+
         // Make eyes white with slight gloss for realism
         var eyeMaterial = CreateURPMaterial(smoothness: 0.8f, metallic: 0.0f);
         eyeMaterial.color = Color.white;
         eyeMaterial.name = "EyeMaterial";
-        
+
         leftEye.GetComponent<Renderer>().sharedMaterial = eyeMaterial;
         rightEye.GetComponent<Renderer>().sharedMaterial = eyeMaterial;
-        
+
         // Remove colliders from eyes so they don't interfere with physics
         Object.DestroyImmediate(leftEye.GetComponent<Collider>());
         Object.DestroyImmediate(rightEye.GetComponent<Collider>());
+        
+        // Add blinking animation for visual polish
+        if (agent.GetComponent<EyeBlinker>() == null)
+        {
+            agent.AddComponent<EyeBlinker>();
+            TrainArenaDebugManager.Log($"✅ Added EyeBlinker component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
     }
 
     #endregion Polish and Effects

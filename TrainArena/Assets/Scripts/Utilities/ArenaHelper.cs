@@ -28,7 +28,7 @@ public class ArenaHelper
     
     [Header("Placement Constraints")]
     [SerializeField] private float minGoalDistance = 1.5f;     // Minimum distance between agent and goal
-    [SerializeField] private float minObstacleDistance = 1.5f; // Minimum clearance around obstacles
+    [SerializeField] private float minObstacleDistance = 2.25f;// Minimum clearance around obstacles
     [SerializeField] private int maxPlacementAttempts = 20;    // Maximum attempts for valid placement
     
     // Properties - match exact calculations from EnvInitializer
@@ -108,7 +108,7 @@ public class ArenaHelper
     {
         // Use same algorithm as EnvInitializer: prime number offset for distribution
         var goalAngle = (arenaIndex * 73f) % 360f;
-        var goalDistance = Random.Range(GroundRadius * 0.2f, GroundRadius * 0.8f);
+        var goalDistance = Random.Range(GroundRadius * 0.4f, GroundRadius * 0.8f);
         var goalOffset = new Vector3(
             Mathf.Cos(goalAngle * Mathf.Deg2Rad) * goalDistance,
             goalHeight,

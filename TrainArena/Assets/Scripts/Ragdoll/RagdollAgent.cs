@@ -50,7 +50,7 @@ public class RagdollAgent : BaseTrainArenaAgent
     // Episode management
     [Header("Episode Management")]
     [Tooltip("Minimum time before episode can end (learning grace period)")]
-    public float episodeGracePeriod = 3.0f;
+    public float episodeGracePeriod = 8.0f;
     
     [Tooltip("Maximum episode duration before auto-reset")]
     public float maxEpisodeDuration = 30.0f;

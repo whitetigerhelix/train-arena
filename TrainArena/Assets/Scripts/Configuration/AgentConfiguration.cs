@@ -137,4 +137,68 @@ namespace TrainArena.Configuration
             }
         }
     }
+
+    /// <summary>
+    /// Configuration for agent visual components and features
+    /// </summary>
+    [System.Serializable]
+    public static class AgentVisuals
+    {
+        /// <summary>
+        /// Eye positioning and scale configuration for different agent types
+        /// </summary>
+        public static class EyeConfiguration
+        {
+            /// <summary>
+            /// Eye configuration for CubeAgent
+            /// </summary>
+            public static class Cube
+            {
+                public static readonly Vector3 LeftEyePosition = new Vector3(-0.2f, 0.2f, 0.51f);
+                public static readonly Vector3 RightEyePosition = new Vector3(0.2f, 0.2f, 0.51f);
+                public static readonly Vector3 EyeScale = Vector3.one * 0.15f;
+            }
+            
+            /// <summary>
+            /// Eye configuration for RagdollAgent (positioned on head visual)
+            /// </summary>
+            public static class Ragdoll
+            {
+                public static readonly Vector3 LeftEyePosition = new Vector3(-0.15f, 0.1f, 0.45f);
+                public static readonly Vector3 RightEyePosition = new Vector3(0.15f, 0.1f, 0.45f);
+                public static readonly Vector3 EyeScale = Vector3.one * 0.12f;
+            }
+        }
+        
+        /// <summary>
+        /// Ragdoll structure navigation paths
+        /// </summary>
+        public static class RagdollStructure
+        {
+            /// <summary>
+            /// Path to head visual object from pelvis: Pelvis -> Chest -> Head -> Visual
+            /// </summary>
+            public static readonly string[] HeadVisualPath = { RagdollJointNames.Chest, RagdollJointNames.Head, "Visual" };
+            
+            /// <summary>
+            /// Get head visual object from pelvis using configured path
+            /// </summary>
+            public static GameObject FindHeadVisual(Transform pelvis)
+            {
+                Transform current = pelvis;
+                
+                foreach (string pathComponent in HeadVisualPath)
+                {
+                    current = current.Find(pathComponent);
+                    if (current == null)
+                    {
+                        TrainArenaDebugManager.LogWarning($"⚠️ Could not find '{pathComponent}' in ragdoll structure path");
+                        return null;
+                    }
+                }
+                
+                return current.gameObject;
+            }
+        }
+    }
 }
