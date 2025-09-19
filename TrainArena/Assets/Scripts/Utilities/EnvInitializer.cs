@@ -172,8 +172,25 @@ public class EnvInitializer : MonoBehaviour
         var agentPosition = center + Vector3.up * 0.5f; // Initial position at center
         agentPosition.y += arenaHelper.AgentSpawnHeight;
         var agentGO = Instantiate(cubeAgentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
-        agentGO.name = $"CubeAgent_Arena_{arenaIndex}";
-        var agent = agentGO.GetComponent<CubeAgent>();
+        
+        // Detect agent type and name appropriately
+        var cubeAgent = agentGO.GetComponent<CubeAgent>();
+        var ragdollAgent = agentGO.GetComponentInChildren<RagdollAgent>();
+        
+        if (ragdollAgent != null)
+        {
+            agentGO.name = $"RagdollAgent_Arena_{arenaIndex}";
+        }
+        else if (cubeAgent != null)
+        {
+            agentGO.name = $"CubeAgent_Arena_{arenaIndex}";
+        }
+        else
+        {
+            agentGO.name = $"Agent_Arena_{arenaIndex}"; // Fallback
+        }
+        
+        var agent = cubeAgent; // For goal assignment (cubes need goal reference)
         
         TrainArenaDebugManager.Log($"Spawned Agent at {agentPosition} in {arenaContainer.name}", TrainArenaDebugManager.DebugLogLevel.Verbose);
 

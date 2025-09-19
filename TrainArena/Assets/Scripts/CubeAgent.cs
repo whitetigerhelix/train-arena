@@ -151,8 +151,8 @@ public class CubeAgent : BaseTrainArenaAgent
         // Store current velocity for next frame comparison
         lastFrameVelocity = rb.linearVelocity;
         
-        // Request decisions for ML-Agents system to work
-        RequestDecision();
+        // Note: ML-Agents decisions are now handled by DecisionRequester component
+        // (consistent with RagdollAgent - no manual RequestDecision calls needed)
     }
     
     void LateUpdate()

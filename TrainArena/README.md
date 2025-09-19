@@ -239,6 +239,7 @@ See `RESET_GUIDE.md` for detailed reset options.
 
 - 🚀 **[Quick Start Guide](Docs/QUICK_START.md)** - 5-minute setup and first training
 - 📖 **[Complete Training Guide](Docs/TRAINING_GUIDE.md)** - In-depth training workflow and optimization
+- 🤖 **[ML-Agents System Guide](Docs/ML_AGENTS_GUIDE.md)** - Model management, automation, and training dashboard
 - 🔧 **[Debug & Troubleshooting](Docs/DEBUG_AND_TROUBLESHOOTING.md)** - Debug system usage and problem solving
 - 🌟 **[Advanced Features](Docs/ADVANCED_FEATURES.md)** - Self-play, domain randomization, TensorBoard integration
 - 🎬 **[Recording & Demo Guide](Docs/RECORDING_AND_DEMO.md)** - Create shareable videos and demos

@@ -241,31 +241,45 @@ public static class PrimitiveBuilder
         root.transform.position = position;
 
         // Create pelvis as the main body (contains RagdollAgent component)
+        // Position pelvis at center, elevated for standing posture
         var pelvis = CreateRagdollBodyPart("Pelvis", Vector3.zero, new Vector3(0.4f, 0.3f, 0.25f), root.transform);
         
         // Create hierarchical skeleton: Pelvis -> Thigh -> Shin -> Foot
-        // Left leg chain
-        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
-        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), leftThigh.transform);
-        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(0, -0.35f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), leftShin.transform);
-
-        // Right leg chain  
-        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.4f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
-        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0, -0.4f, 0), new Vector3(0.15f, 0.35f, 0.15f), rightThigh.transform);
-        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0, -0.35f, 0.15f), new Vector3(0.12f, 0.1f, 0.3f), rightShin.transform);
-
-        // Add joints connecting the skeletal hierarchy
-        // Hips: Connect thighs to pelvis
-        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(-0.15f, -0.15f, 0), 45f);
-        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.2f, 0), new Vector3(0.15f, -0.15f, 0), 45f);
+        // CRITICAL: Position body parts so their connection points align
         
-        // Knees: Connect shins to thighs  
-        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 90f);
-        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.175f, 0), new Vector3(0, -0.2f, 0), 90f);
+        // Pelvis: 0.4x0.3x0.25 scale = 0.8x0.6x0.5 world size (capsule height = 0.6, radius = 0.2)
+        // Thigh: 0.2x0.4x0.2 scale = 0.4x0.8x0.4 world size (capsule height = 0.8, radius = 0.1)
         
-        // Ankles: Connect feet to shins
-        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.175f, 0), 30f);
-        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.1f), new Vector3(0, -0.175f, 0), 30f);
+        // Left leg chain - positioned so joint connection points align properly
+        // Thigh: positioned so its TOP (at +0.4 local Y) aligns with pelvis BOTTOM (at -0.3 local Y)
+        var leftThigh = CreateRagdollBodyPart("LeftThigh", new Vector3(-0.15f, -0.7f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        // Shin: positioned so its TOP (at +0.35 local Y) aligns with thigh BOTTOM (at -0.4 local Y)
+        var leftShin = CreateRagdollBodyPart("LeftShin", new Vector3(0, -0.75f, 0), new Vector3(0.15f, 0.35f, 0.15f), leftThigh.transform);
+        // Foot: positioned so its BACK (at -0.175 local Z) aligns with shin BOTTOM (at -0.35 local Y)
+        var leftFoot = CreateRagdollBodyPart("LeftFoot", new Vector3(0, -0.45f, 0.175f), new Vector3(0.12f, 0.1f, 0.35f), leftShin.transform);
+
+        // Right leg chain - mirrored positioning
+        var rightThigh = CreateRagdollBodyPart("RightThigh", new Vector3(0.15f, -0.7f, 0), new Vector3(0.2f, 0.4f, 0.2f), pelvis.transform);
+        var rightShin = CreateRagdollBodyPart("RightShin", new Vector3(0, -0.75f, 0), new Vector3(0.15f, 0.35f, 0.15f), rightThigh.transform);
+        var rightFoot = CreateRagdollBodyPart("RightFoot", new Vector3(0, -0.45f, 0.175f), new Vector3(0.12f, 0.1f, 0.35f), rightShin.transform);
+
+        // Add joints with anchors at exact connection surfaces
+        // CRITICAL: Anchors must be at the touching surfaces of the capsules
+        
+        // Hips: Pelvis (height=0.6) bottom at -0.3, Thigh (height=0.8) top at +0.4
+        // Connection point: Pelvis bottom surface, Thigh top surface
+        AddRagdollJointWithAnchors(leftThigh, pelvis, new Vector3(0, 0.4f, 0), new Vector3(-0.15f, -0.3f, 0), 45f);
+        AddRagdollJointWithAnchors(rightThigh, pelvis, new Vector3(0, 0.4f, 0), new Vector3(0.15f, -0.3f, 0), 45f);
+        
+        // Knees: Thigh (height=0.8) bottom at -0.4, Shin (height=0.7) top at +0.35
+        // Connection point: Thigh bottom surface, Shin top surface  
+        AddRagdollJointWithAnchors(leftShin, leftThigh, new Vector3(0, 0.35f, 0), new Vector3(0, -0.4f, 0), 90f);
+        AddRagdollJointWithAnchors(rightShin, rightThigh, new Vector3(0, 0.35f, 0), new Vector3(0, -0.4f, 0), 90f);
+        
+        // Ankles: Shin (height=0.7) bottom at -0.35, Foot at back edge
+        // Connection point: Shin bottom surface, Foot back surface
+        AddRagdollJointWithAnchors(leftFoot, leftShin, new Vector3(0, 0.05f, -0.175f), new Vector3(0, -0.35f, 0), 30f);
+        AddRagdollJointWithAnchors(rightFoot, rightShin, new Vector3(0, 0.05f, -0.175f), new Vector3(0, -0.35f, 0), 30f);
 
         // Add RagdollAgent to pelvis
         var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
@@ -303,6 +317,10 @@ public static class PrimitiveBuilder
         bodyPart.transform.localPosition = localPosition;
         bodyPart.transform.localScale = size;
         
+        // Debug log to verify positioning
+        TrainArenaDebugManager.Log($"Created {name} at local position {localPosition} relative to {parent.name}", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
+        
         // Add rigidbody with balanced mass distribution for stability
         var rb = bodyPart.AddComponent<Rigidbody>();
         rb.mass = name == "Pelvis" ? 8f : (name.Contains("Thigh") ? 6f : (name.Contains("Shin") ? 4f : 2f));
@@ -329,6 +347,9 @@ public static class PrimitiveBuilder
         joint.anchor = childAnchor;
         joint.connectedAnchor = parentAnchor;
         
+        // CRITICAL: Use AutoConfigureConnectedAnchor to maintain proper distance
+        joint.autoConfigureConnectedAnchor = false; // We set anchors manually for precise control
+        
         // Configure joint as hinge for simplicity
         joint.xMotion = ConfigurableJointMotion.Locked;
         joint.yMotion = ConfigurableJointMotion.Locked;
@@ -354,6 +375,10 @@ public static class PrimitiveBuilder
         drive.positionDamper = 15f;       // Light damping for natural movement
         drive.maximumForce = 300f;        // Lower force limit for smoother motion
         joint.angularXDrive = drive;
+        
+        // Debug log joint creation
+        TrainArenaDebugManager.Log($"Created joint: {child.name} -> {parent.name}, anchors: child{childAnchor}, parent{parentAnchor}", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
         
         // Add PD controller with natural gains for locomotion
         var pdController = child.AddComponent<PDJointController>();

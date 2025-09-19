@@ -40,7 +40,7 @@ public static class SceneBuilder
     }
 
     [MenuItem("Tools/ML Hack/Build Cube Training Scene")]
-    public static void BuildCubeScene()
+    public static void BuildCubeTrainingScene()
     {
         BuildCubeSceneInternal(SceneType.Training);
     }
@@ -117,9 +117,15 @@ public static class SceneBuilder
         init.goalPrefab = CreateGoalPrefab(init);
         init.obstaclePrefab = CreateObstaclePrefab(init);
 
-        TrainArenaDebugManager.Log("🎯 Cube training scene created with auto behavior switching and time scale monitoring!", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        // Apply scene enhancements (post-processing, skybox, lighting, camera settings)
+        SceneEnhancer.EnhanceScene(camera, isRagdollScene: false);
+        SceneEnhancer.ApplyCameraPrefabSettings(camera);
+        
+        // Auto-apply newest cube model if available
+        ModelManager.ApplyNewestModelToAgents("Cube");
+
+        TrainArenaDebugManager.Log("🎯 Cube training scene created with comprehensive enhancements!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ Features: Auto behavior switching, time scale monitoring, post-processing, enhanced lighting", TrainArenaDebugManager.DebugLogLevel.Important);
         TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
@@ -222,9 +228,15 @@ public static class SceneBuilder
             TrainArenaDebugManager.Log("✅ Academy initialized for ragdoll training scene", TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
-        TrainArenaDebugManager.Log("🎭 Ragdoll scene created with auto behavior switching and time scale monitoring!", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("✅ AutoBehaviorSwitcher: Automatically switches between training and testing modes", TrainArenaDebugManager.DebugLogLevel.Important);
-        TrainArenaDebugManager.Log("⏱️ TimeScaleManager: Monitors training speed (20x during training, 1x during testing)", TrainArenaDebugManager.DebugLogLevel.Important);
+        // Apply scene enhancements (post-processing, skybox, lighting, camera settings)
+        SceneEnhancer.EnhanceScene(camera, isRagdollScene: true);
+        SceneEnhancer.ApplyCameraPrefabSettings(camera);
+        
+        // Auto-apply newest ragdoll model if available
+        ModelManager.ApplyNewestModelToAgents("Ragdoll");
+
+        TrainArenaDebugManager.Log("🎭 Ragdoll training scene created with comprehensive enhancements!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log("✅ Features: Auto behavior switching, enhanced lighting for ragdoll visibility, post-processing", TrainArenaDebugManager.DebugLogLevel.Important);
         TrainArenaDebugManager.Log("🎮 Usage: Press Play to simulate (press 'H' for debug controls), or start training via mlagents-learn", TrainArenaDebugManager.DebugLogLevel.Important);
     }
 
@@ -278,6 +290,14 @@ public static class SceneBuilder
                                      $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts), Mode: {behaviorMode}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
+        
+        // Add DecisionRequester for automatic ML-Agents decision scheduling (consistent with RagdollAgent)
+        var decisionRequester = agent.AddComponent<Unity.MLAgents.DecisionRequester>();
+        decisionRequester.DecisionPeriod = 5;  // Request decisions every 5 fixed updates (matches typical setup)
+        decisionRequester.TakeActionsBetweenDecisions = true;  // Allow actions between decisions
+        
+        TrainArenaDebugManager.Log($"Added DecisionRequester with period {decisionRequester.DecisionPeriod} (automatic ML-Agents decisions)", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
         
         // Add blinking animation for visual polish
         agent.AddComponent<EyeBlinker>();
