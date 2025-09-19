@@ -47,6 +47,20 @@ public class RagdollAgent : BaseTrainArenaAgent
     public const int JOINT_STATE_OBSERVATIONS_PER_JOINT = 2; // Angle and angular velocity per joint
     // Total observations = UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT)
     
+    // Episode management
+    [Header("Episode Management")]
+    [Tooltip("Minimum time before episode can end (learning grace period)")]
+    public float episodeGracePeriod = 3.0f;
+    
+    [Tooltip("Maximum episode duration before auto-reset")]
+    public float maxEpisodeDuration = 30.0f;
+    
+    [Tooltip("Minimum uprightness to avoid termination")]
+    public float minUprightness = 0.1f;  // Very lenient during learning
+    
+    [Tooltip("Minimum height before episode termination")]
+    public float minHeight = -0.5f;  // Allow falling below ground briefly
+    
     // Episode reset state
     private Vector3 startPosition;
     private Quaternion startRotation;
@@ -55,6 +69,8 @@ public class RagdollAgent : BaseTrainArenaAgent
     public override Transform MainTransform => pelvis;
     public override Rigidbody MainRigidbody => pelvis?.GetComponent<Rigidbody>();
     public override string AgentTypeIcon => "🎭";
+
+    public float Uprightness => Vector3.Dot(pelvis.up, Vector3.up);
 
     public override int GetTotalObservationCount()
     {
@@ -157,6 +173,9 @@ public class RagdollAgent : BaseTrainArenaAgent
 
     protected override void OnAgentEpisodeBegin()
     {
+        // Track episode start time for grace period and timeout
+        episodeStartTime = Time.time;
+        
         // Reset ragdoll to initial pose with slight elevation to prevent ground clipping
         if (pelvis != null)
         {
@@ -171,8 +190,10 @@ public class RagdollAgent : BaseTrainArenaAgent
             rigidbody.angularVelocity = Vector3.zero;
         }
         
-        // Episode start logging (verbose only to avoid spam during training)
-        TrainArenaDebugManager.Log($"🎭 {name}: Episode {CompletedEpisodes} started - {joints.Count} joints, pelvis at Y={pelvis.position.y:F2}", 
+        // Enhanced episode start logging with detailed diagnostics
+        TrainArenaDebugManager.Log($"🎭 {name}: Episode {CompletedEpisodes} started - Grace={episodeGracePeriod:F1}s, Timeout={maxEpisodeDuration:F1}s", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log($"🎭 {name}: Ragdoll State - {joints.Count} joints, pelvis Y={pelvis.position.y:F2}, Uprightness={Uprightness:F2}", 
             TrainArenaDebugManager.DebugLogLevel.Verbose);
         
         // ML-Agents configuration check (important level for troubleshooting)
@@ -189,11 +210,10 @@ public class RagdollAgent : BaseTrainArenaAgent
         if (pelvis == null) return;
         
         var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
-        
-        // Observation 1: Pelvis uprightness (1 value)
+
+        // Observation 1: Pelvis Uprightness (1 value)
         // Range: [-1,1] where 1 = perfectly upright, 0 = horizontal, -1 = upside down
-        float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
-        sensor.AddObservation(uprightness);
+        sensor.AddObservation(Uprightness);
         
         // Observations 2-4: Pelvis velocity in local space (3 values)
         // Provides direction-aware velocity information for movement learning
@@ -262,7 +282,6 @@ public class RagdollAgent : BaseTrainArenaAgent
         if (pelvis == null) return;
         
         var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
-        float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
         float forwardVelocity = Vector3.Dot(pelvisRigidbody.linearVelocity, transform.forward);
         
         // Primary reward: Forward movement within target speed range
@@ -270,7 +289,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         AddReward(normalizedVelocity * 0.03f);
         
         // Balance reward: Encourage staying upright (threshold at 0.8 for stability)
-        AddReward((uprightness - 0.8f) * 0.02f);
+        AddReward((Uprightness - 0.8f) * 0.02f);
         
         // Energy efficiency: Penalize excessive joint movements
         float energyUsage = CalculateEnergyUsage();
@@ -283,7 +302,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         // Performance logging (sample periodically to avoid log spam)
         if (Time.fixedTime % 5f < Time.fixedDeltaTime)
         {
-            TrainArenaDebugManager.Log($"🎭 {name}: Upright={uprightness:F2} | Velocity={forwardVelocity:F2}m/s | Height={pelvis.position.y:F2}m | Energy={energyUsage:F3}", 
+            TrainArenaDebugManager.Log($"🎭 {name}: Uprightness={Uprightness:F2} | Velocity={forwardVelocity:F2}m/s | Height={pelvis.position.y:F2}m | Energy={energyUsage:F3}", 
                 TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
     }
@@ -306,21 +325,49 @@ public class RagdollAgent : BaseTrainArenaAgent
     }
 
     /// <summary>
-    /// Check ragdoll-specific episode termination conditions
+    /// Check ragdoll-specific episode termination conditions with learning-friendly grace period
     /// </summary>
     private void CheckRagdollEpisodeTermination()
     {
         if (pelvis == null) return;
         
-        float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
+        float episodeTime = Time.time - episodeStartTime;
         float height = pelvis.position.y;
         
-        // Terminate if ragdoll falls over or clips through ground
-        if (uprightness < 0.3f || height < 0.2f)
+        // Grace period: Allow ragdoll to fall and learn during initial seconds
+        if (episodeTime < episodeGracePeriod)
         {
-            TrainArenaDebugManager.Log($"🎭 {name}: Episode terminated - Uprightness={uprightness:F2}, Height={height:F2}m", 
-                TrainArenaDebugManager.DebugLogLevel.Verbose);
+            return; // No termination during grace period
+        }
+        
+        // Episode timeout: Prevent episodes from running indefinitely
+        if (episodeTime > maxEpisodeDuration)
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: Episode timeout after {episodeTime:F1}s - Uprightness={Uprightness:F2}, Height={height:F2}m", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
             EndEpisode();
+            return;
+        }
+        
+        // Failure conditions: Only terminate if ragdoll is severely compromised
+        bool severelyFallen = Uprightness < minUprightness;
+        bool belowGround = height < minHeight;
+        
+        if (severelyFallen || belowGround)
+        {
+            string reason = severelyFallen ? $"severe fall (Uprightness={Uprightness:F2} < {minUprightness})" : $"below ground (height={height:F2}m < {minHeight}m)";
+            TrainArenaDebugManager.Log($"🎭 {name}: Episode terminated after {episodeTime:F1}s - {reason}", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+            EndEpisode();
+        }
+        else
+        {
+            // Periodic status logging during training (every 5 seconds)
+            if (episodeTime % 5.0f < Time.fixedDeltaTime && episodeTime > episodeGracePeriod)
+            {
+                TrainArenaDebugManager.Log($"🎭 {name}: Episode progress - Time={episodeTime:F1}s, Uprightness={Uprightness:F2}, Height={height:F2}m", 
+                    TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
         }
     }
 

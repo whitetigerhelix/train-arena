@@ -196,7 +196,19 @@ public static class PrimitiveBuilder
             return;
         }
         
-        TrainArenaDebugManager.Log($"Found {configJoints.Length} ConfigurableJoints in ragdoll", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        TrainArenaDebugManager.Log($"🔧 Found {configJoints.Length} ConfigurableJoints in ragdoll '{ragdoll.name}' - analyzing joint structure", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Log all available joint names for diagnostic purposes
+        TrainArenaDebugManager.Log($"🔍 Available joints in '{ragdoll.name}':", TrainArenaDebugManager.DebugLogLevel.Important);
+        foreach (var joint in configJoints)
+        {
+            if (joint != null)
+            {
+                bool isLocomotion = RagdollJointNames.IsLocomotionJoint(joint.gameObject.name);
+                string status = isLocomotion ? "✅ LOCOMOTION" : "⏭️ skip";
+                TrainArenaDebugManager.Log($"  - {joint.gameObject.name} ({status})", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+        }
         
         int legJointCount = 0;
         foreach (var configJoint in configJoints)
@@ -328,7 +340,7 @@ public static class PrimitiveBuilder
             int actualActions = behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions;
             if (actualActions != expectedActions)
             {
-                TrainArenaDebugManager.LogWarning($"⚠️ Updating BehaviorParameters action count from {actualActions} to {expectedActions}");
+                TrainArenaDebugManager.Log($"⚠️ Updating BehaviorParameters action count from {actualActions} to {expectedActions}");
                 behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(expectedActions);
             }
         }
@@ -338,7 +350,7 @@ public static class PrimitiveBuilder
         try
         {
             // Add blinking animation for visual polish
-            var headVisualObject = ragdoll.transform.Find("Head")?.transform.Find("Visual")?.gameObject;
+            var headVisualObject = pelvis.transform.Find("Chest")?.Find("Head")?.Find("Visual")?.gameObject;
             if (headVisualObject != null)
             {
                 if (headVisualObject.GetComponent<EyeBlinker>() == null)
