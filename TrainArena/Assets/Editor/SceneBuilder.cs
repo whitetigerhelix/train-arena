@@ -228,9 +228,22 @@ public static class SceneBuilder
             }
             
             string behaviorMode = behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.Default ? "ML Training" : "Editor Testing";
-            TrainArenaDebugManager.Log($"Configured agent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
-                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {agent.raycastDirections} raycasts), Mode: {behaviorMode}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+            
+            // Log configuration with agent-specific details
+            if (agentType == AgentType.Cube)
+            {
+                var cubeAgent = agent as CubeAgent;
+                TrainArenaDebugManager.Log($"Configured CubeAgent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
+                                         $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgent.raycastDirections} raycasts), Mode: {behaviorMode}", 
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            else
+            {
+                var ragdollAgent = agent as RagdollAgent;
+                TrainArenaDebugManager.Log($"Configured RagdollAgent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
+                                         $"({RagdollAgent.UPRIGHTNESS_OBSERVATIONS} uprightness + {RagdollAgent.VELOCITY_OBSERVATIONS} velocity + {ragdollAgent.joints.Count * RagdollAgent.JOINT_STATE_OBSERVATIONS_PER_JOINT} joint states), Mode: {behaviorMode}", 
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
         }
 
         //NOTE: agent.gameObject != agentObject (ragdoll agent is on pelvis, not root)

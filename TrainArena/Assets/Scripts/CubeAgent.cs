@@ -1,17 +1,15 @@
 using System.Collections.Generic;
+using TrainArena.Core;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using TrainArena.Core;
 
 [RequireComponent(typeof(Rigidbody))]
 public class CubeAgent : BaseTrainArenaAgent
 {
-    //TODO: We need to move some of the important logic in this class that should also be leveraged by other agents (ie. ragdoll) into BaseTrainArenaAgent
-
-    [Header("Scene Refs")]
+    [Header("Cube Agent Configuration")]
     public Transform goal;
     public LayerMask obstacleMask;
     public float moveAccel = 50f;                   // Increased force for better movement
@@ -20,21 +18,6 @@ public class CubeAgent : BaseTrainArenaAgent
     [Header("Observation Space Configuration")]
     public int raycastDirections = 8;
     
-    [Header("Episode Management")]
-    public int maxEpisodeSteps = 500;               // Balanced episode length: visible navigation + performance
-    public float episodeTimeLimit = 30f;            // 30 seconds: enough time to navigate, better performance
-    
-    // AgentActivity is now inherited from BaseTrainArenaAgent
-    
-    // Episode tracking
-    private int episodeStepCount;
-    private float episodeStartTime;
-    private int totalEpisodesCompleted;
-    private int totalActionsReceived;
-    
-    // Memory management
-    private static int globalEpisodeCount = 0;
-    
     // Observation space constants
     public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
     public const int GOAL_OBSERVATIONS = 3;         // Local goal direction (x, y, z)
@@ -42,7 +25,6 @@ public class CubeAgent : BaseTrainArenaAgent
     
     // Timing and threshold constants
     private const float PHYSICS_DEBUG_INTERVAL = 10f;       // Physics debugging every 10 seconds
-    private const float AGENT_LOG_INTERVAL = 5f;            // Agent status logging every 5 seconds
     private const float RANDOM_ACTION_CHANGE_TIME = 2f;     // Change random actions every 2 seconds
     private const float MOVEMENT_THRESHOLD = 0.02f;         // Lower threshold since physics seem sluggish
     private const float HIGH_VELOCITY_THRESHOLD = 2f;       // High velocity worth logging
@@ -51,10 +33,6 @@ public class CubeAgent : BaseTrainArenaAgent
     Rigidbody rb;
     float prevDist;
     Vector3 lastAppliedForce;
-    
-    // Arena integration
-    private ArenaHelper arenaHelper;
-    private Vector3 arenaCenter;
     
     // Physics debugging
     private Vector3 totalForceThisFrame;
@@ -70,7 +48,7 @@ public class CubeAgent : BaseTrainArenaAgent
     private float randomActionTimer;
     private Vector2 currentRandomAction;
     
-    // Add these fields to your class
+    // Collision tracking
     private List<Collision> activeCollisions = new List<Collision>();
     private List<ContactPoint> currentContacts = new List<ContactPoint>();
     
@@ -92,25 +70,9 @@ public class CubeAgent : BaseTrainArenaAgent
         return VELOCITY_OBSERVATIONS + GOAL_OBSERVATIONS + raycastDirections;
     }
 
-    public override void Initialize()
+    protected override void InitializeAgent()
     {
-        TrainArenaDebugManager.Log($"{gameObject.name} iniitializing", context: transform);
-        
         rb = GetComponent<Rigidbody>();
-
-        // Get ArenaHelper from parent EnvInitializer
-        EnvInitializer envManager = FindFirstObjectByType<EnvInitializer>(); // Should only be one
-        if (envManager != null)
-        {
-            arenaHelper = envManager.ArenaHelper;
-            arenaCenter = transform.parent ? transform.parent.position : Vector3.zero;
-            TrainArenaDebugManager.Log($"🔗 {gameObject.name} connected to ArenaHelper: {arenaHelper.GetDebugInfo()}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-        else
-        {
-            TrainArenaDebugManager.LogError($"❌ {gameObject.name} could not find EnvInitializer parent! Arena positioning will not work correctly.");
-        }
         
         // Ensure optimal physics settings for movement
         SetPhysics(rb);
@@ -130,6 +92,24 @@ public class CubeAgent : BaseTrainArenaAgent
         // Initialize random action for testing
         randomActionTimer = 0f;
         GenerateRandomAction();
+    }
+    
+    protected override void OnAgentEpisodeBegin()
+    {
+        // CRITICAL: Verify physics settings are correct (especially for inference mode)
+        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
+        
+        if (isInference)
+        {
+            // Force correct physics settings for inference
+            SetPhysics(rb);
+            
+            TrainArenaDebugManager.Log($"🔧 INFERENCE PHYSICS CHECK: Mass={rb.mass} | Drag={rb.linearDamping} | Kinematic={rb.isKinematic} | Constraints={rb.constraints} | MoveAccel={moveAccel} | TimeScale={Time.timeScale} | FixedDeltaTime={Time.fixedDeltaTime}", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
     }
     
     void FixedUpdate()
@@ -152,9 +132,6 @@ public class CubeAgent : BaseTrainArenaAgent
         
         // Store current velocity for next frame comparison
         lastFrameVelocity = rb.linearVelocity;
-        
-        // Note: ML-Agents decisions are now handled by DecisionRequester component
-        // (consistent with RagdollAgent - no manual RequestDecision calls needed)
     }
     
     void LateUpdate()
@@ -175,80 +152,6 @@ public class CubeAgent : BaseTrainArenaAgent
             forceApplicationCount = 0;
             lastPhysicsDebugTime = Time.time;
         }
-    }
-
-    public override void OnEpisodeBegin()
-    {
-        // Reset episode tracking
-        episodeStepCount = 0;
-        episodeStartTime = Time.time;
-        totalEpisodesCompleted++;
-        totalActionsReceived = 0; // Reset action counter for new episode
-        globalEpisodeCount++;
-        
-        // Periodic garbage collection to prevent memory buildup
-        if (globalEpisodeCount % 50 == 0)
-        {
-            System.GC.Collect();
-            TrainArenaDebugManager.Log($"🧹 Performed garbage collection after {globalEpisodeCount} episodes", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-        
-        // Reset physics
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        
-        // CRITICAL: Verify physics settings are correct (especially for inference mode)
-        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
-        bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
-        
-        if (isInference)
-        {
-            // Force correct physics settings for inference
-            SetPhysics(rb);
-            
-            TrainArenaDebugManager.Log($"🔧 INFERENCE PHYSICS CHECK: Mass={rb.mass} | Drag={rb.linearDamping} | Kinematic={rb.isKinematic} | Constraints={rb.constraints} | MoveAccel={moveAccel} | TimeScale={Time.timeScale} | FixedDeltaTime={Time.fixedDeltaTime}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-
-        // Use ArenaHelper for consistent position generation (removes all hardcoding)
-        if (arenaHelper != null)
-        {
-            // Generate new agent position using ArenaHelper
-            Vector3 newAgentPos = arenaHelper.GetRandomAgentPosition(arenaCenter);
-            transform.position = newAgentPos;
-            transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
-
-            // Generate new goal position using ArenaHelper (ensures minimum distance from agent)
-            if (goal != null)
-            {
-                Vector3 newGoalPos = arenaHelper.GetRandomGoalPosition(arenaCenter, newAgentPos);
-                goal.position = newGoalPos;
-                
-                // Enhanced debug logging with distance validation
-                float distance = Vector3.Distance(newAgentPos, newGoalPos);
-                bool withinBounds = arenaHelper.IsWithinArenaBounds(newAgentPos, arenaCenter) && 
-                                   arenaHelper.IsWithinArenaBounds(newGoalPos, arenaCenter);
-                TrainArenaDebugManager.Log($"Episode Reset: Agent {gameObject.name} → {newAgentPos}, Goal → {newGoalPos} | Distance: {distance:F2} | InBounds: {withinBounds}", 
-                                         TrainArenaDebugManager.DebugLogLevel.Verbose);
-            }
-        }
-        else
-        {
-            // Fallback to old method if ArenaHelper not available
-            TrainArenaDebugManager.LogWarning($"⚠️ {gameObject.name}: ArenaHelper not available, using fallback positioning");
-            var arena = transform.parent;
-            Vector3 center = arena ? arena.position : Vector3.zero;
-            transform.position = center + new Vector3(Random.Range(-8f, 8f), 0.5f, Random.Range(-8f, 8f));
-            transform.rotation = Quaternion.Euler(0f, Random.Range(0, 360f), 0f);
-            
-            if (goal != null)
-            {
-                goal.position = center + new Vector3(Random.Range(-8f, 8f), 1.0f, Random.Range(-8f, 8f));
-            }
-        }
-
-        prevDist = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
     }
 
     void SetPhysics(Rigidbody rb)
@@ -298,14 +201,7 @@ public class CubeAgent : BaseTrainArenaAgent
         float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
         float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
         
-        // Count non-zero actions to detect if agent is receiving proper actions
-        if (Mathf.Abs(moveX) > 0.01f || Mathf.Abs(moveZ) > 0.01f)
-        {
-            totalActionsReceived++;
-        }
-        
         // Debug inference mode - always log first few actions to verify model is working
-        // Get behavior parameters once and use for all debugging
         var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
         bool isInference = behaviorParams?.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
         string behaviorType = behaviorParams ? behaviorParams.BehaviorType.ToString() : "Unknown";
@@ -370,16 +266,12 @@ public class CubeAgent : BaseTrainArenaAgent
             
             // Show episode progress and status
             float goalDistance = goal ? Vector3.Distance(transform.position, goal.position) : 0f;
-            float episodeTime = Time.time - episodeStartTime;
             
             // Enhanced logging with model info - especially important for inference debugging
-            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {behaviorType} | Model:{modelName}({hasModel}) | Vel={velocity.magnitude:F2} | Goal={goalDistance:F1} | Actions={totalActionsReceived} | Step={episodeStepCount}/{maxEpisodeSteps}", 
+            TrainArenaDebugManager.Log($"🤖 {gameObject.name}: {status} | {GetAgentStatusInfo()} | Goal={goalDistance:F1} | {GetEpisodeProgressInfo()}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
-        // Increment episode step counter
-        episodeStepCount++;
-        
         // Simplified penalties to reduce computation
         AddReward(-0.005f); // Single time penalty per step
 
@@ -393,43 +285,12 @@ public class CubeAgent : BaseTrainArenaAgent
             if (d < 1.5f) // Even easier goal to ensure regular completion
             {
                 AddReward(+3.0f); // Higher reward for reaching goal
-                TrainArenaDebugManager.Log($"🎯 {gameObject.name} REACHED GOAL! Distance={d:F2} | Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s | Episodes={totalEpisodesCompleted}", 
+                TrainArenaDebugManager.Log($"🎯 {gameObject.name} REACHED GOAL! Distance={d:F2} | {GetEpisodeProgressInfo()}", 
                                          TrainArenaDebugManager.DebugLogLevel.Important);
                 EndEpisode();
                 return;
             }
         }
-
-        // Fall detection
-        if (transform.position.y < -1f)
-        {
-            AddReward(-0.5f); // Penalty for falling
-            TrainArenaDebugManager.Log($"💥 {gameObject.name} FELL! Steps={episodeStepCount} | Time={Time.time - episodeStartTime:F1}s", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-            EndEpisode();
-            return;
-        }
-        
-        // Aggressive episode limits to prevent Unity hanging
-        if (episodeStepCount >= maxEpisodeSteps)
-        {
-            AddReward(-0.5f); // Penalty for timeout
-            TrainArenaDebugManager.Log($"⏰ {gameObject.name} STEP TIMEOUT! Steps={episodeStepCount} | Episodes={totalEpisodesCompleted}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-            EndEpisode();
-            return;
-        }
-        
-        if (Time.time - episodeStartTime > episodeTimeLimit)
-        {
-            AddReward(-0.5f); // Penalty for timeout
-            TrainArenaDebugManager.Log($"⏰ {gameObject.name} TIME TIMEOUT! Time={Time.time - episodeStartTime:F1}s | Episodes={totalEpisodesCompleted}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-            EndEpisode();
-            return;
-        }
-        
-        // Removed emergency stuck reset - let agents have time to navigate properly
     }
 
     protected override void HandleActiveHeuristic(in ActionBuffers actionsOut)

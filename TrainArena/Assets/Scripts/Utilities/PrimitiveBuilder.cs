@@ -105,23 +105,15 @@ public static class PrimitiveBuilder
             var behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
             behaviorParameters.BehaviorName = "RagdollAgent";
             
-            // Use 6 continuous actions for leg joints (hips, knees, ankles)
-            behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6);
+            // Use continuous actions matching the number of joints
+            behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(ragdollAgent.joints.Count);
             
-            // Ensure observation space is correct (16 observations for ragdoll)
-            //TODO: Hardcoding
-            TrainArenaDebugManager.LogWarning($"Ragdoll observation count: {ragdollAgent.GetTotalObservationCount()}, vector observation size: {behaviorParameters.BrainParameters.VectorObservationSize}, (should be 16, or more?)");
-            /*if (behaviorParams.BrainParameters.VectorObservationSize != 16)
-            {
-                behaviorParams.BrainParameters.VectorObservationSize = 16;
-                TrainArenaDebugManager.Log("Fixed VectorObservationSize to 16 for RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
-            }*/
+            // Configure observation space using RagdollAgent's calculation
+            int totalObservations = ragdollAgent.GetTotalObservationCount();
+            behaviorParameters.BrainParameters.VectorObservationSize = totalObservations;
             
-            TrainArenaDebugManager.Log($"Added BehaviorParameters with {ragdollAgent.joints.Count} continuous actions", TrainArenaDebugManager.DebugLogLevel.Important);
-            
-            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions} actions, " +
-                                     $"{behaviorParameters.BrainParameters.VectorObservationSize} observations " +
-                                     $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 
+            TrainArenaDebugManager.Log($"Added BehaviorParameters: {ragdollAgent.joints.Count} actions, {totalObservations} observations " +
+                                     $"({RagdollAgent.UPRIGHTNESS_OBSERVATIONS} uprightness + {RagdollAgent.VELOCITY_OBSERVATIONS} velocity + {ragdollAgent.joints.Count * RagdollAgent.JOINT_STATE_OBSERVATIONS_PER_JOINT} joint states)", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 

@@ -1,4 +1,4 @@
-// Assets/Scripts/Ragdoll/BlockmanRagdollBuilder.cs
+// Assets/Editor/BlockmanRagdollBuilder.cs
 // Unity 6.x / 2021+
 // Key changes vs v1:
 //  - Never scales transforms; sizes colliders instead.
@@ -9,7 +9,7 @@
 using UnityEngine;
 using UnityEditor;
 
-public class BlockmanRagdollBuilder : MonoBehaviour
+public class BlockmanRagdollBuilder
 {
     [System.Serializable]
     public class Cfg
@@ -80,7 +80,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
             // visual child (scaled)
             var vis = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            DestroyImmediate(vis.GetComponent<BoxCollider>());
+            Object.DestroyImmediate(vis.GetComponent<BoxCollider>());
             vis.name = "Visual";
             vis.transform.SetParent(go.transform, false);
             vis.transform.localScale = size;
@@ -106,7 +106,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
             col.radius = radius; col.center = Vector3.zero;
 
             var vis = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            DestroyImmediate(vis.GetComponent<SphereCollider>());
+            Object.DestroyImmediate(vis.GetComponent<SphereCollider>());
             vis.name = "Visual";
             vis.transform.SetParent(go.transform, false);
             vis.transform.localScale = Vector3.one * (radius * 2f);
@@ -157,7 +157,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         Spherical(lUArm,  chest,   WorldInnerX(lUArm, +1),  WorldOuterX(chest, -1), cfg.shoulderSwing, cfg);
         Spherical(rUArm,  chest,   WorldInnerX(rUArm, -1),  WorldOuterX(chest, +1), cfg.shoulderSwing, cfg);
 
-        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends “down”
+        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends "down"
         HingeZ(rLArm, rUArm, WorldInnerX(rLArm, -1), WorldOuterX(rUArm, +1), 0f, cfg.elbowFlex, cfg);
 
         Spherical(lULeg, pelvis, WorldTop(lULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
@@ -183,7 +183,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         var t = go.transform;
         if (go.TryGetComponent(out BoxCollider box))
         {
-            // convert the world direction to the bone’s local space to pick the correct face
+            // convert the world direction to the bone's local space to pick the correct face
             Vector3 dL = t.InverseTransformDirection(worldDir.normalized);
             Vector3 half = box.size * 0.5f;
             Vector3 local = new Vector3(
@@ -196,7 +196,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         if (go.TryGetComponent(out SphereCollider sph))
         {
             float r = sph.radius;
-            // move a bit outside so anchors aren’t inside the collider
+            // move a bit outside so anchors aren't inside the collider
             return t.position + worldDir.normalized * (r + 0.0005f);
         }
         return t.position;

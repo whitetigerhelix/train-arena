@@ -1,9 +1,10 @@
+using System.Collections;
 using System.Collections.Generic;
+using TrainArena.Core;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
 using UnityEngine;
-using TrainArena.Core;
 
 /// <summary>
 /// ML-Agents controller for hierarchical ragdoll locomotion learning
@@ -26,8 +27,6 @@ using TrainArena.Core;
 /// </summary>
 public class RagdollAgent : BaseTrainArenaAgent
 {
-    //TODO: We need to move more important shared logic into BaseTrainArenaAgent from CubeAgent, and leverage that here, then tune here appropriately for ragdoll locomotion training
-
     [Header("Ragdoll Configuration")]
     [Tooltip("PDJointControllers in action order - each gets one continuous action")]
     public List<PDJointController> joints = new List<PDJointController>();
@@ -42,6 +41,12 @@ public class RagdollAgent : BaseTrainArenaAgent
     [Tooltip("Weight for uprightness reward component")]
     public float uprightBonus = 0.5f;
     
+    // Observation space constants (matching CubeAgent pattern)
+    public const int UPRIGHTNESS_OBSERVATIONS = 1;      // Pelvis uprightness (dot product with world up)
+    public const int VELOCITY_OBSERVATIONS = 3;         // Pelvis velocity (x, y, z)
+    public const int JOINT_STATE_OBSERVATIONS_PER_JOINT = 2; // Angle and angular velocity per joint
+    // Total observations = UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT)
+    
     // Episode reset state
     private Vector3 startPosition;
     private Quaternion startRotation;
@@ -53,21 +58,25 @@ public class RagdollAgent : BaseTrainArenaAgent
 
     public override int GetTotalObservationCount()
     {
-        return 16;  //TODO: Don't hardcode - use constants like CubeAgent does, add a comment describing the observations so it's clear
+        // Calculate total observations: uprightness + velocity + joint states
+        return UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT);
     }
 
-    public override void Initialize()
+    protected override void InitializeAgent()
     {
         // Ensure pelvis reference is set
         if (pelvis == null && transform != null) 
             pelvis = transform;
         
         // Store initial pose for episode resets
-        startPosition = pelvis.position;
-        startRotation = pelvis.rotation;
+        if (pelvis != null)
+        {
+            startPosition = pelvis.position;
+            startRotation = pelvis.rotation;
+        }
         
         // Log initialization success
-        TrainArenaDebugManager.Log($"🎭 {name}: Initialized ragdoll with {joints.Count} joints, Activity={AgentActivity}", 
+        TrainArenaDebugManager.Log($"🎭 {name}: Initialized ragdoll with {joints.Count} joints, Activity={AgentActivity}, ObsCount={GetTotalObservationCount()}", 
             TrainArenaDebugManager.DebugLogLevel.Important);
         
         // Validate configuration
@@ -146,30 +155,20 @@ public class RagdollAgent : BaseTrainArenaAgent
         }
     }
 
-    static int globalRagdollEpisodeCount = 0; // Track episodes across all ragdoll agents
-    
-    public override void OnEpisodeBegin()
+    protected override void OnAgentEpisodeBegin()
     {
         // Reset ragdoll to initial pose with slight elevation to prevent ground clipping
-        pelvis.position = startPosition + Vector3.up * 0.2f;
-        pelvis.rotation = startRotation;
+        if (pelvis != null)
+        {
+            pelvis.position = startPosition + Vector3.up * 0.2f;
+            pelvis.rotation = startRotation;
+        }
         
         // Reset all rigidbody velocities to ensure clean episode start
         foreach (var rigidbody in GetComponentsInChildren<Rigidbody>())
         {
             rigidbody.linearVelocity = Vector3.zero;
             rigidbody.angularVelocity = Vector3.zero;
-        }
-        
-        // Global episode tracking for memory management
-        globalRagdollEpisodeCount++;
-        
-        // Perform periodic garbage collection to prevent memory accumulation during training
-        if (globalRagdollEpisodeCount % 50 == 0)
-        {
-            System.GC.Collect();
-            TrainArenaDebugManager.Log($"🧹 Memory: Garbage collection after {globalRagdollEpisodeCount} episodes", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
         
         // Episode start logging (verbose only to avoid spam during training)
@@ -187,6 +186,8 @@ public class RagdollAgent : BaseTrainArenaAgent
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        if (pelvis == null) return;
+        
         var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
         
         // Observation 1: Pelvis uprightness (1 value)
@@ -235,8 +236,8 @@ public class RagdollAgent : BaseTrainArenaAgent
         // Calculate and apply rewards for learning progress
         CalculateLocomotionRewards();
         
-        // Check episode termination conditions
-        CheckEpisodeTermination();
+        // Check ragdoll-specific episode termination conditions
+        CheckRagdollEpisodeTermination();
     }
 
     /// <summary>
@@ -258,6 +259,8 @@ public class RagdollAgent : BaseTrainArenaAgent
     /// </summary>
     private void CalculateLocomotionRewards()
     {
+        if (pelvis == null) return;
+        
         var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
         float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
         float forwardVelocity = Vector3.Dot(pelvisRigidbody.linearVelocity, transform.forward);
@@ -303,10 +306,12 @@ public class RagdollAgent : BaseTrainArenaAgent
     }
 
     /// <summary>
-    /// Check if episode should terminate due to ragdoll falling or other conditions
+    /// Check ragdoll-specific episode termination conditions
     /// </summary>
-    private void CheckEpisodeTermination()
+    private void CheckRagdollEpisodeTermination()
     {
+        if (pelvis == null) return;
+        
         float uprightness = Vector3.Dot(pelvis.up, Vector3.up);
         float height = pelvis.position.y;
         
