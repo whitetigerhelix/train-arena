@@ -1,5 +1,6 @@
 using System.Linq;
 using TrainArena.Core;
+using TrainArena.Configuration;
 using Unity.MLAgents;
 using UnityEditor;
 using UnityEditorInternal;
@@ -52,27 +53,22 @@ public static class SceneBuilder
         var camera = cam.AddComponent<Camera>();
         cam.tag = "MainCamera";
         
-        //TODO: Don't hardcode camera and lights (and any other magic numbers we're using), make them configurable or use constants/properties
-        //TODO: Cleanup camera tuning, align both types of agents, etc
+        // Use centralized configuration for camera positioning
         if (agentType == AgentType.Cube)
         {
-            // Position camera with slight isometric angle for better arena framing
-            // Center of grid is at (30, 0, 30) - halfway between (0,0) and (60,60)
-            cam.transform.position = new Vector3(30, 50, -15); // Higher and closer for better framing
-            cam.transform.LookAt(new Vector3(30, 0, 30)); // Look at center of 4x4 arena grid
+            cam.transform.position = SceneConfiguration.Camera.CubeAgent.Position;
+            cam.transform.LookAt(SceneConfiguration.Camera.CubeAgent.LookAtTarget);
+            camera.fieldOfView = SceneConfiguration.Camera.DefaultFieldOfView;
         }
         else
         {   
-            // Position camera for 2x2 ragdoll grid (4 arenas) 
-            // Center of grid is at (4, 0, 4) - halfway between (0,0) and (8,8) 
-            cam.transform.position = new Vector3(4, 12, -8); // Higher and further back for ragdolls
-            cam.transform.LookAt(new Vector3(4, 0, 4)); // Look at center of 2x2 arena grid
+            cam.transform.position = SceneConfiguration.Camera.RagdollAgent.Position;
+            cam.transform.LookAt(SceneConfiguration.Camera.RagdollAgent.LookAtTarget);
+            camera.fieldOfView = SceneConfiguration.Camera.RagdollFieldOfView;
         }
         
-        // Optimize for 16:9 aspect ratio
-        camera.aspect = 16f / 9f;
-        camera.fieldOfView = 60f; // Slightly wider FOV to frame all arenas tightly
-        //TODO: camera.fieldOfView = 50f; // Slightly narrower FOV for better ragdoll detail
+        // Use configuration for camera settings
+        camera.aspect = SceneConfiguration.Camera.AspectRatio;
         camera.clearFlags = CameraClearFlags.Skybox;
         
         // Add camera controller for WASD navigation
@@ -94,17 +90,18 @@ public static class SceneBuilder
             domainUI.AddComponent<DomainRandomizationUI>();
         }
 
-        // Light - Enhanced setup with soft shadows
+        // Light - Enhanced setup with soft shadows using centralized configuration
         var lightGO = new GameObject("Directional Light");
         var light = lightGO.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.intensity = 1.2f;
-        lightGO.transform.rotation = Quaternion.Euler(50, -30, 0);
+        light.color = SceneConfiguration.Lighting.DirectionalLightColor;
+        light.intensity = SceneConfiguration.Lighting.DirectionalLightIntensity;
+        lightGO.transform.rotation = Quaternion.Euler(SceneConfiguration.Lighting.DirectionalLightRotation);
         
         // Enhanced lighting settings for better quality
         light.shadows = LightShadows.Soft;
         light.shadowStrength = 0.6f;
-        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium; // 1024x1024
+        light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
 
         // Manager
         var agentTypeStr = agentType == AgentType.Cube ? "Cube" : "Ragdoll";
@@ -113,20 +110,38 @@ public static class SceneBuilder
         var manager = new GameObject(envManagerName);
         var init = manager.AddComponent<EnvInitializer>();
 
-        // Configure based on scene type
+        // Configure based on scene type using centralized configuration
         if (sceneType == SceneType.Testing)
         {
-            // Test scene configuration: 2x2 grid with more obstacles
-            init.EnvCountX = 2;
-            init.EnvCountZ = 2;
-            init.ObstaclesPerArena = 6;
-
-            if (agentType == AgentType.Ragdoll)
+            // Test scene configuration with more obstacles
+            if (agentType == AgentType.Cube)
             {
-                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are a lot taller than cubes
+                init.EnvCountX = SceneConfiguration.Layout.GridDimensions.CubeTestingX;
+                init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.CubeTestingZ;
+            }
+            else
+            {
+                init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTestingX;
+                init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTestingZ;
+                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
+            }
+            init.ObstaclesPerArena = 6;
+        }
+        else // Training scene
+        {
+            // Training scene configuration
+            if (agentType == AgentType.Cube)
+            {
+                init.EnvCountX = SceneConfiguration.Layout.GridDimensions.CubeTrainingX;
+                init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.CubeTrainingZ;
+            }
+            else
+            {
+                init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTrainingX;
+                init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTrainingZ;
+                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
             }
         }
-        // Training scene uses default settings (configured in EnvInitializer)
 
         // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
         if (agentType == AgentType.Cube)
@@ -191,10 +206,10 @@ public static class SceneBuilder
 
     static GameObject CreateAgentPrefab(EnvInitializer init, AgentType agentType, SceneType sceneType)
     {
-        //TODO: Use the configured names instead of hardcoding
+        // Use centralized configuration for agent names
         GameObject agentObject = agentType == AgentType.Cube 
-            ? PrimitiveBuilder.CreateCubeAgent("CubeAgent") 
-            : PrimitiveBuilder.CreateRagdoll("RagdollAgent");
+            ? PrimitiveBuilder.CreateCubeAgent(SceneConfiguration.AgentPrefabs.CubeAgentPrefabName) 
+            : PrimitiveBuilder.CreateRagdoll(SceneConfiguration.AgentPrefabs.RagdollAgentPrefabName);
 
         BaseTrainArenaAgent agent = agentType == AgentType.Cube 
             ? agentObject.GetComponentInChildren<CubeAgent>() 

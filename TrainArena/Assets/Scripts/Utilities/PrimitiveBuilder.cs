@@ -490,7 +490,7 @@ public static class PrimitiveBuilder
         {
             //TODO: A bunch of this should be abstracted to the main shared builder, rather than duping with both agents
             try
-            {
+            {   
                 behaviorParameters = agent.AddComponent<BehaviorParameters>();
                 behaviorParameters.BehaviorName = AgentConfiguration.CubeAgent.BehaviorName;
 

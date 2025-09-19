@@ -122,7 +122,7 @@ public class CubeAgent : BaseTrainArenaAgent
             TrainArenaDebugManager.Log($"📊 VELOCITY TRACKING: " +
                                      $"LastVel={lastFrameVelocity.magnitude:F3} | CurrentVel={currentVelocity.magnitude:F3} | " +
                                      $"Change={velocityChange.magnitude:F3} | LastForce={lastAppliedForceForTracking.magnitude:F1}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
             trackingVelocity = false; // Only track for one frame after force application
         }
         
@@ -207,7 +207,7 @@ public class CubeAgent : BaseTrainArenaAgent
         if (isInference && totalActionsReceived <= 10)
         {
             TrainArenaDebugManager.Log($"🧠 INFERENCE ACTION #{totalActionsReceived}: Raw=({actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveXActionIndex]:F4}, {actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveZActionIndex]:F4}) | Clamped=({moveX:F4}, {moveZ:F4})", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
 
         Vector3 localMove = new Vector3(moveX, 0f, moveZ);
@@ -218,7 +218,7 @@ public class CubeAgent : BaseTrainArenaAgent
         {
             string mode = isInference ? "INFERENCE" : "TRAINING";
             TrainArenaDebugManager.Log($"🎮 {gameObject.name} [{mode}] MODEL:{modelName} ACTION: ({moveX:F3},{moveZ:F3}) → Force={worldForce.magnitude:F1} | Vel={rb.linearVelocity.magnitude:F2}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
         
         // CRITICAL: Apply force before debugging so we can see the immediate effect
@@ -244,7 +244,7 @@ public class CubeAgent : BaseTrainArenaAgent
                                      $"Constraints={rb.constraints} | Grounded={isGrounded} | Contacts={contactCount} | " +
                                      $"Position={transform.position} | " +
                                      $"VelBefore={velocityBeforeForce.magnitude:F3} | Force={worldForce.magnitude:F1}", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
+                                     TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
         
         // Store for debug visualization
