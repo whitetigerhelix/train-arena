@@ -3,25 +3,34 @@ using Unity.MLAgents;
 using Unity.MLAgents.Policies;
 
 /// <summary>
-/// Automatically switches BehaviorParameters type based on ML-Agents training status.
+/// Automatically switches BehaviorParameters type based on ML-Agents training status and model availability.
 /// 
 /// When ML-Agents trainer is connected (Academy.IsCommunicatorOn == true):
-/// - Switches to BehaviorType.Default (enables ML training/inference)
+/// - Always switches to BehaviorType.Default (enables ML training)
 /// 
 /// When ML-Agents trainer is NOT connected (Academy.IsCommunicatorOn == false):
-/// - Switches to BehaviorType.HeuristicOnly (uses manual controls for testing)
+/// - If manual override is set: Uses override behavior type
+/// - If trained model is available: Switches to BehaviorType.InferenceOnly (model-driven behavior)
+/// - If no model available: Switches to BehaviorType.HeuristicOnly (manual controls)
 /// 
-/// This allows seamless switching between training mode and testing mode without
-/// manual Inspector changes.
+/// Manual Override Behavior:
+/// - When connected: Manual changes are temporary and revert when training resumes
+/// - When disconnected: Manual changes persist until cleared or auto-switching is re-enabled
+/// 
+/// This allows seamless switching between training, inference, and testing modes without
+/// manual Inspector changes, while supporting user preferences when not training.
 /// </summary>
 public class AutoBehaviorSwitcher : MonoBehaviour
 {
     [Header("Auto Behavior Switching")]
-    [Tooltip("Enable automatic switching between Default and HeuristicOnly based on ML-Agents connection")]
+    [Tooltip("Enable automatic switching between Default, InferenceOnly, and HeuristicOnly based on ML-Agents connection and model availability")]
     public bool enableAutoSwitching = true;
     
     [Tooltip("Show debug messages when switching behavior types")]
     public bool showDebugMessages = true;
+    
+    [Tooltip("Allow manual override when not connected to trainer")]
+    public bool allowManualOverride = true;
     
     // Timing and threshold constants
     private const float CONNECTION_CHECK_INTERVAL = 5f;     // Check connection every 5 seconds
@@ -37,6 +46,12 @@ public class AutoBehaviorSwitcher : MonoBehaviour
     
     [SerializeField, Tooltip("Number of times behavior has been switched this session")]
     private int switchCount = 0;
+    
+    [SerializeField, Tooltip("Whether a trained model is available for inference")]
+    private bool hasTrainedModel = false;
+    
+    [SerializeField, Tooltip("User manually set behavior type (overrides auto-switching when not connected)")]
+    private BehaviorType? manualOverride = null;
     
     private BehaviorParameters behaviorParams;
     private Academy academy;
@@ -96,10 +111,18 @@ public class AutoBehaviorSwitcher : MonoBehaviour
         // Use multiple methods to detect trainer connection
         bool isConnected = DetectTrainerConnection();
         academyConnected = isConnected;
-        
+
+        // If not connected, just use whatever is set
+        if (!academyConnected)// && (behaviorParams.BehaviorType == BehaviorType.HeuristicOnly || behaviorParams.BehaviorType == BehaviorType.InferenceOnly))
+        {
+            //TrainArenaDebugManager.Log($"ℹ️ {gameObject.name}: Not connected to trainer, current behavior remains {behaviorParams.BehaviorType}", 
+            //                         TrainArenaDebugManager.DebugLogLevel.Important);
+            return;
+        }
+
         // Determine desired behavior type
-        BehaviorType desiredType = isConnected ? BehaviorType.Default : BehaviorType.HeuristicOnly;
-        
+        BehaviorType desiredType = DetermineDesiredBehaviorType(isConnected);
+
         // Update if changed
         if (behaviorParams.BehaviorType != desiredType)
         {
@@ -110,7 +133,7 @@ public class AutoBehaviorSwitcher : MonoBehaviour
             
             if (showDebugMessages)
             {
-                string reason = isConnected ? "ML-Agents trainer connected" : "ML-Agents trainer disconnected";
+                string reason = GetSwitchReason(isConnected, desiredType);
                 TrainArenaDebugManager.Log($"🔄 {gameObject.name}: Switched behavior {previousType} → {desiredType} ({reason})", 
                                          TrainArenaDebugManager.DebugLogLevel.Important);
             }
@@ -131,6 +154,76 @@ public class AutoBehaviorSwitcher : MonoBehaviour
             }
             
             wasConnectedLastFrame = isConnected;
+        }
+    }
+    
+    /// <summary>
+    /// Determine the desired behavior type based on connection status, model availability, and user preferences
+    /// </summary>
+    private BehaviorType DetermineDesiredBehaviorType(bool isConnected)
+    {
+        // If connected to trainer, always use Default (training mode)
+        if (isConnected)
+        {
+            return BehaviorType.Default;
+        }
+        
+        // If not connected, check for manual override first
+        if (allowManualOverride && manualOverride.HasValue)
+        {
+            return manualOverride.Value;
+        }
+        
+        // Auto-determine based on model availability
+        hasTrainedModel = HasTrainedModel();
+        
+        if (hasTrainedModel)
+        {
+            // Model available: prefer inference mode
+            return BehaviorType.InferenceOnly;
+        }
+        else
+        {
+            // No model: use heuristic controls
+            return BehaviorType.HeuristicOnly;
+        }
+    }
+    
+    /// <summary>
+    /// Check if a trained model is available for inference
+    /// </summary>
+    private bool HasTrainedModel()
+    {
+        if (behaviorParams == null) return false;
+        
+        // Check if a model is assigned to the BehaviorParameters
+        var model = behaviorParams.Model;
+        return model != null;
+    }
+    
+    /// <summary>
+    /// Get human-readable reason for behavior switch
+    /// </summary>
+    private string GetSwitchReason(bool isConnected, BehaviorType targetType)
+    {
+        if (isConnected)
+        {
+            return "ML-Agents trainer connected";
+        }
+        
+        if (manualOverride.HasValue)
+        {
+            return $"Manual override to {manualOverride.Value}";
+        }
+        
+        switch (targetType)
+        {
+            case BehaviorType.InferenceOnly:
+                return "Model available, using inference";
+            case BehaviorType.HeuristicOnly:
+                return "No model available, using heuristic";
+            default:
+                return "Auto-determined";
         }
     }
     
@@ -182,28 +275,44 @@ public class AutoBehaviorSwitcher : MonoBehaviour
     }
     
     /// <summary>
-    /// Manually force a specific behavior type (disables auto-switching temporarily)
+    /// Manually force a specific behavior type
+    /// Sets manual override when not connected to trainer
     /// </summary>
     public void SetBehaviorType(BehaviorType type)
     {
         if (behaviorParams == null) return;
         
-        behaviorParams.BehaviorType = type;
-        currentBehaviorType = type;
+        bool isConnected = DetectTrainerConnection();
         
-        TrainArenaDebugManager.Log($"🔧 {gameObject.name}: Manually set behavior to {type}", 
-                                 TrainArenaDebugManager.DebugLogLevel.Important);
+        if (isConnected)
+        {
+            // When connected, temporarily set but don't store override
+            behaviorParams.BehaviorType = type;
+            TrainArenaDebugManager.Log($"🔧 {gameObject.name}: Temporarily set behavior to {type} (trainer connected)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        else
+        {
+            // When not connected, store as manual override
+            manualOverride = type;
+            behaviorParams.BehaviorType = type;
+            TrainArenaDebugManager.Log($"🔧 {gameObject.name}: Manual override to {type} (trainer not connected)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        currentBehaviorType = type;
     }
     
     /// <summary>
-    /// Re-enable automatic behavior switching
+    /// Re-enable automatic behavior switching (clears manual override)
     /// </summary>
     public void EnableAutoSwitching()
     {
         enableAutoSwitching = true;
+        manualOverride = null; // Clear manual override
         CheckAndUpdateBehaviorType();
         
-        TrainArenaDebugManager.Log($"✅ {gameObject.name}: Auto behavior switching enabled", 
+        TrainArenaDebugManager.Log($"✅ {gameObject.name}: Auto behavior switching enabled (manual override cleared)", 
                                  TrainArenaDebugManager.DebugLogLevel.Important);
     }
     
@@ -222,9 +331,11 @@ public class AutoBehaviorSwitcher : MonoBehaviour
     {
         if (academy != null)
         {
+            string overrideInfo = manualOverride.HasValue ? $", ManualOverride = {manualOverride.Value}" : ", No Override";
             TrainArenaDebugManager.Log($"🔍 {gameObject.name}: Academy.IsCommunicatorOn = {academy.IsCommunicatorOn}, " +
                                      $"BehaviorType = {currentBehaviorType}, " +
-                                     $"AutoSwitching = {enableAutoSwitching}", 
+                                     $"HasModel = {hasTrainedModel}, " +
+                                     $"AutoSwitching = {enableAutoSwitching}" + overrideInfo, 
                                      TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
         else
@@ -265,6 +376,34 @@ public class AutoBehaviorSwitcher : MonoBehaviour
     {
         SetBehaviorType(BehaviorType.HeuristicOnly);
         TrainArenaDebugManager.Log($"🧪 {gameObject.name}: Test switched to HeuristicOnly behavior", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+    
+    /// <summary>
+    /// Manually switch to InferenceOnly behavior for testing
+    /// </summary>
+    [ContextMenu("Test: Switch to InferenceOnly")]
+    public void TestSwitchToInference()
+    {
+        if (!HasTrainedModel())
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ {gameObject.name}: No trained model available for inference mode!");
+        }
+        
+        SetBehaviorType(BehaviorType.InferenceOnly);
+        TrainArenaDebugManager.Log($"🧪 {gameObject.name}: Test switched to InferenceOnly behavior", 
+                                 TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+    
+    /// <summary>
+    /// Clear manual override and return to automatic switching
+    /// </summary>
+    [ContextMenu("Clear Manual Override")]
+    public void ClearManualOverride()
+    {
+        manualOverride = null;
+        CheckAndUpdateBehaviorType();
+        TrainArenaDebugManager.Log($"🔄 {gameObject.name}: Manual override cleared, returning to auto-switching", 
                                  TrainArenaDebugManager.DebugLogLevel.Important);
     }
     

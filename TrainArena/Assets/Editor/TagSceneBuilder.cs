@@ -3,7 +3,7 @@ using UnityEngine;
 
 public static class TagSceneBuilder
 {
-    [MenuItem("Tools/ML Hack/Build Tag Arena Scene")]
+    [MenuItem("TrainArena/Scenes/Build Tag Arena Scene")]
     public static void BuildTagScene()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
@@ -37,7 +37,7 @@ public static class TagSceneBuilder
 
     static GameObject CreateRunnerPrefab()
     {
-        var go = PrimitiveBuilder.CreateAgent("Runner");//TODO:, Vector3.zero, Color.blue);
+        var go = PrimitiveBuilder.CreateCubeAgent("Runner", Vector3.zero, Color.blue);
 
         var agent = go.AddComponent<RunnerAgent>();
         var bp = go.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
@@ -54,7 +54,7 @@ public static class TagSceneBuilder
 
     static GameObject CreateTaggerPrefab()
     {
-        var go = PrimitiveBuilder.CreateAgent("Tagger");//TODO:, Vector3.zero, Color.red);
+        var go = PrimitiveBuilder.CreateCubeAgent("Tagger", Vector3.zero, Color.red);
         go.AddComponent<HeuristicTagger>();
         return go;
     }

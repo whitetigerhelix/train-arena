@@ -7,7 +7,7 @@ using UnityEditor.Recorder.Encoder;
 
 public class RecorderUtility : MonoBehaviour
 {
-    [MenuItem("Tools/ML Hack/Start Recording")]
+    [MenuItem("TrainArena/Recording/Start Recording")]
     static void StartRecording()
     {
         var recorderController = new RecorderController(new RecorderControllerSettings());
@@ -35,10 +35,10 @@ public class RecorderUtility : MonoBehaviour
         recorderController.Settings.SetRecordModeToManual();
         recorderController.PrepareRecording();
         recorderController.StartRecording();
-        Debug.Log("Recording started. Stop via Tools/ML Hack/Stop Recording.");
+        Debug.Log("Recording started. Stop via TrainArena/Recording/Stop Recording.");
     }
 
-    [MenuItem("Tools/ML Hack/Stop Recording")]
+    [MenuItem("TrainArena/Recording/Stop Recording")]
     static void StopRecording()
     {
         RecorderWindow recorderWindow = EditorWindow.GetWindow<RecorderWindow>();

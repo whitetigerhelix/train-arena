@@ -1,5 +1,9 @@
-using System.Linq;
+using Unity.MLAgents.Policies;
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using TrainArena.Configuration;
 
 /// <summary>
 /// Centralized primitive and material creation system for TrainArena.
@@ -8,6 +12,409 @@ using UnityEngine;
 /// </summary>
 public static class PrimitiveBuilder
 {
+    public enum SceneType { Training, Testing }
+    public enum AgentType { Cube, Ragdoll }
+
+    #region Ragdoll
+
+    /// <summary>
+    /// Creates ragdoll using the stable BlockmanRagdollBuilder system
+    /// This is the main entry point for ragdoll creation - delegates to BlockmanRagdollBuilder
+    /// </summary>
+    public static GameObject CreateRagdoll(string name = "Ragdoll", Vector3 position = default)
+    {
+        TrainArenaDebugManager.Log($"🎯 Creating ragdoll '{name}' at position {position} using BlockmanRagdollBuilder system", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        GameObject ragdoll = null;
+        
+        try
+        {
+            // Use BlockmanRagdollBuilder for consistent, stable ragdoll creation
+            ragdoll = BlockmanRagdollBuilder.Build(position, new BlockmanRagdollBuilder.Cfg());
+            
+            if (ragdoll == null)
+            {
+                TrainArenaDebugManager.LogError($"❌ CRITICAL: BlockmanRagdollBuilder returned null ragdoll! Creation failed.");
+                return null;
+            }
+            
+            ragdoll.name = name;
+            TrainArenaDebugManager.Log($"✅ BlockmanRagdollBuilder created ragdoll structure successfully", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: BlockmanRagdollBuilder failed to create ragdoll: {e.Message}");
+            TrainArenaDebugManager.LogError($"Stack trace: {e.StackTrace}");
+            return null;
+        }
+        
+        // Validate basic ragdoll structure before proceeding
+        if (!ValidateRagdollStructure(ragdoll))
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: Created ragdoll '{name}' failed structure validation!");
+            if (ragdoll != null)
+            {
+                Object.DestroyImmediate(ragdoll);
+            }
+            return null;
+        }
+
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis)?.gameObject;  // Pelvis is guaranteed because we just validated ragdoll structure above
+
+        // Add visual polish components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
+        try
+        {
+            // Add blinking animation for visual polish
+            var headVisualObject = AgentVisuals.RagdollStructure.FindHeadVisual(pelvis.transform);
+            if (headVisualObject != null)
+            {
+                AddAgentFace(headVisualObject, AgentType.Ragdoll);
+            }
+            else
+            {
+                TrainArenaDebugManager.LogWarning("⚠️ Could not find Head/Visual object for eye blinking animation");
+            }
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add EyeBlinker: {e.Message}");
+        }
+
+        // Add debug and development components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
+        try
+        {
+            // Add debug info component for development
+            if (pelvis.GetComponent<AgentDebugInfo>() == null)
+            {
+                pelvis.AddComponent<AgentDebugInfo>();
+                TrainArenaDebugManager.Log($"✅ Added AgentDebugInfo component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+
+            // Add domain randomization for physics testing
+            var domainRandomizer = pelvis.GetComponent<DomainRandomizer>();
+            if (domainRandomizer == null)
+            {
+                domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
+                domainRandomizer.randomizeMass = true;
+                domainRandomizer.randomizeFriction = true;
+                domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
+                TrainArenaDebugManager.Log($"✅ Added DomainRandomizer component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add optional components: {e.Message}");
+        }
+        
+        // Add ML-Agents components if not already present
+        try
+        {
+            AddMLAgentsToBlockman(ragdoll);
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to add ML-Agents components to ragdoll '{name}': {e.Message}");
+            TrainArenaDebugManager.LogError($"Stack trace: {e.StackTrace}");
+
+            // Don't destroy the ragdoll since the structure might still be usable
+            TrainArenaDebugManager.LogWarning($"⚠️ Ragdoll '{name}' created but ML-Agents integration may not work properly");
+        }
+        
+        // Final validation
+        var ragdollAgent = ragdoll.GetComponentInChildren<RagdollAgent>();
+        if (ragdollAgent == null)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No RagdollAgent component found in created ragdoll '{name}'!");
+        }
+        else
+        {
+            TrainArenaDebugManager.Log($"✅ Ragdoll '{name}' created successfully using BlockmanRagdollBuilder with ML-Agents integration", TrainArenaDebugManager.DebugLogLevel.Important);
+            
+            // Log final configuration summary
+            int jointCount = ragdollAgent.joints?.Count ?? 0;
+            int totalObservations = ragdollAgent.GetTotalObservationCount();
+            TrainArenaDebugManager.Log($"📊 Ragdoll Summary: {jointCount} joints, {totalObservations} observations", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        return ragdoll;
+    }
+    
+    /// <summary>
+    /// Validates basic ragdoll structure to ensure it has required components
+    /// </summary>
+    private static bool ValidateRagdollStructure(GameObject ragdoll)
+    {
+        if (ragdoll == null)
+        {
+            TrainArenaDebugManager.LogError("❌ Cannot validate null ragdoll structure");
+            return false;
+        }
+        
+        // Check for pelvis
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis);
+        if (pelvis == null)
+        {
+            TrainArenaDebugManager.LogError($"❌ Ragdoll '{ragdoll.name}' missing required {RagdollJointNames.Pelvis} bone");
+            return false;
+        }
+        
+        // Check pelvis has rigidbody
+        var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
+        if (pelvisRigidbody == null)
+        {
+            TrainArenaDebugManager.LogError($"❌ Ragdoll pelvis '{pelvis.name}' missing Rigidbody component");
+            return false;
+        }
+        
+        // Check for configurable joints
+        var joints = ragdoll.GetComponentsInChildren<ConfigurableJoint>();
+        if (joints == null || joints.Length == 0)
+        {
+            TrainArenaDebugManager.LogError($"❌ Ragdoll '{ragdoll.name}' has no ConfigurableJoint components");
+            return false;
+        }
+        
+        // Check for rigidbodies on joint objects
+        int rigidbodyCount = ragdoll.GetComponentsInChildren<Rigidbody>().Length;
+        if (rigidbodyCount < 2) // At least pelvis + one other part
+        {
+            TrainArenaDebugManager.LogError($"❌ Ragdoll '{ragdoll.name}' has insufficient Rigidbody components: {rigidbodyCount}");
+            return false;
+        }
+        
+        TrainArenaDebugManager.Log($"✅ Ragdoll structure validation passed: Pelvis OK, {joints.Length} joints, {rigidbodyCount} rigidbodies", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
+        
+        return true;
+    }
+
+    /// <summary>
+    /// Adds ML-Agents components to a blockman ragdoll if they're not already present
+    /// </summary>
+    private static void AddMLAgentsToBlockman(GameObject ragdoll)
+    {
+        if (ragdoll == null)
+        {
+            TrainArenaDebugManager.LogError("❌ CRITICAL: Cannot add ML-Agents components to null ragdoll!");
+            return;
+        }
+        
+        var pelvis = ragdoll.transform.Find(RagdollJointNames.Pelvis)?.gameObject;
+        if (pelvis == null)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No {RagdollJointNames.Pelvis} found in blockman ragdoll '{ragdoll.name}'! ML-Agents components cannot be added. Ragdoll structure is invalid.");
+            
+            // Log available children for debugging
+            TrainArenaDebugManager.Log($"Available children in '{ragdoll.name}':", TrainArenaDebugManager.DebugLogLevel.Important);
+            foreach (Transform child in ragdoll.transform)
+            {
+                TrainArenaDebugManager.Log($"  - {child.name}", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            return;
+        }
+        
+        TrainArenaDebugManager.Log($"✅ Found Pelvis '{pelvis.name}' in ragdoll '{ragdoll.name}'", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        
+        // Add RagdollAgent if not present
+        var ragdollAgent = pelvis.GetComponent<RagdollAgent>();
+        if (ragdollAgent == null)
+        {
+            try
+            {
+                ragdollAgent = pelvis.AddComponent<RagdollAgent>();
+                ragdollAgent.pelvis = pelvis.transform;
+                TrainArenaDebugManager.Log($"✅ Added RagdollAgent component to pelvis", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            catch (System.Exception e)
+            {
+                TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to add RagdollAgent component: {e.Message}");
+                return;
+            }
+        }
+        else
+        {
+            TrainArenaDebugManager.Log($"RagdollAgent component already exists on pelvis", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
+        
+        // Find and configure leg joints for ML-Agents control
+        var joints = new List<PDJointController>();
+        var configJoints = ragdoll.GetComponentsInChildren<ConfigurableJoint>();
+        
+        if (configJoints == null || configJoints.Length == 0)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No ConfigurableJoints found in ragdoll '{ragdoll.name}'! Cannot create PDJointControllers.");
+            return;
+        }
+        
+        TrainArenaDebugManager.Log($"🔧 Found {configJoints.Length} ConfigurableJoints in ragdoll '{ragdoll.name}' - analyzing joint structure", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Log all available joint names for diagnostic purposes
+        TrainArenaDebugManager.Log($"🔍 Available joints in '{ragdoll.name}':", TrainArenaDebugManager.DebugLogLevel.Important);
+        foreach (var joint in configJoints)
+        {
+            if (joint != null)
+            {
+                bool isLocomotion = RagdollJointNames.IsLocomotionJoint(joint.gameObject.name);
+                string status = isLocomotion ? "✅ LOCOMOTION" : "⏭️ skip";
+                TrainArenaDebugManager.Log($"  - {joint.gameObject.name} ({status})", TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+        }
+        
+        int legJointCount = 0;
+        foreach (var configJoint in configJoints)
+        {
+            if (configJoint == null)
+            {
+                TrainArenaDebugManager.LogWarning($"⚠️ Null ConfigurableJoint found in ragdoll children");
+                continue;
+            }
+            
+            var partName = configJoint.gameObject.name;
+            
+            // Use centralized configuration for joint detection
+            bool isLegJoint = RagdollJointNames.IsLocomotionJoint(partName);
+            
+            if (isLegJoint)
+            {
+                try
+                {
+                    // Add PDJointController if not present
+                    var pdController = configJoint.GetComponent<PDJointController>();
+                    if (pdController == null)
+                    {
+                        pdController = configJoint.gameObject.AddComponent<PDJointController>();
+                        pdController.joint = configJoint;
+                        
+                        // Get configuration from centralized system
+                        var (minAngle, maxAngle, kp, kd) = RagdollJointNames.GetJointControllerConfig(partName);
+                        pdController.minAngle = minAngle;
+                        pdController.maxAngle = maxAngle;
+                        pdController.kp = kp;
+                        pdController.kd = kd;
+                        
+                        TrainArenaDebugManager.Log($"✅ Added PDJointController to '{configJoint.gameObject.name}'", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                        legJointCount++;
+                    }
+                    else
+                    {
+                        TrainArenaDebugManager.Log($"PDJointController already exists on '{configJoint.gameObject.name}'", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                    }
+                    
+                    // Validate PDJointController configuration
+                    if (pdController.joint == null)
+                    {
+                        TrainArenaDebugManager.LogError($"❌ PDJointController on '{configJoint.gameObject.name}' has null joint reference!");
+                        continue;
+                    }
+                    
+                    joints.Add(pdController);
+                }
+                catch (System.Exception e)
+                {
+                    TrainArenaDebugManager.LogError($"❌ Error configuring PDJointController on '{configJoint.gameObject.name}': {e.Message}");
+                }
+            }
+        }
+        
+        // Validate we found appropriate leg joints
+        if (joints.Count == 0)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No locomotion joints found in ragdoll '{ragdoll.name}'! Expected joints: {string.Join(", ", RagdollJointNames.LocomotionJoints)}");
+            TrainArenaDebugManager.Log("Available joint names:", TrainArenaDebugManager.DebugLogLevel.Important);
+            foreach (var joint in configJoints)
+            {
+                if (joint != null)
+                {
+                    TrainArenaDebugManager.Log($"  - {joint.gameObject.name}", TrainArenaDebugManager.DebugLogLevel.Important);
+                }
+            }
+            return;
+        }
+        
+        // Assign joints to RagdollAgent
+        try
+        {
+            ragdollAgent.joints = joints;
+            TrainArenaDebugManager.Log($"✅ Configured RagdollAgent with {joints.Count} leg joints ({legJointCount} newly added)", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to assign joints to RagdollAgent: {e.Message}");
+            return;
+        }
+        
+        // Add BehaviorParameters if not present - MUST be done after joints are assigned
+        var behaviorParameters = pelvis.GetComponent<BehaviorParameters>();
+        if (behaviorParameters == null)
+        {
+            //TODO: A bunch of this should probably be abstracted to the main shared builder, rather than duping with both agents
+            try
+            {
+                behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
+                behaviorParameters.BehaviorName = AgentConfiguration.RagdollAgent.BehaviorName;
+
+                // Use actual joint count for continuous actions (should match expected locomotion joint count)
+                int actionCount = ragdollAgent.joints.Count;
+                if (actionCount != AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount)
+                {
+                    TrainArenaDebugManager.LogWarning($"⚠️ Joint count mismatch: found {actionCount}, expected {AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount}");
+                }
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(actionCount);
+
+                // Configure observation space using RagdollAgent's calculation
+                int totalObservations = ragdollAgent.GetTotalObservationCount();
+                if (totalObservations <= 0)
+                {
+                    TrainArenaDebugManager.LogError($"❌ CRITICAL: RagdollAgent returned invalid observation count: {totalObservations}");
+                    return;
+                }
+
+                behaviorParameters.BrainParameters.VectorObservationSize = totalObservations;
+
+                TrainArenaDebugManager.Log($"✅ Added BehaviorParameters: {ragdollAgent.joints.Count} actions, {totalObservations} observations " +
+                                         $"({RagdollAgent.UPRIGHTNESS_OBSERVATIONS} uprightness + {RagdollAgent.VELOCITY_OBSERVATIONS} velocity + {ragdollAgent.joints.Count * RagdollAgent.JOINT_STATE_OBSERVATIONS_PER_JOINT} joint states)",
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            catch (System.Exception e)
+            {
+                TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to add/configure BehaviorParameters: {e.Message}");
+                return;
+            }
+        }
+        else
+        {
+            TrainArenaDebugManager.Log($"BehaviorParameters already exists on pelvis", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            
+            // Update existing BehaviorParameters to match joint count
+            int expectedActions = ragdollAgent.joints.Count;
+            int actualActions = behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions;
+            if (actualActions != expectedActions)
+            {
+                TrainArenaDebugManager.Log($"⚠️ Updating BehaviorParameters action count from {actualActions} to {expectedActions}");
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(expectedActions);
+            }
+        }
+        
+        TrainArenaDebugManager.Log($"🎭 Successfully configured ragdoll '{ragdoll.name}' for ML-Agents training with {ragdollAgent.joints.Count} action joints", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+
+    // Unity Editor menu items for ragdoll creation
+#if UNITY_EDITOR
+    [UnityEditor.MenuItem("TrainArena/Ragdoll/Create Test Ragdoll")]
+    public static void CreateTestRagdoll()
+    {
+        var ragdoll = CreateRagdoll("TestRagdoll", Vector3.zero);
+        UnityEditor.Selection.activeGameObject = ragdoll;
+        TrainArenaDebugManager.Log($"🎭 Created test ragdoll using BlockmanRagdollBuilder system. Joints: {ragdoll.GetComponentsInChildren<PDJointController>().Length}", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+#endif
+
+    #endregion Ragdoll
+
+    #region Materials
+
     /// <summary>
     /// Creates a material compatible with Unity 6.2 URP with specified surface properties
     /// </summary>
@@ -43,19 +450,23 @@ public static class PrimitiveBuilder
         
         return mat;
     }
-    
+
+    #endregion Materials
+
+    #region Agents and Object Creation
+
     /// <summary>
     /// Creates a complete CubeAgent with proper materials, physics, and trail
     /// </summary>
-    public static GameObject CreateAgent(string name = "CubeAgent")
+    public static GameObject CreateCubeAgent(string name = "CubeAgent")
     {
-        return CreateAgent(name, Vector3.zero, new Color(0.216f, 0.490f, 1.0f)); // Default blue color - #377DFF in linear space
+        return CreateCubeAgent(name, Vector3.zero, new Color(0.216f, 0.490f, 1.0f)); // Default blue color - #377DFF in linear space
     }
     
     /// <summary>
     /// Creates a complete CubeAgent with proper materials, physics, and trail at specified position and color
     /// </summary>
-    public static GameObject CreateAgent(string name, Vector3 position, Color color)
+    public static GameObject CreateCubeAgent(string name, Vector3 position, Color color)
     {
         var agent = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Object.DestroyImmediate(agent.GetComponent<Collider>());
@@ -81,7 +492,84 @@ public static class PrimitiveBuilder
         AddTrail(agent);
         
         // Add simple face to show agent orientation
-        AddAgentFace(agent);
+        AddAgentFace(agent, AgentType.Cube);
+
+        // Add CubeAgent component
+        var cubeAgent = agent.AddComponent<CubeAgent>();
+        
+        // Add BehaviorParameters - MUST be done after CubeAgent is added
+        var behaviorParameters = agent.GetComponent<BehaviorParameters>();
+        if (behaviorParameters == null)
+        {
+            //TODO: A bunch of this should be abstracted to the main shared builder, rather than duping with both agents
+            try
+            {   
+                behaviorParameters = agent.AddComponent<BehaviorParameters>();
+                behaviorParameters.BehaviorName = AgentConfiguration.CubeAgent.BehaviorName;
+
+                // Use centralized configuration for CubeAgent action count
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(AgentConfiguration.CubeAgent.ActionCount);
+
+                // Configure observation space using CubeAgent's calculation
+                int totalObservations = cubeAgent.GetTotalObservationCount();
+                if (totalObservations <= 0)
+                {
+                    TrainArenaDebugManager.LogError($"❌ CRITICAL: CubeAgent returned invalid observation count: {totalObservations}");
+                    return agent; // Return but don't fail completely
+                }
+
+                behaviorParameters.BrainParameters.VectorObservationSize = totalObservations;
+
+                TrainArenaDebugManager.Log($"✅ Added BehaviorParameters: {AgentConfiguration.CubeAgent.ActionCount} actions, {totalObservations} observations",
+                                         TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            catch (System.Exception e)
+            {
+                TrainArenaDebugManager.LogError($"❌ CRITICAL: Failed to add/configure BehaviorParameters for CubeAgent: {e.Message}");
+                return agent; // Return but don't fail completely
+            }
+        }
+        else
+        {
+            TrainArenaDebugManager.Log($"BehaviorParameters already exists on CubeAgent", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            
+            // Update existing BehaviorParameters to ensure correct configuration
+            int actualActions = behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions;
+            if (actualActions != AgentConfiguration.CubeAgent.ActionCount)
+            {
+                TrainArenaDebugManager.Log($"⚠️ Updating CubeAgent BehaviorParameters action count from {actualActions} to {AgentConfiguration.CubeAgent.ActionCount}", TrainArenaDebugManager.DebugLogLevel.Important);
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(AgentConfiguration.CubeAgent.ActionCount);
+            }
+        }
+
+        // Add debug components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
+        try
+        {
+            // Add debug info component for development
+            if (agent.GetComponent<AgentDebugInfo>() == null)
+            {
+                agent.AddComponent<AgentDebugInfo>();
+                TrainArenaDebugManager.Log($"✅ Added AgentDebugInfo component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+
+            // Add domain randomization for physics testing
+            var domainRandomizer = agent.GetComponent<DomainRandomizer>();
+            if (domainRandomizer == null)
+            {
+                domainRandomizer = agent.AddComponent<DomainRandomizer>();
+                domainRandomizer.randomizeMass = true;
+                domainRandomizer.randomizeFriction = true;
+                domainRandomizer.randomizeGravity = false; // Keep gravity stable
+                TrainArenaDebugManager.Log($"✅ Added DomainRandomizer component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            }
+        }
+        catch (System.Exception e)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ Failed to add optional components to CubeAgent: {e.Message}");
+        }
+
+        TrainArenaDebugManager.Log($"🧊 Successfully configured CubeAgent '{agent.name}' for ML-Agents training with {AgentConfiguration.CubeAgent.ActionCount} action dimensions", TrainArenaDebugManager.DebugLogLevel.Important);
         
         return agent;
     }
@@ -130,6 +618,7 @@ public static class PrimitiveBuilder
         mr.sharedMaterial = mat;
         
         obs.name = name;
+        EnsureTagExists("Obstacle");
         obs.tag = "Obstacle"; // Ensure proper tag for agent detection
         
         return obs;
@@ -162,7 +651,11 @@ public static class PrimitiveBuilder
         
         return ground;
     }
-    
+
+    #endregion Agents and Object Creation
+
+    #region Polish and Effects
+
     /// <summary>
     /// Adds trail renderer to agents for path visualization
     /// </summary>
@@ -183,39 +676,75 @@ public static class PrimitiveBuilder
         
         TrainArenaDebugManager.Log($"Added trail to {agent.name}", TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
-    
+
     /// <summary>
     /// Adds simple "eyes" to show agent forward direction
     /// </summary>
-    public static void AddAgentFace(GameObject agent)
+    public static void AddAgentFace(GameObject agent, AgentType agentType)
     {
-        // Create left eye - positioned ON the cube surface, not inside
+        // Get eye configuration based on agent type
+        Vector3 leftEyePos, rightEyePos, eyeScale;
+        
+        switch (agentType)
+        {
+            case AgentType.Cube:
+                leftEyePos = AgentVisuals.EyeConfiguration.Cube.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Cube.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Cube.EyeScale;
+                break;
+                
+            case AgentType.Ragdoll:
+                leftEyePos = AgentVisuals.EyeConfiguration.Ragdoll.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Ragdoll.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Ragdoll.EyeScale;
+                break;
+                
+            default:
+                TrainArenaDebugManager.LogWarning($"⚠️ Unknown agent type '{agentType}' for face configuration, using cube defaults");
+                leftEyePos = AgentVisuals.EyeConfiguration.Cube.LeftEyePosition;
+                rightEyePos = AgentVisuals.EyeConfiguration.Cube.RightEyePosition;
+                eyeScale = AgentVisuals.EyeConfiguration.Cube.EyeScale;
+                break;
+        }
+
+        // Create left eye
         var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         leftEye.name = "LeftEye";
         leftEye.transform.parent = agent.transform;
-        leftEye.transform.localPosition = new Vector3(-0.2f, 0.2f, 0.51f); // Outside cube surface (0.5 + 0.01 margin)
-        leftEye.transform.localScale = Vector3.one * 0.15f; // Slightly larger for visibility
-        
+        leftEye.transform.localPosition = leftEyePos;
+        leftEye.transform.localScale = eyeScale;
+
         // Create right eye  
         var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         rightEye.name = "RightEye";
         rightEye.transform.parent = agent.transform;
-        rightEye.transform.localPosition = new Vector3(0.2f, 0.2f, 0.51f); // Outside cube surface
-        rightEye.transform.localScale = Vector3.one * 0.15f;
-        
+        rightEye.transform.localPosition = rightEyePos;
+        rightEye.transform.localScale = eyeScale;
+
         // Make eyes white with slight gloss for realism
         var eyeMaterial = CreateURPMaterial(smoothness: 0.8f, metallic: 0.0f);
         eyeMaterial.color = Color.white;
         eyeMaterial.name = "EyeMaterial";
-        
+
         leftEye.GetComponent<Renderer>().sharedMaterial = eyeMaterial;
         rightEye.GetComponent<Renderer>().sharedMaterial = eyeMaterial;
-        
+
         // Remove colliders from eyes so they don't interfere with physics
         Object.DestroyImmediate(leftEye.GetComponent<Collider>());
         Object.DestroyImmediate(rightEye.GetComponent<Collider>());
+        
+        // Add blinking animation for visual polish
+        if (agent.GetComponent<EyeBlinker>() == null)
+        {
+            agent.AddComponent<EyeBlinker>();
+            TrainArenaDebugManager.Log($"✅ Added EyeBlinker component", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        }
     }
-    
+
+    #endregion Polish and Effects
+
+    #region Utilities and Helpers
+
     /// <summary>
     /// Ensures a tag exists in Unity's TagManager
     /// </summary>
@@ -230,4 +759,6 @@ public static class PrimitiveBuilder
         UnityEditorInternal.InternalEditorUtility.AddTag(tagName);
 #endif
     }
+
+    #endregion Utilities and Helpers
 }

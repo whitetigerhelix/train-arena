@@ -1,9 +1,23 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using TrainArena.Core;
 
 /// <summary>
-/// Global debug settings manager for TrainArena
-/// Controls visualization and logging levels across all components
+/// Centralized debug system for TrainArena ML-Agents training environment
+/// 
+/// Features:
+/// - Real-time visualization toggles (R/I/O/V/B/M/T/N keys)
+/// - Hierarchical logging system (None/Errors/Warnings/Important/Verbose)
+/// - ML-Agents status monitoring and training progress tracking
+/// - Memory management and performance monitoring
+/// - Agent activity control and debugging utilities
+/// 
+/// Key Controls:
+/// - R: Raycast visualization, I: Agent info, O: Observations, V: Velocity vectors
+/// - M: ML-Agents status panel, T: TimeScale UI, L: Cycle log levels, H: Help
+/// - Z: Toggle all agent activity (useful for demos and testing)
 /// </summary>
 public class TrainArenaDebugManager : MonoBehaviour
 {
@@ -17,12 +31,13 @@ public class TrainArenaDebugManager : MonoBehaviour
     public static bool ShowMLAgentsStatus = true; // Show ML-Agents behavior info by default
     public static bool ShowTimeScale = true; // Show TimeScale UI by default
     public static bool ShowHelp = true; // Show by default
-    
-    [Header("Logging Controls")]
-    public static DebugLogLevel LogLevel = DebugLogLevel.Important;  // Show important info by default
+    public static bool ShowDomainRandomization = false; // Show Domain Randomization UI
+
+    [Header("Logging Controls")]  
+    public static DebugLogLevel LogLevel = DebugLogLevel.Important; // Show important info by default, verbose for troubleshooting
     
     [Header("Auto-Adjust Log Level")]
-    public static bool autoAdjustLogLevel = false;  // Don't auto-spam with verbose logs
+    public static bool autoAdjustLogLevel = false;  // Automatically increase verbosity during ML-Agents training
     
     [Header("Timing Constants")]
     private const float LOG_LEVEL_CHECK_INTERVAL = 10f;     // Check log level every 10 seconds  
@@ -56,6 +71,9 @@ public class TrainArenaDebugManager : MonoBehaviour
         }
     }
     
+    static float lastGCTime = 0f;
+    const float GC_INTERVAL = 120f; // Force GC every 2 minutes as safety net
+    
     void Update()
     {
         HandleInput();
@@ -70,6 +88,20 @@ public class TrainArenaDebugManager : MonoBehaviour
         if (Time.fixedTime % STATUS_REPORT_INTERVAL < Time.fixedDeltaTime)
         {
             LogTrainingStatus();
+        }
+        
+        // Memory management - force GC periodically to prevent OOM
+        if (Time.time - lastGCTime > GC_INTERVAL)
+        {
+            long memoryBefore = System.GC.GetTotalMemory(false);
+            System.GC.Collect();
+            System.GC.WaitForPendingFinalizers();
+            System.GC.Collect();
+            long memoryAfter = System.GC.GetTotalMemory(false);
+            
+            Log($"🧹 Periodic GC: Released {(memoryBefore - memoryAfter) / 1024 / 1024:F1} MB (mem: {memoryAfter / 1024 / 1024:F1} MB)", 
+                DebugLogLevel.Important);
+            lastGCTime = Time.time;
         }
     }
     
@@ -219,6 +251,13 @@ public class TrainArenaDebugManager : MonoBehaviour
             Log($"TimeScale UI: {(ShowTimeScale ? "ON" : "OFF")}");
         }
         
+        // Toggle Domain Randomization UI with 'N' key (D is camera control)
+        if (keyboard.nKey.wasPressedThisFrame)
+        {
+            ShowDomainRandomization = !ShowDomainRandomization;
+            Log($"Domain Randomization UI: {(ShowDomainRandomization ? "ON" : "OFF")}");
+        }
+        
         // Toggle all agents activity with 'Z' key (for demos) - Q is camera control
         if (keyboard.zKey.wasPressedThisFrame)
         {
@@ -233,7 +272,11 @@ public class TrainArenaDebugManager : MonoBehaviour
             "I - Toggle Agent Debug Info\n" +
             "O - Toggle Observations Display\n" +
             "V - Toggle Velocity Display\n" +
-            "A - Toggle Arena Bounds\n" +
+            "B - Toggle Arena Bounds\n" +
+            "M - Toggle ML-Agents Status Panel\n" +
+            "T - Toggle TimeScale UI\n" +
+            "N - Toggle Domain Randomization UI\n" +
+            "Z - Toggle All Agents Activity\n" +
             "L - Cycle Log Level\n" +
             "H - Toggle Help Display\n" +
             "================================");
@@ -266,6 +309,7 @@ public class TrainArenaDebugManager : MonoBehaviour
                            $"{(ShowArenaBounds ? "🟢" : "⚫")}B " +
                            $"{(ShowMLAgentsStatus ? "🟢" : "⚫")}M " +
                            $"{(ShowTimeScale ? "🟢" : "⚫")}T " +
+                           $"{(ShowDomainRandomization ? "🟢" : "⚫")}N " +
                            $"🎮Z " +
                            $"📊{LogLevel}";
         
@@ -304,6 +348,7 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUILayout.Label($"{(ShowArenaBounds ? "🟢" : "⚫")} [B] - Arena Bounds");
             GUILayout.Label($"{(ShowMLAgentsStatus ? "🟢" : "⚫")} [M] - ML-Agents Status Panel");
             GUILayout.Label($"{(ShowTimeScale ? "🟢" : "⚫")} [T] - TimeScale UI");
+            GUILayout.Label($"{(ShowDomainRandomization ? "🟢" : "⚫")} [N] - Domain Randomization UI");
             
             GUILayout.Space(4);
             GUI.color = Color.gray;
@@ -395,13 +440,19 @@ public class TrainArenaDebugManager : MonoBehaviour
     
     void DrawMLAgentsStatusPanel(bool isTraining)
     {
-        // Find all CubeAgent instances in the scene
-        CubeAgent[] agents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        // Find all TrainArena agents in the scene using unified interface
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
         
-        if (agents.Length == 0)
-        {
-            return; // No agents to display
-        }
+        // Always show panel even if no agents found (for debugging)
+        bool hasAgents = allAgents.Length > 0;
+        
+        int totalAgents = allAgents.Length;
+        
+        // Count agents by type for display
+        int cubeCount = allAgents.Count(a => a.AgentTypeIcon == "🧊");
+        int ragdollCount = allAgents.Count(a => a.AgentTypeIcon == "🎭");
         
         // Panel positioning - top-left corner
         float panelWidth = 650f; // Wider for better button layout
@@ -419,7 +470,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         int maxVisibleAgents = Mathf.FloorToInt(availableScrollHeight / agentHeight);
         
         // Always use maximum available space but ensure scroll works when needed
-        float contentHeight = headerHeight + agentLabelHeight + (Mathf.Min(agents.Length, maxVisibleAgents) * agentHeight) + 40f;
+        float contentHeight = headerHeight + agentLabelHeight + (Mathf.Min(totalAgents, maxVisibleAgents) * agentHeight) + 40f;
         float panelHeight = Mathf.Min(contentHeight, maxPanelHeight);
         
         Rect panelRect = new Rect(posX, posY, panelWidth, panelHeight);
@@ -450,7 +501,7 @@ public class TrainArenaDebugManager : MonoBehaviour
         // Global behavior type switching (disabled during training)
         GUI.enabled = !isTraining;
         GUILayout.BeginHorizontal();
-        GUILayout.Label($"All Agents ({agents.Length}):", GUILayout.Width(110));
+        GUILayout.Label($"All Agents ({totalAgents} - {cubeCount}🧊 {ragdollCount}🎭):", GUILayout.Width(180));
         
         GUI.backgroundColor = new Color(0f, 0.8f, 1f, isTraining ? 0.3f : 0.8f); // Dimmed when training
         if (GUILayout.Button("🎯 Training", GUILayout.Width(100)))
@@ -503,36 +554,53 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUI.enabled = true; // Re-enable GUI
         
         GUILayout.Space(6);
-        GUI.color = Color.gray;
-        GUILayout.Label($"Agent Status ({agents.Length} total):", GUI.skin.label);
-        GUI.color = Color.white;
-        
-        // Scroll view for agent controls with proper sizing
-        float scrollHeight = panelHeight - headerHeight - 50f; // Account for spacing and label
-        scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, 
-                                                 GUILayout.Width(panelWidth - 20), 
-                                                 GUILayout.Height(scrollHeight),
-                                                 GUILayout.ExpandHeight(false));
-        
-        // Display ALL agents with compact layout - no artificial limit
-        for (int i = 0; i < agents.Length; i++)
+        if (!hasAgents)
         {
-            DrawAgentStatus(agents[i], isTraining);
+            GUILayout.Space(6);
+            GUI.color = Color.yellow;
+            GUILayout.Label("⚠️ No agents found in scene", GUI.skin.box);
+            GUI.color = Color.gray;
+            GUILayout.Label("• Load a scene with CubeAgent or RagdollAgent");
+            GUILayout.Label("• Check that agents have proper ML-Agents components");
+            GUI.color = Color.white;
+        }
+        else
+        {
+            GUI.color = Color.gray;
+            GUILayout.Label($"Agent Status ({totalAgents} total - {cubeCount} cubes, {ragdollCount} ragdolls):", GUI.skin.label);
+            GUI.color = Color.white;
         }
         
-        GUILayout.EndScrollView();
+        // Only show scroll view if we have agents
+        if (hasAgents)
+        {
+            // Scroll view for agent controls with proper sizing
+            float scrollHeight = panelHeight - headerHeight - 50f; // Account for spacing and label
+            scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, true, 
+                                                     GUILayout.Width(panelWidth - 20), 
+                                                     GUILayout.Height(scrollHeight),
+                                                     GUILayout.ExpandHeight(false));
+            
+            // Display ALL agents with unified layout - polymorphic approach
+            foreach (var agent in allAgents)
+            {
+                DrawAgentStatus(agent, isTraining);
+            }
+            
+            GUILayout.EndScrollView();
+        }
         GUILayout.Space(16);
         
         GUILayout.EndVertical();
         GUILayout.EndArea();
     }
     
-    void DrawAgentStatus(CubeAgent agent, bool isTraining)
+    void DrawAgentStatus(ITrainArenaAgent agent, bool isTraining)
     {
         if (agent == null) return;
         
-        // Get behavior parameters
-        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        // Get behavior parameters using unified interface
+        var behaviorParams = agent.BehaviorParameters;
         string behaviorType = "Unknown";
         string modelName = "NO MODEL";
         Color statusColor = Color.white;
@@ -564,16 +632,16 @@ public class TrainArenaDebugManager : MonoBehaviour
             }
         }
         
-        // Get activity status
-        string activityEmoji = agent.agentActivity == AgentActivity.Active ? "🟢" : "⚫";
-        string activityStatus = agent.agentActivity == AgentActivity.Active ? "Active" : "Inactive";
+        // Get activity status using unified interface
+        string activityEmoji = agent.AgentActivity == AgentActivity.Active ? "🟢" : "⚫";
+        string activityStatus = agent.AgentActivity == AgentActivity.Active ? "Active" : "Inactive";
         
         // Ultra-compact single-line agent display with inline model info
         GUILayout.BeginHorizontal();
         
         // Agent name with status info inline for compactness
         GUI.color = statusColor;
-        string agentDisplay = $"{activityEmoji} {behaviorEmoji} {agent.name}";
+        string agentDisplay = $"{activityEmoji} {agent.AgentTypeIcon} {behaviorEmoji} {agent.DisplayName}";
         
         // Add model info directly inline for AI agents
         if (behaviorParams != null && behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly && !string.IsNullOrEmpty(modelName) && modelName != "NO MODEL")
@@ -586,20 +654,21 @@ public class TrainArenaDebugManager : MonoBehaviour
             agentDisplay += $" ({behaviorType})";
         }
         
-        float agentDescriptionWidth = 425f; // Not including buttons to the right
+        float agentDescriptionWidth = 450f; // Not including buttons to the right
         GUILayout.Label(agentDisplay, GUILayout.Width(agentDescriptionWidth));
         GUI.color = Color.white;
         
         // Spacer to push buttons to the right
         GUILayout.FlexibleSpace();
         
-        // Activity toggle button
-        if (agent.agentActivity == AgentActivity.Active)
+        // Activity toggle button - unified for all agent types
+        if (agent.AgentActivity == AgentActivity.Active)
         {
             GUI.backgroundColor = new Color(0f, 0.8f, 0.2f, 0.8f); // Green for active
             if (GUILayout.Button("🟢", GUILayout.Width(25)))
             {
-                SetAgentActivity(agent, AgentActivity.Inactive);
+                agent.AgentActivity = AgentActivity.Inactive;
+                Log($"Set {agent.DisplayName} to ⚫ Inactive");
             }
         }
         else
@@ -607,11 +676,12 @@ public class TrainArenaDebugManager : MonoBehaviour
             GUI.backgroundColor = new Color(0.6f, 0.6f, 0.6f, 0.8f); // Gray for inactive
             if (GUILayout.Button("⚫", GUILayout.Width(25)))
             {
-                SetAgentActivity(agent, AgentActivity.Active);
+                agent.AgentActivity = AgentActivity.Active;
+                Log($"Set {agent.DisplayName} to 🟢 Active");
             }
         }
         
-        // Individual behavior type buttons (more compact)
+        // Individual behavior type buttons (more compact) - unified for all agent types
         GUI.backgroundColor = new Color(0f, 0.8f, 1f, 0.6f);
         if (GUILayout.Button("🎯", GUILayout.Width(25)))
         {
@@ -634,32 +704,62 @@ public class TrainArenaDebugManager : MonoBehaviour
         GUILayout.Space(3); // Better spacing between agents for readability and scroll accuracy
     }
     
+    // DrawRagdollAgentStatus method removed - now using unified DrawAgentStatus
+    
     void SetAllAgentsBehaviorType(Unity.MLAgents.Policies.BehaviorType behaviorType)
     {
-        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        foreach (var agent in cubeAgents)
+        // Check if trying to set InferenceOnly without any models
+        if (behaviorType == Unity.MLAgents.Policies.BehaviorType.InferenceOnly)
         {
-            var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+            ITrainArenaAgent[] testAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+                .OfType<ITrainArenaAgent>()
+                .ToArray();
+            
+            bool hasAnyModel = testAgents.Any(agent => 
+                agent.BehaviorParameters != null && agent.BehaviorParameters.Model != null);
+            
+            if (!hasAnyModel)
+            {
+                Log("⚠️ Cannot set agents to Inference mode - no ML models found. Please load models first.", DebugLogLevel.Important);
+                return;
+            }
+        }
+        
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
+        
+        int totalSet = 0;
+        int cubeCount = 0, ragdollCount = 0;
+        
+        foreach (var agent in allAgents)
+        {
+            var behaviorParams = agent.BehaviorParameters;
             if (behaviorParams != null)
             {
                 behaviorParams.BehaviorType = behaviorType;
+                totalSet++;
+                
+                // Count by type for logging
+                if (agent.AgentTypeIcon == "🧊") cubeCount++;
+                else if (agent.AgentTypeIcon == "🎭") ragdollCount++;
             }
         }
         
         string behaviorName = behaviorType switch
         {
             Unity.MLAgents.Policies.BehaviorType.Default => "Training",
-            Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+            Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Heuristic",
             Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
             _ => behaviorType.ToString()
         };
         
-        Log($"Set all {cubeAgents.Length} agents to {behaviorName} behavior type");
+        Log($"Set all {totalSet} agents ({cubeCount} cubes, {ragdollCount} ragdolls) to {behaviorName} behavior type");
     }
     
-    void SetAgentBehaviorType(CubeAgent agent, Unity.MLAgents.Policies.BehaviorType behaviorType)
+    void SetAgentBehaviorType(ITrainArenaAgent agent, Unity.MLAgents.Policies.BehaviorType behaviorType)
     {
-        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        var behaviorParams = agent.BehaviorParameters;
         if (behaviorParams != null)
         {
             behaviorParams.BehaviorType = behaviorType;
@@ -667,57 +767,77 @@ public class TrainArenaDebugManager : MonoBehaviour
             string behaviorName = behaviorType switch
             {
                 Unity.MLAgents.Policies.BehaviorType.Default => "Training",
-                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Manual",
+                Unity.MLAgents.Policies.BehaviorType.HeuristicOnly => "Heuristic",
                 Unity.MLAgents.Policies.BehaviorType.InferenceOnly => "AI Model",
                 _ => behaviorType.ToString()
             };
             
-            Log($"Set {agent.name} to {behaviorName} behavior type");
+            Log($"Set {agent.DisplayName} to {behaviorName} behavior type");
         }
     }
     
+    // SetRagdollAgentBehaviorType method removed - now using unified SetAgentBehaviorType
+    
     void ToggleAllAgentsActivity()
     {
-        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        if (cubeAgents.Length == 0)
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
+        
+        if (allAgents.Length == 0)
         {
             Log("No agents found to toggle activity");
             return;
         }
         
-        // Determine current state by checking first agent
-        AgentActivity newActivity = cubeAgents[0].agentActivity == AgentActivity.Active ? 
-                                   AgentActivity.Inactive : AgentActivity.Active;
-        
+        // Determine current state - check if any agent is active
+        bool anyActive = allAgents.Length > 0 && allAgents[0].AgentActivity == AgentActivity.Active;
+        bool newActiveState = !anyActive;
         int toggledCount = 0;
-        foreach (var agent in cubeAgents)
+        int cubeCount = 0, ragdollCount = 0;
+        AgentActivity newActivity = newActiveState ? AgentActivity.Active : AgentActivity.Inactive;
+        
+        foreach (var agent in allAgents)
         {
-            agent.agentActivity = newActivity;
+            agent.AgentActivity = newActivity;
             toggledCount++;
+            
+            // Count by type for logging
+            if (agent.AgentTypeIcon == "🧊") cubeCount++;
+            else if (agent.AgentTypeIcon == "🎭") ragdollCount++;
         }
         
-        string activityName = newActivity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
-        Log($"Toggled {toggledCount} agents to {activityName} (press Z to toggle)", DebugLogLevel.Important);
+        string activityName = newActiveState ? "🟢 ACTIVE" : "⚫ INACTIVE";
+        Log($"Toggled {toggledCount} agents ({cubeCount} cubes, {ragdollCount} ragdolls) to {activityName} (press Z to toggle)", DebugLogLevel.Important);
     }
     
     void SetAllAgentsActivity(AgentActivity activity)
     {
-        var cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
-        foreach (var agent in cubeAgents)
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
+        
+        int cubeCount = 0, ragdollCount = 0;
+        
+        foreach (var agent in allAgents)
         {
-            agent.agentActivity = activity;
+            agent.AgentActivity = activity;
+            
+            // Count by type for logging
+            if (agent.AgentTypeIcon == "🧊") cubeCount++;
+            else if (agent.AgentTypeIcon == "🎭") ragdollCount++;
         }
         
         string activityName = activity == AgentActivity.Active ? "🟢 ACTIVE" : "⚫ INACTIVE";
-        Log($"Set all {cubeAgents.Length} agents to {activityName}");
+        Log($"Set all {allAgents.Length} agents ({cubeCount} cubes, {ragdollCount} ragdolls) to {activityName}");
     }
     
-    void SetAgentActivity(CubeAgent agent, AgentActivity activity)
+    void SetAgentActivity(ITrainArenaAgent agent, AgentActivity activity)
     {
-        agent.agentActivity = activity;
+        agent.AgentActivity = activity;
         
         string activityName = activity == AgentActivity.Active ? "🟢 Active" : "⚫ Inactive";
-        Log($"Set {agent.name} to {activityName}");
+        Log($"Set {((MonoBehaviour)agent).name} to {activityName}");
     }
     
     // Logging methods with level filtering
@@ -743,5 +863,243 @@ public class TrainArenaDebugManager : MonoBehaviour
         {
             Debug.LogError($"[TrainArena] {message}");
         }
+    }
+
+    // Visual debug rendering with Gizmos
+    void OnDrawGizmos()
+    {
+        if (ShowArenaBounds)
+        {
+            DrawArenaBounds();
+        }
+        
+        if (ShowVelocityDisplay)
+        {
+            DrawVelocityVectors();
+        }
+        
+        if (ShowRaycastVisualization)
+        {
+            DrawRaycastVisualization();
+        }
+        
+        if (ShowObservations)
+        {
+            DrawObservationVisuals();
+        }
+    }
+    
+    void DrawArenaBounds()
+    {
+        // Find Ground objects as descendants of EnvManager for efficiency
+        List<GameObject> arenas = new List<GameObject>();
+        
+        // Look for EnvManager first
+        var envInitializer = FindFirstObjectByType<EnvInitializer>();
+        GameObject envManager = envInitializer?.gameObject;
+        if (envManager != null)
+        {
+            // Search for Ground objects under EnvManager
+            Transform[] children = envManager.GetComponentsInChildren<Transform>();
+            foreach (var child in children)
+            {
+                if (child.name.Contains("Ground"))
+                {
+                    var collider = child.GetComponent<Collider>();
+                    if (collider != null)
+                    {
+                        arenas.Add(child.gameObject);
+                    }
+                }
+            }
+        }
+        
+        // Fallback: if no EnvManager or Ground objects found, use previous method
+        if (arenas.Count == 0)
+        {
+            GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            foreach (var obj in allObjects)
+            {
+                string objName = obj.name.ToLower();
+                if (objName.Contains("arena") || objName.Contains("ground") || 
+                    objName.Contains("platform") || objName.Contains("floor"))
+                {
+                    var collider = obj.GetComponent<Collider>();
+                    if (collider != null && collider.bounds.size.magnitude > 5f)
+                    {
+                        arenas.Add(obj);
+                    }
+                }
+            }
+        }
+        
+        // Draw bounds for all found arenas
+        foreach (var arena in arenas)
+        {
+            var bounds = arena.GetComponent<Collider>();
+            if (bounds != null)
+            {
+                // Draw arena bounds
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireCube(bounds.bounds.center, bounds.bounds.size);
+                
+                // Draw grid on the ground for reference
+                Gizmos.color = new Color(0, 1, 1, 0.3f); // Transparent cyan
+                Vector3 center = bounds.bounds.center;
+                Vector3 size = bounds.bounds.size;
+                
+                // Draw grid lines (fewer lines for multiple arenas to avoid clutter)
+                int gridLines = 5;
+                for (int i = -gridLines; i <= gridLines; i++)
+                {
+                    float x = center.x + (i * size.x / (gridLines * 2));
+                    Gizmos.DrawLine(new Vector3(x, center.y, center.z - size.z/2), 
+                                   new Vector3(x, center.y, center.z + size.z/2));
+                    
+                    float z = center.z + (i * size.z / (gridLines * 2));
+                    Gizmos.DrawLine(new Vector3(center.x - size.x/2, center.y, z), 
+                                   new Vector3(center.x + size.x/2, center.y, z));
+                }
+            }
+        }
+        
+        // If still no arenas found, draw default
+        if (arenas.Count == 0)
+        {
+            // Default arena bounds (20x20x20) with grid
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireCube(Vector3.zero, new Vector3(20, 20, 20));
+            
+            // Default grid
+            Gizmos.color = new Color(0, 1, 1, 0.3f);
+            for (int i = -5; i <= 5; i++)
+            {
+                Gizmos.DrawLine(new Vector3(i * 2f, 0, -10), new Vector3(i * 2f, 0, 10));
+                Gizmos.DrawLine(new Vector3(-10, 0, i * 2f), new Vector3(10, 0, i * 2f));
+            }
+        }
+    }
+    
+    void DrawVelocityVectors()
+    {
+        // Show velocity vectors for all agents using polymorphic approach
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
+        
+        foreach (var agent in allAgents)
+        {
+            if (agent.MainRigidbody != null && agent.MainRigidbody.linearVelocity.magnitude > 0.1f)
+            {
+                // Color by agent type
+                Gizmos.color = agent.AgentTypeIcon == "🧊" ? Color.yellow : Color.magenta;
+                
+                Vector3 start = agent.MainTransform.position;
+                Vector3 end = start + agent.MainRigidbody.linearVelocity;
+                Gizmos.DrawLine(start, end);
+                Gizmos.DrawWireSphere(end, 0.1f);
+                
+                // Draw speed indicator
+                float speed = agent.MainRigidbody.linearVelocity.magnitude;
+                Gizmos.color = Color.white;
+                Gizmos.DrawWireCube(start + Vector3.up * 0.5f, Vector3.one * (0.1f + speed * 0.1f));
+            }
+        }
+    }
+    
+    void DrawRaycastVisualization()
+    {
+        // Show raycasts for all agents with raycast sensors using polymorphic approach
+        ITrainArenaAgent[] allAgents = FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None)
+            .OfType<ITrainArenaAgent>()
+            .ToArray();
+        
+        foreach (var agent in allAgents)
+        {
+            // Find raycast sensors on the agent or its children
+            var agentMono = (MonoBehaviour)agent;
+            var sensors = agentMono.GetComponentsInChildren<Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D>();
+            foreach (var sensor in sensors)
+            {
+                DrawRaycastSensor(sensor);
+            }
+        }
+    }
+    
+    void DrawRaycastSensor(Unity.MLAgents.Sensors.RayPerceptionSensorComponent3D sensor)
+    {
+        if (sensor == null) return;
+
+        // Use the sensor's own method to get ray perception input with proper angles
+        var rayInput = sensor.GetRayPerceptionInput();
+        var transform = sensor.transform;
+
+        // Draw each ray using the angles from the ray input
+        for (int i = 0; i < rayInput.Angles.Count; i++)
+        {
+            float angle = rayInput.Angles[i];
+            Vector3 direction = Quaternion.AngleAxis(angle, transform.up) * transform.forward;
+            Vector3 start = transform.position + Vector3.up * sensor.GetStartVerticalOffset();
+            Vector3 end = start + direction * rayInput.RayLength;
+
+            // Use different colors based on what the ray hits
+            RaycastHit hit;
+            if (Physics.Raycast(start, direction, out hit, rayInput.RayLength, rayInput.LayerMask))
+            {
+                // Check if the hit object has a tag that's in the detectable tags list
+                bool isDetectable = rayInput.DetectableTags.Contains(hit.collider.tag);
+                Gizmos.color = isDetectable ? Color.green : Color.red;
+                Gizmos.DrawLine(start, hit.point);
+                Gizmos.DrawWireSphere(hit.point, 0.1f);
+            }
+            else
+            {
+                Gizmos.color = Color.white;
+                Gizmos.DrawLine(start, end);
+            }
+        }
+    }
+    
+    void DrawObservationVisuals()
+    {
+        // Visual indicators for agent observations
+        CubeAgent[] cubeAgents = FindObjectsByType<CubeAgent>(FindObjectsSortMode.None);
+        RagdollAgent[] ragdollAgents = FindObjectsByType<RagdollAgent>(FindObjectsSortMode.None);
+        
+        // Show cube agent observation sphere
+        foreach (var agent in cubeAgents)
+        {
+            Gizmos.color = new Color(0, 1, 1, 0.2f); // Transparent cyan
+            Gizmos.DrawWireSphere(agent.transform.position, 2f); // Observation range
+        }
+        
+        // Show ragdoll agent observation sphere (around pelvis)
+        foreach (var agent in ragdollAgents)
+        {
+            if (agent.pelvis != null)
+            {
+                Gizmos.color = new Color(1, 0, 1, 0.2f); // Transparent magenta
+                Gizmos.DrawWireSphere(agent.pelvis.position, 2f); // Observation range
+            }
+        }
+    }
+
+    private static float[] GetRayAngles(int raysPerDirection, float maxRayDegrees)
+    {
+        // This is a simplified version of the ML-Agents internal method.
+        // It generates evenly spaced angles from -maxRayDegrees to +maxRayDegrees.
+        int numRays = raysPerDirection * 2 + 1;
+        float[] angles = new float[numRays];
+        if (numRays == 1)
+        {
+            angles[0] = 0f;
+            return angles;
+        }
+        float delta = (maxRayDegrees * 2f) / (numRays - 1);
+        for (int i = 0; i < numRays; i++)
+        {
+            angles[i] = -maxRayDegrees + delta * i;
+        }
+        return angles;
     }
 }

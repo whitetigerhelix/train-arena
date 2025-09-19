@@ -4,7 +4,7 @@ using Unity.MLAgents.Policies;
 
 public static class SelfPlayTagSceneBuilder
 {
-    [MenuItem("Tools/ML Hack/Build Self-Play Tag Scene")]
+    [MenuItem("TrainArena/Scenes/Build Self-Play Tag Scene")]
     public static void Build()
     {
         var scene = UnityEditor.SceneManagement.EditorSceneManager.NewScene(UnityEditor.SceneManagement.NewSceneSetup.EmptyScene, UnityEditor.SceneManagement.NewSceneMode.Single);
@@ -32,14 +32,14 @@ public static class SelfPlayTagSceneBuilder
         ui.randomizer = dom;
 
         // Runner
-        var runner = PrimitiveBuilder.CreateAgent("Runner", new Vector3(-2, 0.5f, 0), Color.blue);
+        var runner = PrimitiveBuilder.CreateCubeAgent("Runner", new Vector3(-2, 0.5f, 0), Color.blue);
         var runnerAgent = runner.AddComponent<RunnerAgent>();
         var rBP = runner.AddComponent<BehaviorParameters>();
         rBP.BehaviorName = "RunnerAgent";
         rBP.BehaviorType = BehaviorType.Default;
 
         // Tagger (trainable)
-        var tagger = PrimitiveBuilder.CreateAgent("Tagger", new Vector3(2, 0.5f, 0), Color.red);
+        var tagger = PrimitiveBuilder.CreateCubeAgent("Tagger", new Vector3(2, 0.5f, 0), Color.red);
         var taggerAgent = tagger.AddComponent<TaggerAgentTrainable>();
         var tBP = tagger.AddComponent<BehaviorParameters>();
         tBP.BehaviorName = "TaggerAgent";

@@ -39,7 +39,7 @@ public class DomainRandomizer : MonoBehaviour
 
         if (randomizeLighting)
         {
-            var light = FindFirstObjectByType<Light>(); //TODO: FindAnyObjectByType?  Have a smarter way to select lights
+            var light = FindFirstObjectByType<Light>();
             if (light) light.intensity = Random.Range(lightIntensityRange.x, lightIntensityRange.y);
         }
 
