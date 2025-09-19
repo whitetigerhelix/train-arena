@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TrainArena.Core;
+using TrainArena.Configuration;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -193,8 +194,8 @@ public class CubeAgent : BaseTrainArenaAgent
 
     protected override void HandleActiveActions(ActionBuffers actions)
     {
-        float moveX = Mathf.Clamp(actions.ContinuousActions[0], -1f, 1f);
-        float moveZ = Mathf.Clamp(actions.ContinuousActions[1], -1f, 1f);
+        float moveX = Mathf.Clamp(actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveXActionIndex], -1f, 1f);
+        float moveZ = Mathf.Clamp(actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveZActionIndex], -1f, 1f);
         
         // Debug inference mode - always log first few actions to verify model is working
         var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
@@ -205,7 +206,7 @@ public class CubeAgent : BaseTrainArenaAgent
         
         if (isInference && totalActionsReceived <= 10)
         {
-            TrainArenaDebugManager.Log($"🧠 INFERENCE ACTION #{totalActionsReceived}: Raw=({actions.ContinuousActions[0]:F4}, {actions.ContinuousActions[1]:F4}) | Clamped=({moveX:F4}, {moveZ:F4})", 
+            TrainArenaDebugManager.Log($"🧠 INFERENCE ACTION #{totalActionsReceived}: Raw=({actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveXActionIndex]:F4}, {actions.ContinuousActions[AgentConfiguration.CubeAgent.MoveZActionIndex]:F4}) | Clamped=({moveX:F4}, {moveZ:F4})", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
@@ -296,34 +297,34 @@ public class CubeAgent : BaseTrainArenaAgent
         var keyboard = UnityEngine.InputSystem.Keyboard.current;
         if (keyboard != null)
         {
-            ca[0] = 0f;
-            ca[1] = 0f;
+            ca[AgentConfiguration.CubeAgent.MoveXActionIndex] = 0f;
+            ca[AgentConfiguration.CubeAgent.MoveZActionIndex] = 0f;
             
-            if (keyboard.aKey.isPressed) ca[0] -= 1f; // Left
-            if (keyboard.dKey.isPressed) ca[0] += 1f; // Right
-            if (keyboard.sKey.isPressed) ca[1] -= 1f; // Back
-            if (keyboard.wKey.isPressed) ca[1] += 1f; // Forward
+            if (keyboard.aKey.isPressed) ca[AgentConfiguration.CubeAgent.MoveXActionIndex] -= 1f; // Left
+            if (keyboard.dKey.isPressed) ca[AgentConfiguration.CubeAgent.MoveXActionIndex] += 1f; // Right
+            if (keyboard.sKey.isPressed) ca[AgentConfiguration.CubeAgent.MoveZActionIndex] -= 1f; // Back
+            if (keyboard.wKey.isPressed) ca[AgentConfiguration.CubeAgent.MoveZActionIndex] += 1f; // Forward
             
             // Debug log when manual input is detected (verbose only)
-            if ((ca[0] != 0f || ca[1] != 0f) && Time.fixedTime % 2f < Time.fixedDeltaTime)
+            if ((ca[AgentConfiguration.CubeAgent.MoveXActionIndex] != 0f || ca[AgentConfiguration.CubeAgent.MoveZActionIndex] != 0f) && Time.fixedTime % 2f < Time.fixedDeltaTime)
             {
-                TrainArenaDebugManager.Log($"Manual input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                TrainArenaDebugManager.Log($"Manual input: ({ca[AgentConfiguration.CubeAgent.MoveXActionIndex]:F2}, {ca[AgentConfiguration.CubeAgent.MoveZActionIndex]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
         }
         else
         {
             // Fallback to old Input system if new one isn't available
-            ca[0] = Input.GetAxis("Horizontal");
-            ca[1] = Input.GetAxis("Vertical");
+            ca[AgentConfiguration.CubeAgent.MoveXActionIndex] = Input.GetAxis("Horizontal");
+            ca[AgentConfiguration.CubeAgent.MoveZActionIndex] = Input.GetAxis("Vertical");
             
-            if (ca[0] != 0f || ca[1] != 0f)
+            if (ca[AgentConfiguration.CubeAgent.MoveXActionIndex] != 0f || ca[AgentConfiguration.CubeAgent.MoveZActionIndex] != 0f)
             {
-                TrainArenaDebugManager.Log($"Legacy input: ({ca[0]:F2}, {ca[1]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+                TrainArenaDebugManager.Log($"Legacy input: ({ca[AgentConfiguration.CubeAgent.MoveXActionIndex]:F2}, {ca[AgentConfiguration.CubeAgent.MoveZActionIndex]:F2})", TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
         }
         
         // If no manual input and not connected to ML-Agents, use random actions for testing
-        if (ca[0] == 0f && ca[1] == 0f)
+        if (ca[AgentConfiguration.CubeAgent.MoveXActionIndex] == 0f && ca[AgentConfiguration.CubeAgent.MoveZActionIndex] == 0f)
         {
             randomActionTimer += Time.deltaTime;
             if (randomActionTimer > RANDOM_ACTION_CHANGE_TIME)

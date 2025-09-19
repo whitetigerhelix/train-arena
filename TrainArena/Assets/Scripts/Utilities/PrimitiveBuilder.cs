@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using TrainArena.Configuration;
 
 /// <summary>
 /// Centralized primitive and material creation system for TrainArena.
@@ -206,12 +207,10 @@ public static class PrimitiveBuilder
                 continue;
             }
             
-            var partName = configJoint.gameObject.name; // Keep original case
+            var partName = configJoint.gameObject.name;
             
-			//TODO: Hardcoding the names
-            // Only add PDJointController to leg joints for locomotion (matches BlockmanRagdollBuilder naming)
-            // BlockmanRagdollBuilder uses: LeftUpperLeg, RightUpperLeg, LeftLowerLeg, RightLowerLeg, LeftFoot, RightFoot
-            bool isLegJoint = partName.Contains("UpperLeg") || partName.Contains("LowerLeg") || partName.Contains("Foot");
+            // Use centralized configuration for joint detection
+            bool isLegJoint = RagdollJointNames.IsLocomotionJoint(partName);
             
             if (isLegJoint)
             {
@@ -223,25 +222,13 @@ public static class PrimitiveBuilder
                     {
                         pdController = configJoint.gameObject.AddComponent<PDJointController>();
                         pdController.joint = configJoint;
-                        pdController.kp = 80f;
-                        pdController.kd = 8f;
                         
-                        // Set reasonable angle limits based on body part
-                        if (partName.Contains("UpperLeg"))
-                        {
-                            pdController.minAngle = -45f;
-                            pdController.maxAngle = 45f;
-                        }
-                        else if (partName.Contains("LowerLeg"))
-                        {
-                            pdController.minAngle = -90f;
-                            pdController.maxAngle = 90f;
-                        }
-                        else if (partName.Contains("Foot"))
-                        {
-                            pdController.minAngle = -30f;
-                            pdController.maxAngle = 30f;
-                        }
+                        // Get configuration from centralized system
+                        var (minAngle, maxAngle, kp, kd) = RagdollJointNames.GetJointControllerConfig(partName);
+                        pdController.minAngle = minAngle;
+                        pdController.maxAngle = maxAngle;
+                        pdController.kp = kp;
+                        pdController.kd = kd;
                         
                         TrainArenaDebugManager.Log($"✅ Added PDJointController to '{configJoint.gameObject.name}'", TrainArenaDebugManager.DebugLogLevel.Verbose);
                         legJointCount++;
@@ -270,7 +257,7 @@ public static class PrimitiveBuilder
         // Validate we found appropriate leg joints
         if (joints.Count == 0)
         {
-            TrainArenaDebugManager.LogError($"❌ CRITICAL: No leg joints found in ragdoll '{ragdoll.name}'! Expected parts with names containing 'UpperLeg', 'LowerLeg', or 'Foot'.");
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No locomotion joints found in ragdoll '{ragdoll.name}'! Expected joints: {string.Join(", ", RagdollJointNames.LocomotionJoints)}");
             TrainArenaDebugManager.Log("Available joint names:", TrainArenaDebugManager.DebugLogLevel.Important);
             foreach (var joint in configJoints)
             {
@@ -298,15 +285,20 @@ public static class PrimitiveBuilder
         var behaviorParameters = pelvis.GetComponent<BehaviorParameters>();
         if (behaviorParameters == null)
         {
+            //TODO: A bunch of this should probably be abstracted to the main shared builder, rather than duping with both agents
             try
             {
                 behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
-                behaviorParameters.BehaviorName = "RagdollAgent";
-                
-                // Use actual joint count for continuous actions (should be 6 for legs)
+                behaviorParameters.BehaviorName = AgentConfiguration.RagdollAgent.BehaviorName;
+
+                // Use actual joint count for continuous actions (should match expected locomotion joint count)
                 int actionCount = ragdollAgent.joints.Count;
+                if (actionCount != AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount)
+                {
+                    TrainArenaDebugManager.LogWarning($"⚠️ Joint count mismatch: found {actionCount}, expected {AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount}");
+                }
                 behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(actionCount);
-                
+
                 // Configure observation space using RagdollAgent's calculation
                 int totalObservations = ragdollAgent.GetTotalObservationCount();
                 if (totalObservations <= 0)
@@ -314,11 +306,11 @@ public static class PrimitiveBuilder
                     TrainArenaDebugManager.LogError($"❌ CRITICAL: RagdollAgent returned invalid observation count: {totalObservations}");
                     return;
                 }
-                
+
                 behaviorParameters.BrainParameters.VectorObservationSize = totalObservations;
-                
+
                 TrainArenaDebugManager.Log($"✅ Added BehaviorParameters: {ragdollAgent.joints.Count} actions, {totalObservations} observations " +
-                                         $"({RagdollAgent.UPRIGHTNESS_OBSERVATIONS} uprightness + {RagdollAgent.VELOCITY_OBSERVATIONS} velocity + {ragdollAgent.joints.Count * RagdollAgent.JOINT_STATE_OBSERVATIONS_PER_JOINT} joint states)", 
+                                         $"({RagdollAgent.UPRIGHTNESS_OBSERVATIONS} uprightness + {RagdollAgent.VELOCITY_OBSERVATIONS} velocity + {ragdollAgent.joints.Count * RagdollAgent.JOINT_STATE_OBSERVATIONS_PER_JOINT} joint states)",
                                          TrainArenaDebugManager.DebugLogLevel.Important);
             }
             catch (System.Exception e)
@@ -342,6 +334,7 @@ public static class PrimitiveBuilder
         }
 
         // Add visual polish components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
         try
         {
             // Add blinking animation for visual polish
@@ -365,6 +358,7 @@ public static class PrimitiveBuilder
         }
 
         // Add debug and development components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
         try
         {
             // Add debug info component for development
@@ -373,7 +367,7 @@ public static class PrimitiveBuilder
                 pelvis.AddComponent<AgentDebugInfo>();
                 TrainArenaDebugManager.Log($"✅ Added AgentDebugInfo component", TrainArenaDebugManager.DebugLogLevel.Verbose);
             }
-            
+
             // Add domain randomization for physics testing
             var domainRandomizer = pelvis.GetComponent<DomainRandomizer>();
             if (domainRandomizer == null)
@@ -494,15 +488,15 @@ public static class PrimitiveBuilder
         var behaviorParameters = agent.GetComponent<BehaviorParameters>();
         if (behaviorParameters == null)
         {
+            //TODO: A bunch of this should be abstracted to the main shared builder, rather than duping with both agents
             try
             {
                 behaviorParameters = agent.AddComponent<BehaviorParameters>();
-                behaviorParameters.BehaviorName = "CubeAgent";
-                
-                // CubeAgent uses exactly 2 continuous actions (moveX, moveZ)
-                const int CUBE_ACTION_COUNT = 2;
-                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(CUBE_ACTION_COUNT);
-                
+                behaviorParameters.BehaviorName = AgentConfiguration.CubeAgent.BehaviorName;
+
+                // Use centralized configuration for CubeAgent action count
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(AgentConfiguration.CubeAgent.ActionCount);
+
                 // Configure observation space using CubeAgent's calculation
                 int totalObservations = cubeAgent.GetTotalObservationCount();
                 if (totalObservations <= 0)
@@ -510,10 +504,10 @@ public static class PrimitiveBuilder
                     TrainArenaDebugManager.LogError($"❌ CRITICAL: CubeAgent returned invalid observation count: {totalObservations}");
                     return agent; // Return but don't fail completely
                 }
-                
+
                 behaviorParameters.BrainParameters.VectorObservationSize = totalObservations;
-                
-                TrainArenaDebugManager.Log($"✅ Added BehaviorParameters: {CUBE_ACTION_COUNT} actions, {totalObservations} observations", 
+
+                TrainArenaDebugManager.Log($"✅ Added BehaviorParameters: {AgentConfiguration.CubeAgent.ActionCount} actions, {totalObservations} observations",
                                          TrainArenaDebugManager.DebugLogLevel.Important);
             }
             catch (System.Exception e)
@@ -527,16 +521,16 @@ public static class PrimitiveBuilder
             TrainArenaDebugManager.Log($"BehaviorParameters already exists on CubeAgent", TrainArenaDebugManager.DebugLogLevel.Verbose);
             
             // Update existing BehaviorParameters to ensure correct configuration
-            const int EXPECTED_CUBE_ACTIONS = 2;
             int actualActions = behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions;
-            if (actualActions != EXPECTED_CUBE_ACTIONS)
+            if (actualActions != AgentConfiguration.CubeAgent.ActionCount)
             {
-                TrainArenaDebugManager.LogWarning($"⚠️ Updating CubeAgent BehaviorParameters action count from {actualActions} to {EXPECTED_CUBE_ACTIONS}");
-                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(EXPECTED_CUBE_ACTIONS);
+                TrainArenaDebugManager.Log($"⚠️ Updating CubeAgent BehaviorParameters action count from {actualActions} to {AgentConfiguration.CubeAgent.ActionCount}", TrainArenaDebugManager.DebugLogLevel.Important);
+                behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(AgentConfiguration.CubeAgent.ActionCount);
             }
         }
 
         // Add visual and debug components with error handling
+        //TODO: This should be done in the shared agent builder, rather than mostly duplicating everything
         try
         {
             // Add blinking animation for visual polish
@@ -569,7 +563,7 @@ public static class PrimitiveBuilder
             TrainArenaDebugManager.LogWarning($"⚠️ Failed to add optional components to CubeAgent: {e.Message}");
         }
 
-        TrainArenaDebugManager.Log($"🧊 Successfully configured CubeAgent '{agent.name}' for ML-Agents training with 2 action dimensions", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log($"🧊 Successfully configured CubeAgent '{agent.name}' for ML-Agents training with {AgentConfiguration.CubeAgent.ActionCount} action dimensions", TrainArenaDebugManager.DebugLogLevel.Important);
         
         return agent;
     }

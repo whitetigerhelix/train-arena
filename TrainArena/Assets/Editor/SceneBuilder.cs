@@ -191,6 +191,7 @@ public static class SceneBuilder
 
     static GameObject CreateAgentPrefab(EnvInitializer init, AgentType agentType, SceneType sceneType)
     {
+        //TODO: Use the configured names instead of hardcoding
         GameObject agentObject = agentType == AgentType.Cube 
             ? PrimitiveBuilder.CreateCubeAgent("CubeAgent") 
             : PrimitiveBuilder.CreateRagdoll("RagdollAgent");

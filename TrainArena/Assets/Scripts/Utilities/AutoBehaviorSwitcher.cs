@@ -98,8 +98,8 @@ public class AutoBehaviorSwitcher : MonoBehaviour
         academyConnected = isConnected;
         
         // Determine desired behavior type
-        BehaviorType desiredType = isConnected ? BehaviorType.Default : BehaviorType.HeuristicOnly;
-        
+        BehaviorType desiredType = isConnected ? BehaviorType.Default : BehaviorType.HeuristicOnly; //TODO: Add InferenceOnly also!  We are allowed to switch to Inference if there's a valid model and we're not connected.
+
         // Update if changed
         if (behaviorParams.BehaviorType != desiredType)
         {

@@ -8,6 +8,7 @@
 
 using UnityEngine;
 using UnityEditor;
+using TrainArena.Configuration;
 
 public class BlockmanRagdollBuilder : MonoBehaviour
 {
@@ -117,37 +118,37 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         }
 
         // ---- build bones (no transform scaling anywhere) ----
-        var pelvis = BoxBone("Pelvis", root.transform, cfg.pelvis, cfg.mPelvis, Vector3.zero);
-        var chest = BoxBone("Chest", pelvis.transform, cfg.chest, cfg.mChest,
+        var pelvis = BoxBone(RagdollJointNames.Pelvis, root.transform, cfg.pelvis, cfg.mPelvis, Vector3.zero);
+        var chest = BoxBone(RagdollJointNames.Chest, pelvis.transform, cfg.chest, cfg.mChest,
                              new Vector3(0, (cfg.pelvis.y + cfg.chest.y) * 0.5f + cfg.separation, 0));
-        var head = SphereBone("Head", chest.transform, cfg.headRadius, cfg.mHead,
+        var head = SphereBone(RagdollJointNames.Head, chest.transform, cfg.headRadius, cfg.mHead,
                              new Vector3(0, cfg.chest.y * 0.5f + cfg.headRadius + cfg.separation, 0));
 
         float shoulderY = cfg.chest.y * 0.25f;
         float shoulderX = cfg.chest.x * 0.5f + cfg.upperArm.x * 0.5f + cfg.separation;
 
-        var lUArm = BoxBone("LeftUpperArm", chest.transform, cfg.upperArm, cfg.mUArm, new Vector3(-shoulderX, shoulderY, 0));
-        var rUArm = BoxBone("RightUpperArm", chest.transform, cfg.upperArm, cfg.mUArm, new Vector3(+shoulderX, shoulderY, 0));
+        var lUArm = BoxBone(RagdollJointNames.LeftUpperArm, chest.transform, cfg.upperArm, cfg.mUArm, new Vector3(-shoulderX, shoulderY, 0));
+        var rUArm = BoxBone(RagdollJointNames.RightUpperArm, chest.transform, cfg.upperArm, cfg.mUArm, new Vector3(+shoulderX, shoulderY, 0));
 
-        var lLArm = BoxBone("LeftLowerArm", lUArm.transform, cfg.lowerArm, cfg.mLArm,
+        var lLArm = BoxBone(RagdollJointNames.LeftLowerArm, lUArm.transform, cfg.lowerArm, cfg.mLArm,
                              new Vector3(-(cfg.upperArm.x * 0.5f + cfg.lowerArm.x * 0.5f + cfg.separation), 0, 0));
-        var rLArm = BoxBone("RightLowerArm", rUArm.transform, cfg.lowerArm, cfg.mLArm,
+        var rLArm = BoxBone(RagdollJointNames.RightLowerArm, rUArm.transform, cfg.lowerArm, cfg.mLArm,
                              new Vector3((cfg.upperArm.x * 0.5f + cfg.lowerArm.x * 0.5f + cfg.separation), 0, 0));
 
         float hipX = cfg.pelvis.x * 0.25f;
-        var lULeg = BoxBone("LeftUpperLeg", pelvis.transform, cfg.upperLeg, cfg.mULeg,
+        var lULeg = BoxBone(RagdollJointNames.LeftUpperLeg, pelvis.transform, cfg.upperLeg, cfg.mULeg,
                              new Vector3(-hipX, -(cfg.pelvis.y * 0.5f + cfg.upperLeg.y * 0.5f + cfg.separation), 0));
-        var rULeg = BoxBone("RightUpperLeg", pelvis.transform, cfg.upperLeg, cfg.mULeg,
+        var rULeg = BoxBone(RagdollJointNames.RightUpperLeg, pelvis.transform, cfg.upperLeg, cfg.mULeg,
                              new Vector3(+hipX, -(cfg.pelvis.y * 0.5f + cfg.upperLeg.y * 0.5f + cfg.separation), 0));
 
-        var lLLeg = BoxBone("LeftLowerLeg", lULeg.transform, cfg.lowerLeg, cfg.mLLeg,
+        var lLLeg = BoxBone(RagdollJointNames.LeftLowerLeg, lULeg.transform, cfg.lowerLeg, cfg.mLLeg,
                              new Vector3(0, -(cfg.upperLeg.y * 0.5f + cfg.lowerLeg.y * 0.5f + cfg.separation), 0));
-        var rLLeg = BoxBone("RightLowerLeg", rULeg.transform, cfg.lowerLeg, cfg.mLLeg,
+        var rLLeg = BoxBone(RagdollJointNames.RightLowerLeg, rULeg.transform, cfg.lowerLeg, cfg.mLLeg,
                              new Vector3(0, -(cfg.upperLeg.y * 0.5f + cfg.lowerLeg.y * 0.5f + cfg.separation), 0));
 
-        var lFoot = SphereBone("LeftFoot", lLLeg.transform, cfg.footRadius, cfg.mFoot,
+        var lFoot = SphereBone(RagdollJointNames.LeftFoot, lLLeg.transform, cfg.footRadius, cfg.mFoot,
                              new Vector3(0, -(cfg.lowerLeg.y * 0.5f + cfg.footRadius + cfg.separation), cfg.footRadius * 0.25f));
-        var rFoot = SphereBone("RightFoot", rLLeg.transform, cfg.footRadius, cfg.mFoot,
+        var rFoot = SphereBone(RagdollJointNames.RightFoot, rLLeg.transform, cfg.footRadius, cfg.mFoot,
                              new Vector3(0, -(cfg.lowerLeg.y * 0.5f + cfg.footRadius + cfg.separation), cfg.footRadius * 0.25f));
 
         // ---- joints (anchors from world-space surfaces) ----
@@ -157,7 +158,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         Spherical(lUArm, chest, WorldInnerX(lUArm, +1), WorldOuterX(chest, -1), cfg.shoulderSwing, cfg);
         Spherical(rUArm, chest, WorldInnerX(rUArm, -1), WorldOuterX(chest, +1), cfg.shoulderSwing, cfg);
 
-        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends “down”
+        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends ï¿½downï¿½
         HingeZ(rLArm, rUArm, WorldInnerX(rLArm, -1), WorldOuterX(rUArm, +1), 0f, cfg.elbowFlex, cfg);
 
         Spherical(lULeg, pelvis, WorldTop(lULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
@@ -183,7 +184,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         var t = go.transform;
         if (go.TryGetComponent(out BoxCollider box))
         {
-            // convert the world direction to the bone’s local space to pick the correct face
+            // convert the world direction to the boneï¿½s local space to pick the correct face
             Vector3 dL = t.InverseTransformDirection(worldDir.normalized);
             Vector3 half = box.size * 0.5f;
             Vector3 local = new Vector3(
@@ -196,7 +197,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         if (go.TryGetComponent(out SphereCollider sph))
         {
             float r = sph.radius;
-            // move a bit outside so anchors aren’t inside the collider
+            // move a bit outside so anchors arenï¿½t inside the collider
             return t.position + worldDir.normalized * (r + 0.0005f);
         }
         return t.position;
