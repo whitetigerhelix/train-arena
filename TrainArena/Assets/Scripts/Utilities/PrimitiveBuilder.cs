@@ -1,5 +1,7 @@
 using System.Linq;
+using Unity.MLAgents.Policies;
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// Centralized primitive and material creation system for TrainArena.
@@ -9,68 +11,40 @@ using UnityEngine;
 public static class PrimitiveBuilder
 {
     /// <summary>
-    /// Configurable parameters for ragdoll creation and AI training
+    /// LEGACY - Old ragdoll configuration class (use ReferenceRagdollConfiguration instead)
     /// </summary>
     [System.Serializable]
     public class RagdollConfiguration
     {
-        [Header("Body Part Dimensions - ANATOMICALLY CORRECT HUMAN PROPORTIONS")]
-        // Based on real human anatomy: average adult male proportions
-        public Vector3 pelvisScale = new Vector3(0.35f, 0.25f, 0.25f);    // Human pelvis width ~35cm, height ~25cm  
-        public Vector3 thighScale = new Vector3(0.15f, 0.45f, 0.15f);     // Thigh diameter ~15cm, length ~45cm (femur)
-        public Vector3 shinScale = new Vector3(0.12f, 0.40f, 0.12f);      // Shin diameter ~12cm, length ~40cm (tibia) 
-        public Vector3 footScale = new Vector3(0.26f, 0.06f, 0.10f);      // Foot length ~26cm, height ~6cm, width ~10cm
+        // Legacy properties for backward compatibility
+        public Vector3 pelvisScale = new Vector3(0.5f, 0.4f, 0.3f);
+        public Vector3 thighScale = new Vector3(0.2f, 0.6f, 0.2f);
+        public Vector3 shinScale = new Vector3(0.15f, 0.5f, 0.15f);
+        public Vector3 footScale = new Vector3(0.3f, 0.15f, 0.5f);
         
-        [Header("Joint Connection Points - ANATOMICALLY CORRECT")]
-        // These define where each body part connects to its parent (at the parent's bottom)
-        public float hipSocketDepth = 0.125f;      // How deep into pelvis the hip joint goes
-        public float kneeConnectionHeight = 0.225f; // Distance from thigh center to knee joint
-        public float ankleConnectionHeight = 0.20f;  // Distance from shin center to ankle joint
+        public float pelvisMass = 24.4f;
+        public float thighMass = 11.0f;
+        public float shinMass = 4.4f;
+        public float footMass = 1.1f;
         
-        [Header("Mass Distribution (AI Training Optimized)")]
-        public float pelvisMass = 20f;      // Heavier pelvis for stability
-        public float thighMass = 10f;       // Proportional thigh mass
-        public float shinMass = 6f;         // Realistic shin mass
-        public float footMass = 3f;         // Heavier feet for ground contact stability
+        public float dynamicFriction = 0.5f;
+        public float staticFriction = 0.5f;
+        public float bounciness = 0.2f;
         
-        [Header("Physics Settings")]
+        // Physics settings
         public float linearDamping = 0.1f;
-        public float angularDamping = 3f;
+        public float angularDamping = 0.1f;
         public RigidbodyInterpolation interpolation = RigidbodyInterpolation.Interpolate;
         
-        [Header("Physics Material")]
-        public float dynamicFriction = 0.6f;
-        public float staticFriction = 0.6f;
-        public float bounciness = 0.1f;
+        // Joint properties
+        public float jointBounciness = 0f;
+        public float jointSpring = 125f;
+        public float jointDamper = 0.5f;
+        public float jointMaxForce = 3.4e+38f;
         
-        [Header("Joint Limits (REALISTIC HUMAN RANGE)")]
-        public float hipJointLimit = 70f;      // Realistic hip flexion/extension range
-        public float kneeJointLimit = 120f;    // Natural knee bending range
-        public float ankleJointLimit = 30f;    // Realistic ankle dorsiflexion/plantarflexion
-        
-        [Header("Joint Physics (Muscle-like Behavior)")]
-        public float jointBounciness = 0.1f;
-        public float jointSpring = 500f;       // Muscle-like spring response
-        public float jointDamper = 50f;        // Stability damping
-        public float jointMaxForce = 1000f;    // Maximum force application
-        
-        [Header("PD Controller (AI Training)")]
-        public float pdKp = 400f;              // Higher proportional gain for stable control
-        public float pdKd = 30f;               // Increased damping for smoother movement
-        
-        [Header("ML-Agents Configuration")]
-        public int vectorObservationSize = 4;  // Will be calculated automatically
-        public int continuousActions = 6;      // 6 joints for bipedal locomotion
-        
-        /// <summary>
-        /// Default configuration optimized for AI training
-        /// </summary>
-        public static RagdollConfiguration AITraining()
-        {
-            var config = new RagdollConfiguration(); // Uses default values above
-            TrainArenaDebugManager.Log($"📋 AI_TRAINING CONFIG CREATED - Pelvis: {config.pelvisScale}, Thigh: {config.thighScale}, Shin: {config.shinScale}, Foot: {config.footScale}", TrainArenaDebugManager.DebugLogLevel.Important);
-            return config;
-        }
+        // PD Controller properties
+        public float pdKp = 400f;
+        public float pdKd = 30f;
         
         /// <summary>
         /// Configuration for realistic human proportions
@@ -84,117 +58,397 @@ public static class PrimitiveBuilder
             config.thighScale = new Vector3(0.20f, 0.75f, 0.20f);          // Proportional thigh
             config.shinScale = new Vector3(0.16f, 0.65f, 0.16f);           // Proportional shin
             config.footScale = new Vector3(0.22f, 0.08f, 0.4f);            // Realistic flat foot
-            config.hipJointLimit = 65f;     // Conservative hip range
-            config.kneeJointLimit = 110f;   // Natural knee range
-            config.ankleJointLimit = 25f;   // Conservative ankle range
-            config.pdKp = 350f;             // Moderate control strength
-            config.pdKd = 25f;              // Balanced damping
+            return config;
+        }
+    }
+
+    /// <summary>
+    /// Configurable parameters for ragdoll creation and AI training
+    /// </summary>
+    [System.Serializable]
+    public class ReferenceRagdollConfiguration
+    {
+        // EXACT MASS DISTRIBUTION FROM REFERENCE (85kg total)
+        public float headMass = 6.6f;           // Head: 6.6kg
+        public float chestMass = 18.1f;         // Chest: 18.1kg  
+        public float pelvisMass = 24.4f;        // Pelvis: 24.4kg
+        public float upperArmMass = 3.3f;       // Upper arms: 3.3kg each
+        public float lowerArmMass = 2.2f;       // Lower arms: 2.2kg each
+        public float upperLegMass = 11.0f;      // Upper legs: 11.0kg each
+        public float lowerLegMass = 4.4f;       // Lower legs: 4.4kg each
+        public float footMass = 1.1f;           // Feet: 1.1kg each
+
+        // EXACT PHYSICS SETTINGS FROM REFERENCE
+        public float jointSpring = 125f;        // Spring: 125
+        public float jointDamper = 0.5f;        // Damper: 0.5
+        public float jointMaxForce = 3.4e+38f;  // Max Force: 3.4e+38
+        public float jointBounciness = 0f;      // No bounciness for stability
+
+        // EXACT BODY PART SCALES FROM REFERENCE - Matching the proportions in the reference images
+        public Vector3 headScale = new Vector3(0.25f, 0.25f, 0.25f);           // Small head
+        public Vector3 chestScale = new Vector3(0.4f, 0.5f, 0.25f);            // Medium chest  
+        public Vector3 pelvisScale = new Vector3(0.35f, 0.3f, 0.2f);           // Smaller pelvis - was too big
+        public Vector3 upperArmScale = new Vector3(0.1f, 0.8f, 0.1f);          // Long thin arms
+        public Vector3 lowerArmScale = new Vector3(0.08f, 0.7f, 0.08f);        // Long thin forearms
+        public Vector3 upperLegScale = new Vector3(0.15f, 0.9f, 0.15f);        // Long thighs
+        public Vector3 lowerLegScale = new Vector3(0.12f, 0.85f, 0.12f);       // Long shins
+        public Vector3 footScale = new Vector3(0.2f, 0.15f, 0.35f);
+
+        // Physics settings
+        public float linearDamping = 0.1f;
+        public RigidbodyInterpolation interpolation = RigidbodyInterpolation.Interpolate;
+        public float angularDamping = 0.1f;
+        
+        // Physics material properties
+        public float friction = 0.5f;
+        public float bounciness = 0.2f;
+        
+        // Joint limits for legacy methods
+        public float hipJointLimit = 90f;
+        public float kneeJointLimit = 120f;
+        public float ankleJointLimit = 45f;
+        
+        // PD Controller settings for legacy methods
+        public float pdKp = 400f;
+        public float pdKd = 30f;
+        
+        // Anatomical connection settings for legacy methods
+        public float hipSocketDepth = 0.08f;
+        public float kneeConnectionHeight = 0.15f;
+        public float ankleConnectionHeight = 0.12f;
+        
+        // Legacy property aliases for backward compatibility
+        public float dynamicFriction => friction;
+        public float staticFriction => friction;
+        public float thighMass => upperLegMass;
+        public float shinMass => lowerLegMass;
+        public Vector3 thighScale => upperLegScale;
+        public Vector3 shinScale => lowerLegScale;
+
+        /// <summary>
+        /// Creates exact reference configuration matching the reference images
+        /// </summary>
+        public static ReferenceRagdollConfiguration ReferenceExact()
+        {
+            return new ReferenceRagdollConfiguration();
+        }
+        
+        /// <summary>
+        /// Configuration optimized for AI training
+        /// </summary>
+        public static ReferenceRagdollConfiguration AITraining()
+        {
+            return new ReferenceRagdollConfiguration();
+        }
+        
+        /// <summary>
+        /// Configuration optimized for stable walking
+        /// </summary>
+        public static ReferenceRagdollConfiguration FunctionalWalker()
+        {
+            var config = new ReferenceRagdollConfiguration();
+            config.pelvisScale = new Vector3(0.5f, 0.3f, 0.3f);
+            config.upperLegScale = new Vector3(0.25f, 0.7f, 0.25f);
+            config.lowerLegScale = new Vector3(0.2f, 0.65f, 0.2f);
+            config.footScale = new Vector3(0.3f, 0.08f, 0.5f);
             return config;
         }
         
         /// <summary>
-        /// Configuration matching the inspiration images - very elongated human proportions
+        /// Configuration matching inspiration images
         /// </summary>
-        public static RagdollConfiguration InspirationMatch()
+        public static ReferenceRagdollConfiguration InspirationMatch()
         {
-            var config = new RagdollConfiguration();
-            // Based on inspiration images but with functional proportions
-            config.pelvisScale = new Vector3(0.4f, 0.25f, 0.25f);          // Compact but functional pelvis
-            config.thighScale = new Vector3(0.18f, 0.9f, 0.18f);           // Elongated but sturdy thighs
-            config.shinScale = new Vector3(0.15f, 0.8f, 0.15f);            // Elongated but sturdy shins
-            config.footScale = new Vector3(0.2f, 0.06f, 0.35f);            // Flat, functional feet
-            // Anatomical connection settings for elongated limbs
-            config.hipSocketDepth = 0.06f;      // Shallow hip socket for elongated look
-            config.kneeConnectionHeight = 0.20f; // Extended knee position for longer thigh
-            config.ankleConnectionHeight = 0.18f; // Extended ankle position for longer shin
-            config.hipJointLimit = 70f;
-            config.kneeJointLimit = 120f;
-            config.ankleJointLimit = 30f;
-            config.pdKp = 400f;
-            config.pdKd = 30f;
+            var config = new ReferenceRagdollConfiguration();
+            config.pelvisScale = new Vector3(0.4f, 0.25f, 0.25f);
+            config.upperLegScale = new Vector3(0.18f, 0.9f, 0.18f);
+            config.lowerLegScale = new Vector3(0.15f, 0.8f, 0.15f);
+            config.footScale = new Vector3(0.2f, 0.06f, 0.35f);
             return config;
         }
-
+        
         /// <summary>
-        /// Anatomically correct human proportions based on real human anatomy
+        /// Configuration for athletic performance
         /// </summary>
-        public static RagdollConfiguration AnatomicalHuman()
+        public static ReferenceRagdollConfiguration Athletic()
         {
-            var config = new RagdollConfiguration();
-            // Perfect human proportions based on anatomical data
-            config.pelvisScale = new Vector3(0.35f, 0.25f, 0.25f);        // Real human pelvis proportions
-            config.thighScale = new Vector3(0.15f, 0.45f, 0.15f);         // Real human thigh (femur) proportions
-            config.shinScale = new Vector3(0.12f, 0.40f, 0.12f);          // Real human shin (tibia) proportions  
-            config.footScale = new Vector3(0.26f, 0.06f, 0.10f);          // Real human foot proportions
-            // Anatomical connection settings
-            config.hipSocketDepth = 0.08f;      // Realistic hip socket depth
-            config.kneeConnectionHeight = 0.15f; // Natural knee position
-            config.ankleConnectionHeight = 0.12f; // Natural ankle position
-            // Joint limits based on human anatomy
-            config.hipJointLimit = 70f;         // Natural hip flexion range
-            config.kneeJointLimit = 120f;       // Natural knee flexion range
-            config.ankleJointLimit = 30f;       // Natural ankle range
-            config.pdKp = 400f;                 // Strong control for stability
-            config.pdKd = 35f;                  // Good damping
-            return config;
+            return new ReferenceRagdollConfiguration();
         }
-
+        
         /// <summary>
-        /// Configuration optimized specifically for stable walking and locomotion
+        /// Configuration for realistic human proportions
         /// </summary>
-        public static RagdollConfiguration FunctionalWalker()
+        public static ReferenceRagdollConfiguration RealisticHuman()
         {
-            var config = new RagdollConfiguration();
-            // Optimized for walking stability and balance
-            config.pelvisScale = new Vector3(0.5f, 0.3f, 0.3f);            // Stable pelvis for balance
-            config.thighScale = new Vector3(0.25f, 0.7f, 0.25f);           // Strong thighs for power
-            config.shinScale = new Vector3(0.2f, 0.65f, 0.2f);             // Sturdy shins for support
-            config.footScale = new Vector3(0.3f, 0.08f, 0.5f);             // Large flat feet for stability
-            // Anatomical connection settings optimized for walking stability
-            config.hipSocketDepth = 0.10f;      // Deeper hip socket for stability
-            config.kneeConnectionHeight = 0.18f; // Natural knee position
-            config.ankleConnectionHeight = 0.15f; // Natural ankle position
-            // Optimized for learning to walk
-            config.hipJointLimit = 80f;     // Good range for walking
-            config.kneeJointLimit = 130f;   // Full walking range
-            config.ankleJointLimit = 35f;   // Good ankle flexibility
-            config.pdKp = 450f;             // Strong control for stability
-            config.pdKd = 35f;              // Good damping for smooth movement
-            return config;
-        }
-
-        /// <summary>
-        /// Configuration for high-performance athletic movement
-        /// </summary>
-        public static RagdollConfiguration Athletic()
-        {
-            var config = new RagdollConfiguration();
-            config.hipJointLimit = 120f;
-            config.kneeJointLimit = 160f;
-            config.ankleJointLimit = 60f;
-            config.pdKp = 400f;
+            var config = new ReferenceRagdollConfiguration();
+            config.pelvisScale = new Vector3(0.45f, 0.28f, 0.28f);
+            config.upperLegScale = new Vector3(0.20f, 0.75f, 0.20f);
+            config.lowerLegScale = new Vector3(0.16f, 0.65f, 0.16f);
+            config.footScale = new Vector3(0.22f, 0.08f, 0.4f);
+            config.hipJointLimit = 65f;
+            config.kneeJointLimit = 110f;
+            config.ankleJointLimit = 25f;
+            config.pdKp = 350f;
             config.pdKd = 25f;
-            config.jointMaxForce = 1500f;
+            return config;
+        }
+        
+        /// <summary>
+        /// Anatomically correct human proportions
+        /// </summary>
+        public static ReferenceRagdollConfiguration AnatomicalHuman()
+        {
+            var config = new ReferenceRagdollConfiguration();
+            config.pelvisScale = new Vector3(0.35f, 0.25f, 0.25f);
+            config.upperLegScale = new Vector3(0.15f, 0.45f, 0.15f);
+            config.lowerLegScale = new Vector3(0.12f, 0.40f, 0.12f);
+            config.footScale = new Vector3(0.26f, 0.06f, 0.10f);
+            config.pdKd = 35f;
             return config;
         }
     }
+
+    /// <summary>
+    /// Current active configuration for ragdoll creation
+    /// </summary>
+    //public static ReferenceRagdollConfiguration CurrentConfig { get; set; }
+
+    /// <summary>
+    /// Creates ragdoll with EXACT reference specifications from images:
+    /// 13 bones, 12 joints, full body with head, arms, torso, and legs
+    /// Uses Unity's proven ragdoll system instead of complex procedural generation
+    /// </summary>
+    public static GameObject CreateRagdoll(string name = "ReferenceRagdoll", Vector3 position = default)
+    {
+        TrainArenaDebugManager.Log($"🎯 CREATING SIMPLE REFERENCE RAGDOLL - Using Unity's built-in system", TrainArenaDebugManager.DebugLogLevel.Important);
+        if (CurrentConfig == null)
+        {
+            CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
+        }
+        return CreateSimpleRagdoll(name, position, CurrentConfig);
+    }
+
+    /// <summary>
+    /// Creates a simple body part with material and physics, no complex joints
+    /// </summary>
+    private static GameObject CreateSimpleBodyPart(string name, Vector3 localPosition, Vector3 size, PrimitiveType primitiveType, Transform parent, float mass, Color color)
+    {
+        var bodyPart = GameObject.CreatePrimitive(primitiveType);
+        bodyPart.name = name;
+        bodyPart.transform.parent = parent;
+        bodyPart.transform.localPosition = localPosition;
+        bodyPart.transform.localScale = size;
+        
+        // Apply material like CubeAgent
+        var mr = bodyPart.GetComponent<Renderer>();
+        Material mat = CreateURPMaterial(smoothness: 0.6f, metallic: 0.1f);
+        mat.color = color;
+        mat.name = $"{name}Material";
+        mr.sharedMaterial = mat;
+        
+        // Add simple physics
+        var rb = bodyPart.AddComponent<Rigidbody>();
+        rb.mass = mass;
+        rb.linearDamping = 0.1f;
+        rb.angularDamping = 0.1f;
+        
+        return bodyPart;
+    }
+
+    /// <summary>
+    /// Creates a simple, stable ragdoll that looks right without complex joint math
+    /// </summary>
+    public static GameObject CreateSimpleRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
+    {
+        TrainArenaDebugManager.Log($"🤖 Creating simple stable ragdoll: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Create root object
+        var root = new GameObject(name);
+        root.transform.position = position;
+        
+        // Create a simple humanoid that looks like your reference
+        // Pelvis (foundation)
+        var pelvis = CreateSimpleBodyPart("Pelvis", Vector3.zero, config.pelvisScale, PrimitiveType.Cube, root.transform, config.pelvisMass, new Color(0.9f, 0.7f, 0.5f));
+        
+        // Chest above pelvis
+        var chestPos = new Vector3(0, config.pelvisScale.y * 0.5f + config.chestScale.y * 0.5f, 0);
+        var chest = CreateSimpleBodyPart("Chest", chestPos, config.chestScale, PrimitiveType.Cube, pelvis.transform, config.chestMass, new Color(0.9f, 0.7f, 0.5f));
+        
+        // Head on chest with eyes
+        var headPos = new Vector3(0, config.chestScale.y * 0.5f + config.headScale.y * 0.5f, 0);
+        var head = CreateSimpleBodyPart("Head", headPos, config.headScale, PrimitiveType.Sphere, chest.transform, config.headMass, new Color(1.0f, 0.8f, 0.6f));
+        AddBlinkingEyes(head);
+        
+        // Left arm - horizontal from chest
+        var leftShoulderPos = new Vector3(-config.chestScale.x * 0.5f - config.upperArmScale.y * 0.5f, config.chestScale.y * 0.25f, 0);
+        var leftUpperArm = CreateSimpleBodyPart("LeftUpperArm", leftShoulderPos, config.upperArmScale, PrimitiveType.Capsule, chest.transform, config.upperArmMass, new Color(0.8f, 0.6f, 0.4f));
+        leftUpperArm.transform.localRotation = Quaternion.Euler(0, 0, 90);
+        
+        var leftElbowPos = new Vector3(-config.upperArmScale.y * 0.5f - config.lowerArmScale.y * 0.5f, 0, 0);
+        var leftLowerArm = CreateSimpleBodyPart("LeftLowerArm", leftElbowPos, config.lowerArmScale, PrimitiveType.Capsule, leftUpperArm.transform, config.lowerArmMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        // Right arm - horizontal from chest
+        var rightShoulderPos = new Vector3(config.chestScale.x * 0.5f + config.upperArmScale.y * 0.5f, config.chestScale.y * 0.25f, 0);
+        var rightUpperArm = CreateSimpleBodyPart("RightUpperArm", rightShoulderPos, config.upperArmScale, PrimitiveType.Capsule, chest.transform, config.upperArmMass, new Color(0.8f, 0.6f, 0.4f));
+        rightUpperArm.transform.localRotation = Quaternion.Euler(0, 0, -90);
+        
+        var rightElbowPos = new Vector3(config.upperArmScale.y * 0.5f + config.lowerArmScale.y * 0.5f, 0, 0);
+        var rightLowerArm = CreateSimpleBodyPart("RightLowerArm", rightElbowPos, config.lowerArmScale, PrimitiveType.Capsule, rightUpperArm.transform, config.lowerArmMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        // Left leg - vertical from pelvis
+        var leftHipPos = new Vector3(-config.pelvisScale.x * 0.25f, -config.pelvisScale.y * 0.5f - config.upperLegScale.y * 0.5f, 0);
+        var leftUpperLeg = CreateSimpleBodyPart("LeftUpperLeg", leftHipPos, config.upperLegScale, PrimitiveType.Capsule, pelvis.transform, config.upperLegMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        var leftKneePos = new Vector3(0, -config.upperLegScale.y * 0.5f - config.lowerLegScale.y * 0.5f, 0);
+        var leftLowerLeg = CreateSimpleBodyPart("LeftLowerLeg", leftKneePos, config.lowerLegScale, PrimitiveType.Capsule, leftUpperLeg.transform, config.lowerLegMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        var leftAnklePos = new Vector3(0, -config.lowerLegScale.y * 0.5f - config.footScale.y * 0.5f, config.footScale.z * 0.25f);
+        var leftFoot = CreateSimpleBodyPart("LeftFoot", leftAnklePos, config.footScale, PrimitiveType.Sphere, leftLowerLeg.transform, config.footMass, new Color(0.7f, 0.5f, 0.3f));
+        
+        // Right leg - vertical from pelvis  
+        var rightHipPos = new Vector3(config.pelvisScale.x * 0.25f, -config.pelvisScale.y * 0.5f - config.upperLegScale.y * 0.5f, 0);
+        var rightUpperLeg = CreateSimpleBodyPart("RightUpperLeg", rightHipPos, config.upperLegScale, PrimitiveType.Capsule, pelvis.transform, config.upperLegMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        var rightKneePos = new Vector3(0, -config.upperLegScale.y * 0.5f - config.lowerLegScale.y * 0.5f, 0);
+        var rightLowerLeg = CreateSimpleBodyPart("RightLowerLeg", rightKneePos, config.lowerLegScale, PrimitiveType.Capsule, rightUpperLeg.transform, config.lowerLegMass, new Color(0.8f, 0.6f, 0.4f));
+        
+        var rightAnklePos = new Vector3(0, -config.lowerLegScale.y * 0.5f - config.footScale.y * 0.5f, config.footScale.z * 0.25f);
+        var rightFoot = CreateSimpleBodyPart("RightFoot", rightAnklePos, config.footScale, PrimitiveType.Sphere, rightLowerLeg.transform, config.footMass, new Color(0.7f, 0.5f, 0.3f));
+        
+        // Add ML-Agents components
+        root.AddComponent<RagdollAgent>();
+        var behaviorParameters = root.AddComponent<BehaviorParameters>();
+        behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(12);
+        
+        TrainArenaDebugManager.Log($"✅ Simple ragdoll created successfully: 13 bones, stable hierarchy, no complex joints", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        return root;
+    }
+
+    /// <summary>
+    /// Creates the reference exact ragdoll with 13 bones and 12 joints
+    /// </summary>
+    public static GameObject CreateReferenceRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
+    {
+        TrainArenaDebugManager.Log($"🚀 BUILDING REFERENCE EXACT RAGDOLL: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
+
+        var root = new GameObject(name);
+        root.transform.position = position;
+        
+        // BONE 1: PELVIS (root of hierarchy, center of mass)
+        var pelvis = CreateReferenceBodyPart("Pelvis", Vector3.zero, config.pelvisScale, PrimitiveType.Cube, root.transform, config.pelvisMass, config);
+        
+        // BONE 2: CHEST (connected to pelvis)
+        Vector3 chestPos = new Vector3(0, config.pelvisScale.y * 0.5f + config.chestScale.y * 0.5f, 0);
+        var chest = CreateReferenceBodyPart("Chest", chestPos, config.chestScale, PrimitiveType.Cube, pelvis.transform, config.chestMass, config);
+        
+        // BONE 3: HEAD (connected to chest)
+        Vector3 headPos = new Vector3(0, config.chestScale.y * 0.5f + config.headScale.y * 0.5f, 0);
+        var head = CreateReferenceBodyPart("Head", headPos, config.headScale, PrimitiveType.Sphere, chest.transform, config.headMass, config);
+        
+        // BONES 4-5: LEFT ARM (connected to chest) - Extend horizontally from chest
+        Vector3 leftShoulderPos = new Vector3(-config.chestScale.x * 0.5f - config.upperArmScale.y * 0.5f, config.chestScale.y * 0.25f, 0);
+        var leftUpperArm = CreateReferenceBodyPart("LeftUpperArm", leftShoulderPos, config.upperArmScale, PrimitiveType.Capsule, chest.transform, config.upperArmMass, config);
+        // Rotate upper arm to point outward horizontally
+        leftUpperArm.transform.localRotation = Quaternion.Euler(0, 0, 90);
+        
+        Vector3 leftElbowPos = new Vector3(-config.upperArmScale.y * 0.5f - config.lowerArmScale.y * 0.5f, 0, 0);
+        var leftLowerArm = CreateReferenceBodyPart("LeftLowerArm", leftElbowPos, config.lowerArmScale, PrimitiveType.Capsule, leftUpperArm.transform, config.lowerArmMass, config);
+        // Keep forearm horizontal
+        leftLowerArm.transform.localRotation = Quaternion.Euler(0, 0, 0);
+        
+        // BONES 6-7: RIGHT ARM (connected to chest) - Extend horizontally from chest
+        Vector3 rightShoulderPos = new Vector3(config.chestScale.x * 0.5f + config.upperArmScale.y * 0.5f, config.chestScale.y * 0.25f, 0);
+        var rightUpperArm = CreateReferenceBodyPart("RightUpperArm", rightShoulderPos, config.upperArmScale, PrimitiveType.Capsule, chest.transform, config.upperArmMass, config);
+        // Rotate upper arm to point outward horizontally
+        rightUpperArm.transform.localRotation = Quaternion.Euler(0, 0, -90);
+        
+        Vector3 rightElbowPos = new Vector3(config.upperArmScale.y * 0.5f + config.lowerArmScale.y * 0.5f, 0, 0);
+        var rightLowerArm = CreateReferenceBodyPart("RightLowerArm", rightElbowPos, config.lowerArmScale, PrimitiveType.Capsule, rightUpperArm.transform, config.lowerArmMass, config);
+        // Keep forearm horizontal
+        rightLowerArm.transform.localRotation = Quaternion.Euler(0, 0, 0);
+        
+        // BONES 8-11: LEFT LEG (connected to pelvis)
+        Vector3 leftHipPos = new Vector3(-config.pelvisScale.x * 0.25f, -config.pelvisScale.y * 0.5f - config.upperLegScale.y * 0.5f, 0);
+        var leftUpperLeg = CreateReferenceBodyPart("LeftUpperLeg", leftHipPos, config.upperLegScale, PrimitiveType.Capsule, pelvis.transform, config.upperLegMass, config);
+        
+        Vector3 leftKneePos = new Vector3(0, -config.upperLegScale.y * 0.5f - config.lowerLegScale.y * 0.5f, 0);
+        var leftLowerLeg = CreateReferenceBodyPart("LeftLowerLeg", leftKneePos, config.lowerLegScale, PrimitiveType.Capsule, leftUpperLeg.transform, config.lowerLegMass, config);
+        
+        Vector3 leftAnklePos = new Vector3(0, -config.lowerLegScale.y * 0.5f - config.footScale.y * 0.5f, config.footScale.z * 0.25f);
+        var leftFoot = CreateReferenceBodyPart("LeftFoot", leftAnklePos, config.footScale, PrimitiveType.Sphere, leftLowerLeg.transform, config.footMass, config);
+        
+        // BONES 12-13: RIGHT LEG (connected to pelvis) 
+        Vector3 rightHipPos = new Vector3(config.pelvisScale.x * 0.25f, -config.pelvisScale.y * 0.5f - config.upperLegScale.y * 0.5f, 0);
+        var rightUpperLeg = CreateReferenceBodyPart("RightUpperLeg", rightHipPos, config.upperLegScale, PrimitiveType.Capsule, pelvis.transform, config.upperLegMass, config);
+        
+        Vector3 rightKneePos = new Vector3(0, -config.upperLegScale.y * 0.5f - config.lowerLegScale.y * 0.5f, 0);
+        var rightLowerLeg = CreateReferenceBodyPart("RightLowerLeg", rightKneePos, config.lowerLegScale, PrimitiveType.Capsule, rightUpperLeg.transform, config.lowerLegMass, config);
+        
+        Vector3 rightAnklePos = new Vector3(0, -config.lowerLegScale.y * 0.5f - config.footScale.y * 0.5f, config.footScale.z * 0.25f);
+        var rightFoot = CreateReferenceBodyPart("RightFoot", rightAnklePos, config.footScale, PrimitiveType.Sphere, rightLowerLeg.transform, config.footMass, config);
+        
+        int boneCount = 13;
+        int jointCount = 12;
+        TrainArenaDebugManager.Log($"🎯 Reference ragdoll created with {boneCount} bones", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Add the 12 joints with EXACT reference physics settings
+        // Calculate proper anchor positions based on body part scales
+        
+        // Shoulder joints - connect at top of arms to side of chest
+        AddReferenceJoint(leftUpperArm, chest, new Vector3(0, config.upperArmScale.y * 0.5f, 0), config); // Left shoulder
+        AddReferenceJoint(rightUpperArm, chest, new Vector3(0, config.upperArmScale.y * 0.5f, 0), config); // Right shoulder  
+        
+        // Elbow joints - connect at bottom of upper arms to top of lower arms
+        AddReferenceJoint(leftLowerArm, leftUpperArm, new Vector3(0, config.lowerArmScale.y * 0.5f, 0), config); // Left elbow
+        AddReferenceJoint(rightLowerArm, rightUpperArm, new Vector3(0, config.lowerArmScale.y * 0.5f, 0), config); // Right elbow
+        
+        // Spine joint - connect at top of pelvis to bottom of chest
+        AddReferenceJoint(chest, pelvis, new Vector3(0, config.chestScale.y * -0.5f, 0), config); // Spine
+        
+        // Neck joint - connect at top of chest to bottom of head
+        AddReferenceJoint(head, chest, new Vector3(0, config.headScale.y * -0.5f, 0), config); // Neck
+        
+        // Hip joints - connect at top of upper legs to bottom of pelvis
+        AddReferenceJoint(leftUpperLeg, pelvis, new Vector3(0, config.upperLegScale.y * 0.5f, 0), config); // Left hip
+        AddReferenceJoint(rightUpperLeg, pelvis, new Vector3(0, config.upperLegScale.y * 0.5f, 0), config); // Right hip
+        
+        // Knee joints - connect at top of lower legs to bottom of upper legs
+        AddReferenceJoint(leftLowerLeg, leftUpperLeg, new Vector3(0, config.lowerLegScale.y * 0.5f, 0), config); // Left knee
+        AddReferenceJoint(rightLowerLeg, rightUpperLeg, new Vector3(0, config.lowerLegScale.y * 0.5f, 0), config); // Right knee
+        
+        // Ankle joints - connect at center of feet to bottom of lower legs
+        AddReferenceJoint(leftFoot, leftLowerLeg, new Vector3(0, 0, 0), config); // Left ankle
+        AddReferenceJoint(rightFoot, rightLowerLeg, new Vector3(0, 0, 0), config); // Right ankle
+        
+        TrainArenaDebugManager.Log($"🔗 Added {12} joints with reference physics settings", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Add ML-Agents components
+        root.AddComponent<RagdollAgent>();
+        var behaviorParameters = root.AddComponent<BehaviorParameters>();
+        behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(jointCount);
+        
+        return root;
+    }
+
+
     
     // Default configuration - can be overridden
-    private static RagdollConfiguration _currentConfig = null;
-    public static RagdollConfiguration CurrentConfig 
+    private static ReferenceRagdollConfiguration _currentConfig = null;
+    public static ReferenceRagdollConfiguration CurrentConfig 
     { 
         get 
         { 
             if (_currentConfig == null) 
             {
-                TrainArenaDebugManager.Log($"⚠️ CurrentConfig was NULL, creating default AITraining config", TrainArenaDebugManager.DebugLogLevel.Important);
-                _currentConfig = RagdollConfiguration.AITraining();
+                TrainArenaDebugManager.Log($"⚠️ CurrentConfig was NULL, creating REFERENCE EXACT config", TrainArenaDebugManager.DebugLogLevel.Important);
+                _currentConfig = ReferenceRagdollConfiguration.ReferenceExact();
             }
             return _currentConfig;
         } 
         set 
         { 
-            TrainArenaDebugManager.Log($"🔄 CurrentConfig being set to new value", TrainArenaDebugManager.DebugLogLevel.Important);
+            TrainArenaDebugManager.Log($"🔄 CurrentConfig being set to REFERENCE configuration", TrainArenaDebugManager.DebugLogLevel.Important);
             _currentConfig = value; 
         } 
     }
@@ -423,28 +677,9 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Creates a simple ragdoll structure for ML-Agents training.
-    /// This creates a minimal humanoid with capsule colliders and configurable joints.
+    /// LEGACY - Creates an anatomically correct ragdoll with realistic proportions
     /// </summary>
-    /// <summary>
-    /// Creates a configurable ragdoll structure for ML-Agents training
-    /// </summary>
-    public static GameObject CreateRagdoll(string name = "RagdollAgent", Vector3 position = default)
-    {
-        TrainArenaDebugManager.Log($"🎯 RAGDOLL CREATION ENTRY POINT - Using CurrentConfig: {CurrentConfig != null}", TrainArenaDebugManager.DebugLogLevel.Important);
-        if (CurrentConfig == null)
-        {
-            TrainArenaDebugManager.Log($"❌ CurrentConfig is NULL! Creating default...", TrainArenaDebugManager.DebugLogLevel.Important);
-            CurrentConfig = RagdollConfiguration.AITraining();
-        }
-        TrainArenaDebugManager.Log($"🎯 DELEGATING TO CreateRagdoll with config...", TrainArenaDebugManager.DebugLogLevel.Important);
-        return CreateRagdoll(name, position, CurrentConfig);
-    }
-    
-    /// <summary>
-    /// Creates a ragdoll with custom configuration
-    /// </summary>
-    public static GameObject CreateRagdoll(string name, Vector3 position, RagdollConfiguration config)
+    public static GameObject CreateAnatomicalRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
     {
         TrainArenaDebugManager.Log($"🚀 CREATING ANATOMICALLY CORRECT RAGDOLL: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
 
@@ -519,9 +754,117 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Creates an anatomically correct body part with proper joint connections
+    /// Creates a reference exact body part with specified primitive type and mass
     /// </summary>
-    private static GameObject CreateAnatomicalBodyPart(string name, Vector3 localPosition, Vector3 size, Transform parent, RagdollConfiguration config)
+    private static GameObject CreateReferenceBodyPart(string name, Vector3 localPosition, Vector3 size, PrimitiveType primitiveType, Transform parent, float mass, ReferenceRagdollConfiguration config)
+    {
+        var bodyPart = GameObject.CreatePrimitive(primitiveType);
+        bodyPart.name = name;
+        bodyPart.transform.parent = parent;
+        bodyPart.transform.localPosition = localPosition;
+        bodyPart.transform.localScale = size;
+        
+        // Apply URP material like CubeAgent
+        var mr = bodyPart.GetComponent<Renderer>();
+        Material mat = CreateURPMaterial(smoothness: 0.6f, metallic: 0.1f);
+        
+        // Color body parts differently for easy identification
+        if (name.Contains("Head"))
+        {
+            mat.color = new Color(1.0f, 0.8f, 0.6f); // Skin tone for head
+        }
+        else if (name.Contains("Arm") || name.Contains("Leg"))
+        {
+            mat.color = new Color(0.8f, 0.6f, 0.4f); // Slightly darker for limbs
+        }
+        else
+        {
+            mat.color = new Color(0.9f, 0.7f, 0.5f); // Medium tone for torso
+        }
+        
+        mat.name = $"{name}Material";
+        mr.sharedMaterial = mat;
+        
+        // Add physics components with EXACT reference masses
+        var rb = bodyPart.AddComponent<Rigidbody>();
+        rb.mass = mass; // Use the exact mass from reference
+        rb.linearDamping = config.linearDamping;
+        rb.angularDamping = config.angularDamping;
+        rb.interpolation = config.interpolation;
+        
+        // Configure collider with physics material
+        var collider = bodyPart.GetComponent<Collider>();
+        if (collider is CapsuleCollider capsuleCollider)
+        {
+            capsuleCollider.material = CreatePhysicsMaterial(config);
+        }
+        else if (collider is BoxCollider boxCollider)
+        {
+            boxCollider.material = CreatePhysicsMaterial(config);
+        }
+        else if (collider is SphereCollider sphereCollider)
+        {
+            sphereCollider.material = CreatePhysicsMaterial(config);
+        }
+        
+        // Add blinking eyes if this is the head
+        if (name.Contains("Head"))
+        {
+            AddBlinkingEyes(bodyPart);
+        }
+        
+        TrainArenaDebugManager.Log($"🦴 Created {name}: {primitiveType}, mass={mass}kg, pos={localPosition}, size={size}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+        
+        return bodyPart;
+    }
+
+    /// <summary>
+    /// Adds animated blinking eyes to the head sphere
+    /// </summary>
+    private static void AddBlinkingEyes(GameObject head)
+    {
+        // Create left eye
+        var leftEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        leftEye.name = "LeftEye";
+        leftEye.transform.parent = head.transform;
+        leftEye.transform.localPosition = new Vector3(-0.15f, 0.1f, 0.4f);
+        leftEye.transform.localScale = new Vector3(0.15f, 0.15f, 0.1f);
+        
+        // Remove collider from eye (decorative only)
+        Object.DestroyImmediate(leftEye.GetComponent<Collider>());
+        
+        // Make eye black
+        var leftEyeMat = CreateURPMaterial(smoothness: 0.9f, metallic: 0.0f);
+        leftEyeMat.color = Color.black;
+        leftEyeMat.name = "LeftEyeMaterial";
+        leftEye.GetComponent<Renderer>().sharedMaterial = leftEyeMat;
+        
+        // Create right eye
+        var rightEye = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        rightEye.name = "RightEye";
+        rightEye.transform.parent = head.transform;
+        rightEye.transform.localPosition = new Vector3(0.15f, 0.1f, 0.4f);
+        rightEye.transform.localScale = new Vector3(0.15f, 0.15f, 0.1f);
+        
+        // Remove collider from eye (decorative only)
+        Object.DestroyImmediate(rightEye.GetComponent<Collider>());
+        
+        // Make eye black
+        var rightEyeMat = CreateURPMaterial(smoothness: 0.9f, metallic: 0.0f);
+        rightEyeMat.color = Color.black;
+        rightEyeMat.name = "RightEyeMaterial";
+        rightEye.GetComponent<Renderer>().sharedMaterial = rightEyeMat;
+        
+        // Add blinking animation component
+        var blinkAnimator = head.AddComponent<EyeBlinkAnimator>();
+        blinkAnimator.leftEye = leftEye.transform;
+        blinkAnimator.rightEye = rightEye.transform;
+    }
+    
+    /// <summary>
+    /// LEGACY - Creates an anatomically correct body part with proper joint connections
+    /// </summary>
+    private static GameObject CreateAnatomicalBodyPart(string name, Vector3 localPosition, Vector3 size, Transform parent, ReferenceRagdollConfiguration config)
     {
         var bodyPart = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         bodyPart.name = name;
@@ -553,6 +896,18 @@ public static class PrimitiveBuilder
     
     /// <summary>
     /// Get anatomically appropriate mass for body part
+    /// </summary>
+    private static float GetAnatomicalMass(string partName, ReferenceRagdollConfiguration config)
+    {
+        if (partName.Contains("Pelvis")) return config.pelvisMass;
+        if (partName.Contains("Thigh")) return config.thighMass;
+        if (partName.Contains("Shin")) return config.shinMass;
+        if (partName.Contains("Foot")) return config.footMass;
+        return 1f; // Default
+    }
+    
+    /// <summary>
+    /// LEGACY - Get anatomically appropriate mass for body part
     /// </summary>
     private static float GetAnatomicalMass(string partName, RagdollConfiguration config)
     {
@@ -611,9 +966,109 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Creates an anatomically correct joint connection between body parts
+    /// Adds a reference exact joint between two body parts with EXACT reference physics settings
     /// </summary>
-    private static void AddAnatomicalJoint(GameObject child, GameObject parent, Vector3 childAnchor, Vector3 parentAnchor, Vector3 limits, RagdollConfiguration config)
+    private static void AddReferenceJoint(GameObject child, GameObject parent, Vector3 anchorPos, ReferenceRagdollConfiguration config)
+    {
+        var joint = child.AddComponent<ConfigurableJoint>();
+        joint.connectedBody = parent.GetComponent<Rigidbody>();
+        
+        // EXACT anchor positioning from reference
+        joint.anchor = anchorPos;
+        
+        // Calculate the connected anchor based on parent-child relationship
+        Vector3 connectedAnchorPos = CalculateConnectedAnchor(child, parent, config);
+        joint.connectedAnchor = connectedAnchorPos;
+        joint.autoConfigureConnectedAnchor = false;
+        
+        // EXACT motion settings from reference (3 DOF rotation)
+        joint.xMotion = ConfigurableJointMotion.Locked;
+        joint.yMotion = ConfigurableJointMotion.Locked;
+        joint.zMotion = ConfigurableJointMotion.Locked;
+        joint.angularXMotion = ConfigurableJointMotion.Free;
+        joint.angularYMotion = ConfigurableJointMotion.Free;
+        joint.angularZMotion = ConfigurableJointMotion.Free;
+        
+        // EXACT drive settings from reference (spring=125, damper=0.5, maxForce=3.4e+38)
+        var jointDrive = new JointDrive();
+        jointDrive.positionSpring = config.jointSpring;        // 125
+        jointDrive.positionDamper = config.jointDamper;        // 0.5
+        jointDrive.maximumForce = config.jointMaxForce;        // 3.4e+38
+        
+        joint.slerpDrive = jointDrive;
+        joint.rotationDriveMode = RotationDriveMode.Slerp;
+        
+        // EXACT limits matching reference (wide range for natural movement)
+        var limit = new SoftJointLimit();
+        limit.limit = 60f;
+        limit.bounciness = 0f;
+        limit.contactDistance = 0f;
+        
+        joint.lowAngularXLimit = limit;
+        joint.highAngularXLimit = limit;
+        joint.angularYLimit = limit;
+        joint.angularZLimit = limit;
+        
+        TrainArenaDebugManager.Log($"🔗 Added reference joint: {child.name} -> {parent.name} at {anchorPos} -> {connectedAnchorPos}", TrainArenaDebugManager.DebugLogLevel.Verbose);
+    }
+
+    /// <summary>
+    /// Calculates the proper connected anchor position based on parent-child body part relationship
+    /// </summary>
+    private static Vector3 CalculateConnectedAnchor(GameObject child, GameObject parent, ReferenceRagdollConfiguration config)
+    {
+        // Determine connection points based on body part names
+        string childName = child.name.ToLower();
+        string parentName = parent.name.ToLower();
+        
+        // Leg connections
+        if (childName.Contains("upperleg") && parentName.Contains("pelvis"))
+        {
+            // Upper leg connects to bottom of pelvis
+            return new Vector3(0, -config.pelvisScale.y * 0.5f, 0);
+        }
+        else if (childName.Contains("lowerleg") && parentName.Contains("upperleg"))
+        {
+            // Lower leg connects to bottom of upper leg
+            return new Vector3(0, -config.upperLegScale.y * 0.5f, 0);
+        }
+        else if (childName.Contains("foot") && parentName.Contains("lowerleg"))
+        {
+            // Foot connects to bottom of lower leg
+            return new Vector3(0, -config.lowerLegScale.y * 0.5f, 0);
+        }
+        // Arm connections
+        else if (childName.Contains("upperarm") && parentName.Contains("chest"))
+        {
+            // Upper arm connects to side of chest
+            float sideOffset = childName.Contains("left") ? -config.chestScale.x * 0.5f : config.chestScale.x * 0.5f;
+            return new Vector3(sideOffset, config.chestScale.y * 0.25f, 0);
+        }
+        else if (childName.Contains("lowerarm") && parentName.Contains("upperarm"))
+        {
+            // Lower arm connects to bottom of upper arm
+            return new Vector3(0, -config.upperArmScale.y * 0.5f, 0);
+        }
+        // Torso connections
+        else if (childName.Contains("chest") && parentName.Contains("pelvis"))
+        {
+            // Chest connects to top of pelvis
+            return new Vector3(0, config.pelvisScale.y * 0.5f, 0);
+        }
+        else if (childName.Contains("head") && parentName.Contains("chest"))
+        {
+            // Head connects to top of chest
+            return new Vector3(0, config.chestScale.y * 0.5f, 0);
+        }
+        
+        // Default to center if no specific rule found
+        return Vector3.zero;
+    }
+
+    /// <summary>
+    /// LEGACY - Creates an anatomically correct joint connection between body parts
+    /// </summary>
+    private static void AddAnatomicalJoint(GameObject child, GameObject parent, Vector3 childAnchor, Vector3 parentAnchor, Vector3 limits, ReferenceRagdollConfiguration config)
     {
         var joint = child.AddComponent<ConfigurableJoint>();
         joint.connectedBody = parent.GetComponent<Rigidbody>();
@@ -719,7 +1174,19 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Creates physics material for ragdoll parts using configuration
+    /// Creates physics material for ragdoll parts using ReferenceRagdollConfiguration
+    /// </summary>
+    private static PhysicsMaterial CreatePhysicsMaterial(ReferenceRagdollConfiguration config)
+    {
+        var material = new PhysicsMaterial("ReferenceRagdollMaterial");
+        material.dynamicFriction = config.friction;
+        material.staticFriction = config.friction;
+        material.bounciness = config.bounciness;
+        return material;
+    }
+
+    /// <summary>
+    /// LEGACY - Creates physics material for ragdoll parts using old RagdollConfiguration
     /// </summary>
     private static PhysicsMaterial CreatePhysicsMaterial(RagdollConfiguration config)
     {
@@ -732,34 +1199,32 @@ public static class PrimitiveBuilder
 
     // Unity Editor menu items for ragdoll configuration
     #if UNITY_EDITOR
-   /* [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set AI Training Preset")]
+    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set AI Training Preset")]
     public static void SetAITrainingPreset()
     {
-        CurrentConfig = RagdollConfiguration.AITraining();
+        CurrentConfig = ReferenceRagdollConfiguration.AITraining();
         UnityEngine.Debug.Log("Ragdoll configuration set to AI Training preset");
     }
 
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Realistic Human Preset")]
     public static void SetRealisticHumanPreset()
     {
-        CurrentConfig = RagdollConfiguration.RealisticHuman();
+        CurrentConfig = ReferenceRagdollConfiguration.RealisticHuman();
         UnityEngine.Debug.Log("Ragdoll configuration set to Realistic Human preset");
     }
 
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Athletic Preset")]
     public static void SetAthleticPreset()
     {
-        CurrentConfig = RagdollConfiguration.Athletic();
+        CurrentConfig = ReferenceRagdollConfiguration.Athletic();
         UnityEngine.Debug.Log("Ragdoll configuration set to Athletic preset");
     }
 
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Anatomical Human Ragdoll")]
-    public static void CreateAnatomicalHumanRagdoll()
+    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Reference Exact Preset")]
+    public static void SetReferenceExactPreset()
     {
-        CurrentConfig = RagdollConfiguration.AnatomicalHuman();
-        var ragdoll = CreateRagdoll("AnatomicalHumanRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🧬 Created ANATOMICALLY CORRECT human ragdoll - Real human proportions and joint connections!", TrainArenaDebugManager.DebugLogLevel.Important);
+        CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
+        UnityEngine.Debug.Log("Ragdoll configuration set to Reference Exact preset");
     }
 
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Test Ragdoll (Current Config)")]
@@ -768,12 +1233,12 @@ public static class PrimitiveBuilder
         var ragdoll = CreateRagdoll("TestRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
         TrainArenaDebugManager.Log($"🎭 Created test ragdoll with current configuration. Joints: {ragdoll.GetComponentsInChildren<PDJointController>().Length}", TrainArenaDebugManager.DebugLogLevel.Important);
-    }*/
+    }
 
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Realistic Human Ragdoll")]
     public static void CreateRealisticHumanRagdoll()
     {
-        CurrentConfig = RagdollConfiguration.RealisticHuman();
+        CurrentConfig = ReferenceRagdollConfiguration.RealisticHuman();
         var ragdoll = CreateRagdoll("RealisticHumanRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
         TrainArenaDebugManager.Log($"🎭 Created realistic human ragdoll - Ready for locomotion training!", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -782,7 +1247,7 @@ public static class PrimitiveBuilder
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Functional Walker Ragdoll")]
     public static void CreateFunctionalWalkerRagdoll()
     {
-        CurrentConfig = RagdollConfiguration.FunctionalWalker();
+        CurrentConfig = ReferenceRagdollConfiguration.FunctionalWalker();
         var ragdoll = CreateRagdoll("FunctionalWalkerRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
         TrainArenaDebugManager.Log($"🚶 Created functional walker ragdoll - Optimized for stable locomotion!", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -791,7 +1256,7 @@ public static class PrimitiveBuilder
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Inspiration Match Ragdoll")]
     public static void CreateInspirationMatchRagdoll()
     {
-        CurrentConfig = RagdollConfiguration.InspirationMatch();
+        CurrentConfig = ReferenceRagdollConfiguration.InspirationMatch();
         var ragdoll = CreateRagdoll("InspirationMatchRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
         TrainArenaDebugManager.Log($"🎯 Created inspiration-matched ragdoll - Elongated human proportions like reference images!", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -800,7 +1265,7 @@ public static class PrimitiveBuilder
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Athletic Ragdoll")]
     public static void CreateAthleticRagdoll()
     {
-        CurrentConfig = RagdollConfiguration.Athletic();
+        CurrentConfig = ReferenceRagdollConfiguration.Athletic();
         var ragdoll = CreateRagdoll("AthleticRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
         TrainArenaDebugManager.Log($"🎭 Created athletic ragdoll - Enhanced performance capabilities!", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -809,10 +1274,116 @@ public static class PrimitiveBuilder
     [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create AI Training Ragdoll")]
     public static void CreateAITrainingRagdoll()
     {
-        CurrentConfig = RagdollConfiguration.AITraining();
+        CurrentConfig = ReferenceRagdollConfiguration.AITraining();
         var ragdoll = CreateRagdoll("AITrainingRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🎭 Created AI training ragdoll - Optimized for machine learning!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log($"🤖 Created AI training ragdoll - Optimized for machine learning!", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+
+    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Anatomical Human Ragdoll")]
+    public static void CreateAnatomicalHumanRagdoll()
+    {
+        CurrentConfig = ReferenceRagdollConfiguration.AnatomicalHuman();
+        var ragdoll = CreateRagdoll("AnatomicalHumanRagdoll", Vector3.zero);
+        UnityEditor.Selection.activeGameObject = ragdoll;
+        TrainArenaDebugManager.Log($"🧬 Created anatomically correct human ragdoll - Real human proportions!", TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+
+    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Reference Exact Ragdoll")]
+    public static void CreateReferenceExactRagdoll()
+    {
+        CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
+        var ragdoll = CreateRagdoll("ReferenceExactRagdoll", Vector3.zero);
+        UnityEditor.Selection.activeGameObject = ragdoll;
+        TrainArenaDebugManager.Log($"📐 Created reference exact ragdoll - Precise reference specifications!", TrainArenaDebugManager.DebugLogLevel.Important);
     }
     #endif
+}
+
+/// <summary>
+/// Simple eye blinking animation component for ragdoll heads
+/// </summary>
+public class EyeBlinkAnimator : MonoBehaviour
+{
+    [Header("Eye References")]
+    public Transform leftEye;
+    public Transform rightEye;
+    
+    [Header("Blink Settings")]
+    public float blinkInterval = 3.0f;      // Time between blinks
+    public float blinkDuration = 0.15f;     // How long each blink lasts
+    public float blinkVariation = 1.5f;     // Random variation in blink timing
+    
+    private Vector3 leftEyeOriginalScale;
+    private Vector3 rightEyeOriginalScale;
+    private bool isBlinking = false;
+    
+    void Start()
+    {
+        if (leftEye != null) leftEyeOriginalScale = leftEye.localScale;
+        if (rightEye != null) rightEyeOriginalScale = rightEye.localScale;
+        
+        StartCoroutine(BlinkRoutine());
+    }
+    
+    IEnumerator BlinkRoutine()
+    {
+        while (true)
+        {
+            // Wait for random interval before next blink
+            float waitTime = blinkInterval + Random.Range(-blinkVariation, blinkVariation);
+            yield return new WaitForSeconds(waitTime);
+            
+            // Perform blink
+            if (!isBlinking)
+            {
+                StartCoroutine(PerformBlink());
+            }
+        }
+    }
+    
+    IEnumerator PerformBlink()
+    {
+        isBlinking = true;
+        
+        float halfDuration = blinkDuration * 0.5f;
+        
+        // Blink close (scale Y to 0)
+        float elapsedTime = 0;
+        while (elapsedTime < halfDuration)
+        {
+            float t = elapsedTime / halfDuration;
+            float scaleY = Mathf.Lerp(1f, 0.05f, t); // Almost close, not completely flat
+            
+            if (leftEye != null)
+                leftEye.localScale = new Vector3(leftEyeOriginalScale.x, leftEyeOriginalScale.y * scaleY, leftEyeOriginalScale.z);
+            if (rightEye != null)
+                rightEye.localScale = new Vector3(rightEyeOriginalScale.x, rightEyeOriginalScale.y * scaleY, rightEyeOriginalScale.z);
+            
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        
+        // Blink open (scale Y back to 1)
+        elapsedTime = 0;
+        while (elapsedTime < halfDuration)
+        {
+            float t = elapsedTime / halfDuration;
+            float scaleY = Mathf.Lerp(0.05f, 1f, t);
+            
+            if (leftEye != null)
+                leftEye.localScale = new Vector3(leftEyeOriginalScale.x, leftEyeOriginalScale.y * scaleY, leftEyeOriginalScale.z);
+            if (rightEye != null)
+                rightEye.localScale = new Vector3(rightEyeOriginalScale.x, rightEyeOriginalScale.y * scaleY, rightEyeOriginalScale.z);
+            
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        
+        // Ensure eyes are fully open
+        if (leftEye != null) leftEye.localScale = leftEyeOriginalScale;
+        if (rightEye != null) rightEye.localScale = rightEyeOriginalScale;
+        
+        isBlinking = false;
+    }
 }
