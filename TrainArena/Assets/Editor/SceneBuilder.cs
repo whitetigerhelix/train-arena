@@ -243,7 +243,7 @@ public static class SceneBuilder
     static GameObject CreateCubeAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
     {
         // Use PrimitiveBuilder for consistent agent creation
-        var agent = PrimitiveBuilder.CreateAgent("CubeAgent");
+        var agent = PrimitiveBuilder.CreateCubeAgent("CubeAgent");
 
         var cubeAgent = agent.AddComponent<CubeAgent>();
         // Set obstacle mask to everything for tag-based detection
