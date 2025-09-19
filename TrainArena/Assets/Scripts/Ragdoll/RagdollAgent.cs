@@ -26,6 +26,8 @@ using TrainArena.Core;
 /// </summary>
 public class RagdollAgent : BaseTrainArenaAgent
 {
+    //TODO: We need to move more important shared logic into BaseTrainArenaAgent from CubeAgent, and leverage that here, then tune here appropriately for ragdoll locomotion training
+
     [Header("Ragdoll Configuration")]
     [Tooltip("PDJointControllers in action order - each gets one continuous action")]
     public List<PDJointController> joints = new List<PDJointController>();
@@ -48,6 +50,11 @@ public class RagdollAgent : BaseTrainArenaAgent
     public override Transform MainTransform => pelvis;
     public override Rigidbody MainRigidbody => pelvis?.GetComponent<Rigidbody>();
     public override string AgentTypeIcon => "🎭";
+
+    public override int GetTotalObservationCount()
+    {
+        return 16;  //TODO: Don't hardcode - use constants like CubeAgent does, add a comment describing the observations so it's clear
+    }
 
     public override void Initialize()
     {

@@ -1,4 +1,5 @@
 using System.Linq;
+using TrainArena.Core;
 using Unity.MLAgents;
 using UnityEditor;
 using UnityEditorInternal;
@@ -130,14 +131,14 @@ public static class SceneBuilder
         // Prefabs (create basic ones procedurally - be sure to disable after spawning the environment)
         if (agentType == AgentType.Cube)
         {
-            init.cubeAgentPrefab = CreateCubeAgentPrefab(init, sceneType);
+            init.agentPrefab = CreateCubeAgentPrefab(init, sceneType);
         }
         else
         {
-            init.ragdollAgentPrefab = CreateRagdollAgentPrefab(init, sceneType);
+            init.agentPrefab = CreateRagdollAgentPrefab(init, sceneType);
         }
-        init.goalPrefab = PrimitiveBuilder.CreateGoalPrefab(init.ArenaHelper.GoalHeight);
-        init.obstaclePrefab = PrimitiveBuilder.CreateObstaclePrefab(init.ArenaHelper.ObstacleHeight);
+        init.goalPrefab = PrimitiveBuilder.CreateGoal(init.ArenaHelper.GoalHeight);
+        init.obstaclePrefab = PrimitiveBuilder.CreateObstacle(init.ArenaHelper.ObstacleHeight);
 
         // Ensure ML-Agents Academy is initialized (singleton pattern)
         if (Academy.Instance == null)
@@ -188,20 +189,23 @@ public static class SceneBuilder
 
     #region Create Agent Prefabs
 
-    static GameObject CreateCubeAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
+    static GameObject CreateAgentPrefab(EnvInitializer init, AgentType agentType, SceneType sceneType)
     {
-        // Use PrimitiveBuilder for consistent agent creation
-        var agent = PrimitiveBuilder.CreateCubeAgent("CubeAgent");
+        GameObject agentObject = agentType == AgentType.Cube 
+            ? PrimitiveBuilder.CreateCubeAgent("CubeAgent") 
+            : PrimitiveBuilder.CreateRagdoll("RagdollAgent");
 
-        var cubeAgent = agent.AddComponent<CubeAgent>();
+        BaseTrainArenaAgent agent = agentType == AgentType.Cube 
+            ? agentObject.GetComponentInChildren<CubeAgent>() 
+            : agentObject.GetComponentInChildren<RagdollAgent>();
+
         // Set obstacle mask to everything for tag-based detection
-        cubeAgent.obstacleMask = -1;
-        
+        agent.obstacleMask = -1;
+
         // ML-Agents Agent class automatically adds BehaviorParameters - configure it
-        var behaviorParams = agent.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        var behaviorParams = agent.GetComponentInChildren<Unity.MLAgents.Policies.BehaviorParameters>();
         if (behaviorParams != null)
         {
-            behaviorParams.BehaviorName = "CubeAgent";
             // Configure behavior type based on scene type
             if (sceneType == SceneType.Testing)
             {
@@ -216,18 +220,8 @@ public static class SceneBuilder
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
-            // Configure action and observation space
-            if (behaviorParams.BrainParameters.ActionSpec.NumContinuousActions == 0)
-            {
-                // Set up action space: 2 continuous actions (moveX, moveZ)
-                behaviorParams.BrainParameters.ActionSpec = 
-                    Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(2);
-            }
-            
             // Configure observation space dynamically based on agent configuration
-            var cubeAgentComponent = agent.GetComponent<CubeAgent>();
-            int totalObservations = cubeAgentComponent.GetTotalObservationCount();
-            
+            int totalObservations = agent.GetTotalObservationCount();
             if (behaviorParams.BrainParameters.VectorObservationSize != totalObservations)
             {
                 behaviorParams.BrainParameters.VectorObservationSize = totalObservations;
@@ -235,28 +229,24 @@ public static class SceneBuilder
             
             string behaviorMode = behaviorParams.BehaviorType == Unity.MLAgents.Policies.BehaviorType.Default ? "ML Training" : "Editor Testing";
             TrainArenaDebugManager.Log($"Configured agent: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, {behaviorParams.BrainParameters.VectorObservationSize} observations " +
-                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {cubeAgentComponent.raycastDirections} raycasts), Mode: {behaviorMode}", 
+                                     $"({CubeAgent.VELOCITY_OBSERVATIONS} velocity + {CubeAgent.GOAL_OBSERVATIONS} goal + {agent.raycastDirections} raycasts), Mode: {behaviorMode}", 
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
+
+        //NOTE: agent.gameObject != agentObject (ragdoll agent is on pelvis, not root)
         
         // Add DecisionRequester for automatic ML-Agents decision scheduling (consistent with RagdollAgent)
-        var decisionRequester = agent.AddComponent<Unity.MLAgents.DecisionRequester>();
+        var decisionRequester = agent.gameObject.AddComponent<Unity.MLAgents.DecisionRequester>();
         decisionRequester.DecisionPeriod = 5;  // Request decisions every 5 fixed updates (matches typical setup)
         decisionRequester.TakeActionsBetweenDecisions = true;  // Allow actions between decisions
         
         TrainArenaDebugManager.Log($"Added DecisionRequester with period {decisionRequester.DecisionPeriod} (automatic ML-Agents decisions)", 
                                  TrainArenaDebugManager.DebugLogLevel.Important);
-        
-        // Add blinking animation for visual polish
-        agent.AddComponent<EyeBlinker>();
-        
-        // Add debug info component for development
-        agent.AddComponent<AgentDebugInfo>();
-        
+                
         // Add automatic behavior switching only for training scenes
         if (sceneType == SceneType.Training)
         {
-            var autoSwitcher = agent.AddComponent<AutoBehaviorSwitcher>();
+            var autoSwitcher = agent.gameObject.AddComponent<AutoBehaviorSwitcher>();
             autoSwitcher.enableAutoSwitching = true;
             autoSwitcher.showDebugMessages = true;
             
@@ -269,87 +259,18 @@ public static class SceneBuilder
                                      TrainArenaDebugManager.DebugLogLevel.Important);
         }
 
-        return agent;
+        return agentObject;
+    }
+
+    static GameObject CreateCubeAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
+    {
+        return CreateAgentPrefab(init, AgentType.Cube, sceneType);
     }
 
     static GameObject CreateRagdollAgentPrefab(EnvInitializer init, SceneType sceneType = SceneType.Training)
     {
-        // Use PrimitiveBuilder for consistent ragdoll creation
-        var ragdoll = PrimitiveBuilder.CreateRagdoll("RagdollAgent");
-
-        // The ragdoll already has RagdollAgent and BehaviorParameters from PrimitiveBuilder
-        // Just need to configure behavior switching like cube agents
-        var ragdollAgent = ragdoll.GetComponentInChildren<RagdollAgent>();
-        var behaviorParams = ragdoll.GetComponentInChildren<Unity.MLAgents.Policies.BehaviorParameters>();
-        
-        if (behaviorParams != null)
-        {
-            // Start with HeuristicOnly - AutoBehaviorSwitcher will handle runtime switching
-            behaviorParams.BehaviorType = sceneType == SceneType.Training ? Unity.MLAgents.Policies.BehaviorType.HeuristicOnly : Unity.MLAgents.Policies.BehaviorType.InferenceOnly;
-            behaviorParams.TeamId = 0;
-            behaviorParams.UseChildSensors = true;
-            
-            // Ensure observation space is correct (16 observations for ragdoll)
-            if (behaviorParams.BrainParameters.VectorObservationSize != 16)
-            {
-                behaviorParams.BrainParameters.VectorObservationSize = 16;
-                TrainArenaDebugManager.Log("Fixed VectorObservationSize to 16 for RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
-            }
-            
-            // CRITICAL: Ensure ActionSpec is correctly configured for 6 continuous actions
-            if (behaviorParams.BrainParameters.ActionSpec.NumContinuousActions != 6)
-            {
-                behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6);
-                TrainArenaDebugManager.Log($"FIXED ActionSpec: Set to 6 continuous actions (was {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions})", TrainArenaDebugManager.DebugLogLevel.Important);
-            }
-            
-            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParams.BrainParameters.ActionSpec.NumContinuousActions} actions, " +
-                                     $"{behaviorParams.BrainParameters.VectorObservationSize} observations " +
-                                     $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-        
-        // Add debug UI components (same as cube agents)
-        var pelvis = ragdoll.GetComponentInChildren<RagdollAgent>().gameObject;
-        
-        // Add blinking animation for visual polish
-        var headVisualObject = ragdoll.transform.Find("Head")?.transform.Find("Visual")?.gameObject;
-        if (headVisualObject != null)
-        {
-            headVisualObject.AddComponent<EyeBlinker>();
-        }
-        else
-        {
-            TrainArenaDebugManager.LogWarning("Failed to find head visual object for the eyes!");
-        }
-
-        pelvis.AddComponent<AgentDebugInfo>();
-        
-        // Add domain randomization for physics testing (random mass, friction, etc.)
-        var domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
-        domainRandomizer.randomizeMass = true;
-        domainRandomizer.randomizeFriction = true;
-        domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
-
-        // Add automatic behavior switching only for training scenes
-        if (sceneType == SceneType.Training)
-        {
-            var autoSwitcher = pelvis.AddComponent<AutoBehaviorSwitcher>();
-            autoSwitcher.enableAutoSwitching = true;
-            autoSwitcher.showDebugMessages = true;
-
-            TrainArenaDebugManager.Log("Added AutoBehaviorSwitcher for seamless training/testing mode switching",
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-        else
-        {
-            TrainArenaDebugManager.Log("Test scene: No AutoBehaviorSwitcher (InferenceOnly mode for AI model testing)",
-                                     TrainArenaDebugManager.DebugLogLevel.Important);
-        }
-
-        TrainArenaDebugManager.Log("Added debug components: AgentDebugInfo, DomainRandomizer", 
-                                 TrainArenaDebugManager.DebugLogLevel.Important);
-
-        return ragdoll;
+        return CreateAgentPrefab(init, AgentType.Ragdoll, sceneType);
     }
+
+    #endregion Create Agent Prefabs
 }

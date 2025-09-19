@@ -69,5 +69,10 @@ namespace TrainArena.Core
         /// Get observation range for visualization
         /// </summary>
         float GetObservationRange();
+
+        /// <summary>
+        /// Calculate total observation count based on configuration
+        /// </summary>
+        int GetTotalObservationCount();
     }
 }

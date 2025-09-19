@@ -108,8 +108,42 @@ public static class PrimitiveBuilder
             // Use 6 continuous actions for leg joints (hips, knees, ankles)
             behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6);
             
+            // Ensure observation space is correct (16 observations for ragdoll)
+            //TODO: Hardcoding
+            TrainArenaDebugManager.LogWarning($"Ragdoll observation count: {ragdollAgent.GetTotalObservationCount()}, vector observation size: {behaviorParameters.BrainParameters.VectorObservationSize}, (should be 16, or more?)");
+            /*if (behaviorParams.BrainParameters.VectorObservationSize != 16)
+            {
+                behaviorParams.BrainParameters.VectorObservationSize = 16;
+                TrainArenaDebugManager.Log("Fixed VectorObservationSize to 16 for RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
+            }*/
+            
             TrainArenaDebugManager.Log($"Added BehaviorParameters with {ragdollAgent.joints.Count} continuous actions", TrainArenaDebugManager.DebugLogLevel.Important);
+            
+            TrainArenaDebugManager.Log($"Configured ragdoll: {behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions} actions, " +
+                                     $"{behaviorParameters.BrainParameters.VectorObservationSize} observations " +
+                                     $"(6 joints: hips, knees, ankles), Mode: Editor Testing → ML Training (auto-switch)", 
+                                     TrainArenaDebugManager.DebugLogLevel.Important);
         }
+
+        // Add blinking animation for visual polish
+        var headVisualObject = ragdoll.transform.Find("Head")?.transform.Find("Visual")?.gameObject;
+        if (headVisualObject != null)
+        {
+            headVisualObject.AddComponent<EyeBlinker>();
+        }
+        else
+        {
+            TrainArenaDebugManager.LogWarning("Failed to find head visual object for the eyes!");
+        }
+
+        // Add debug info component for development
+        pelvis.AddComponent<AgentDebugInfo>();
+        
+        // Add domain randomization for physics testing (random mass, friction, etc.)
+        var domainRandomizer = pelvis.AddComponent<DomainRandomizer>();
+        domainRandomizer.randomizeMass = true;
+        domainRandomizer.randomizeFriction = true;
+        domainRandomizer.randomizeGravity = false; // Keep gravity stable for ragdolls
     }
 
     // Unity Editor menu items for ragdoll creation
@@ -205,6 +239,29 @@ public static class PrimitiveBuilder
         
         // Add simple face to show agent orientation
         AddAgentFace(agent);
+
+        agent.AddComponent<CubeAgent>();
+        
+        // Add BehaviorParameters if not present
+        if (agent.GetComponent<BehaviorParameters>() == null)
+        {
+            var behaviorParameters = agent.AddComponent<BehaviorParameters>();
+            behaviorParameters.BehaviorName = "CubeAgent";
+
+            // Configure action and observation space
+            if (behaviorParameters.BrainParameters.ActionSpec.NumContinuousActions == 0)
+            {
+                // Set up action space: 2 continuous actions (moveX, moveZ)
+                behaviorParameters.BrainParameters.ActionSpec = 
+                    Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(2);
+            }
+        }
+
+        // Add blinking animation for visual polish
+        agent.AddComponent<EyeBlinker>();
+
+        // Add debug info component for development
+        agent.AddComponent<AgentDebugInfo>();
         
         return agent;
     }
@@ -253,6 +310,7 @@ public static class PrimitiveBuilder
         mr.sharedMaterial = mat;
         
         obs.name = name;
+        EnsureTagExists("Obstacle");
         obs.tag = "Obstacle"; // Ensure proper tag for agent detection
         
         return obs;

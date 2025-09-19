@@ -19,7 +19,7 @@ using UnityEngine;
 public class EnvInitializer : MonoBehaviour
 {
     [Header("Prefabs")]
-    public GameObject cubeAgentPrefab;
+    public GameObject agentPrefab;
     public GameObject goalPrefab;
     public GameObject obstaclePrefab;
 
@@ -105,7 +105,7 @@ public class EnvInitializer : MonoBehaviour
 
     void Start()
     {
-        if (cubeAgentPrefab == null || goalPrefab == null) { TrainArenaDebugManager.LogError("Assign prefabs in EnvInitializer"); return; }
+        if (agentPrefab == null || goalPrefab == null) { TrainArenaDebugManager.LogError("Assign prefabs in EnvInitializer"); return; }
 
         // Apply preset configuration
         ApplyPreset();
@@ -129,11 +129,10 @@ public class EnvInitializer : MonoBehaviour
     {
         TrainArenaDebugManager.Log("Cleaning up prefab instances from scene hierarchy", TrainArenaDebugManager.DebugLogLevel.Important);
         
-        //TODO: This should just be agentPrefab - it's not limited to CubeAgents
-        if (cubeAgentPrefab != null)
+        if (agentPrefab != null)
         {
-            cubeAgentPrefab.SetActive(false);
-            TrainArenaDebugManager.Log("Disabled cubeAgentPrefab", TrainArenaDebugManager.DebugLogLevel.Verbose);
+            agentPrefab.SetActive(false);
+            TrainArenaDebugManager.Log("Disabled agentPrefab", TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
         
         if (goalPrefab != null)
@@ -171,7 +170,7 @@ public class EnvInitializer : MonoBehaviour
         // Agent - use ArenaHelper for initial positioning (will be overridden in OnEpisodeBegin)
         var agentPosition = center + Vector3.up * 0.5f; // Initial position at center
         agentPosition.y += arenaHelper.AgentSpawnHeight;
-        var agentGO = Instantiate(cubeAgentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
+        var agentGO = Instantiate(agentPrefab, agentPosition, Quaternion.identity, arenaContainer.transform);
         
         // Detect agent type and name appropriately
         var cubeAgent = agentGO.GetComponent<CubeAgent>();

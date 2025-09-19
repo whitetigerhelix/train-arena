@@ -9,6 +9,8 @@ using TrainArena.Core;
 [RequireComponent(typeof(Rigidbody))]
 public class CubeAgent : BaseTrainArenaAgent
 {
+    //TODO: We need to move some of the important logic in this class that should also be leveraged by other agents (ie. ragdoll) into BaseTrainArenaAgent
+
     [Header("Scene Refs")]
     public Transform goal;
     public LayerMask obstacleMask;
@@ -85,7 +87,7 @@ public class CubeAgent : BaseTrainArenaAgent
     /// <summary>
     /// Calculate total observation count based on configuration
     /// </summary>
-    public int GetTotalObservationCount()
+    public override int GetTotalObservationCount()
     {
         return VELOCITY_OBSERVATIONS + GOAL_OBSERVATIONS + raycastDirections;
     }

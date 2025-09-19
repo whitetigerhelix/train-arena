@@ -80,7 +80,15 @@ namespace TrainArena.Core
         {
             return 2f; // Default observation range
         }
-        
+
+        /// <summary>
+        /// Calculate total observation count based on configuration
+        /// </summary>
+        public virtual int GetTotalObservationCount()
+        {
+            return 0; // Default to 0, override in derived classes
+        }
+
         /// <summary>
         /// Base implementation of OnActionReceived with activity check
         /// Derived classes should override HandleActiveActions instead of this method
