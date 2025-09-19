@@ -10,13 +10,8 @@ using UnityEngine.InputSystem;
 public class CubeAgent : BaseTrainArenaAgent
 {
     [Header("Cube Agent Configuration")]
-    public Transform goal;
-    public LayerMask obstacleMask;
     public float moveAccel = 50f;                   // Increased force for better movement
     public float rayLength = 10f;
-    
-    [Header("Observation Space Configuration")]
-    public int raycastDirections = 8;
     
     // Observation space constants
     public const int VELOCITY_OBSERVATIONS = 3;     // Local velocity (x, y, z)
