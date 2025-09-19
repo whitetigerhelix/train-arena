@@ -47,7 +47,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         public float separation = 0.004f; // small gap to avoid initial penetration
     }
 
-    [MenuItem("Tools/TrainArena/Build Reference Blockman")]
+    [MenuItem("Tools/ML Hack/Build Reference Ragdoll")]
     static void BuildMenu()
     {
         var root = Build(Vector3.zero, new Cfg());
@@ -56,7 +56,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
     public static GameObject Build(Vector3 pos, Cfg cfg)
     {
-        var root = new GameObject("Blockman_v2");
+        var root = new GameObject("BlockmanRagdoll");
         root.transform.position = pos;
 
         // ---- helpers ----

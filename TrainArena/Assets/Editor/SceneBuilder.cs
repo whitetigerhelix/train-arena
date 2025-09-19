@@ -377,7 +377,7 @@ public static class SceneBuilder
         // Add debug UI components (same as cube agents)
         var pelvis = ragdoll.GetComponentInChildren<RagdollAgent>().gameObject;
         pelvis.AddComponent<AgentDebugInfo>();
-        // Note: No EyeBlinker for ragdolls - they don't have eyes
+        // Note: Ragdolls now have blinking eyes on their heads!
         
         // Add domain randomization for physics testing (random mass, friction, etc.)
         var domainRandomizer = pelvis.AddComponent<DomainRandomizer>(); //TODO: Or add to root ragdoll object?

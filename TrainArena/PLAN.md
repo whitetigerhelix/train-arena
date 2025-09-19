@@ -24,7 +24,7 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - ✅ **500K step training completion** with multiple model checkpoints
 - ✅ **Perfect inference**: Trained cubes navigate directly to goals
 
-**RagdollAgent (MAJOR PROGRESS):**
+**RagdollAgent (COMPLETE):**
 
 - ✅ **Hierarchical skeleton structure**: Proper pelvis→thigh→shin→foot chains (fixed flat hierarchy)
 - ✅ **Joint-based locomotion system**: 6 PDJointControllers with coordinated movement
@@ -32,6 +32,9 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - ✅ **PD Controller tuning**: Natural gains (kp=80f, kd=8f) for fluid ragdoll physics
 - ✅ **ActionSpec validation**: 6 continuous actions properly configured
 - ✅ **Scene generation**: Complete ragdoll training environments with SceneBuilder integration
+- ✅ **Simple stable ragdoll system**: Replaced complex procedural generation with stable block-based approach
+- ✅ **ML-Agents integration**: All 6 ConfigurableJoints properly connected to PDJointControllers
+- ✅ **Visual polish**: Blinking eyes system integrated from CubeAgent for character appeal
 
 **Training Results (cube_run_20250916_155432):**
 
@@ -98,6 +101,10 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 ### Day 3 – Ragdoll Development & Code Quality ✅ COMPLETE
 
 - [x] **Major ragdoll system overhaul** - fixed hierarchy, joint control, ActionSpec
+- [x] **Simple stable ragdoll integration** - replaced complex procedural with block-based approach
+- [x] **ML-Agents readiness** - all 6 joints configured with PDJointControllers and proper limits
+- [x] **Visual polish** - integrated blinking eye system for character appeal
+- [x] **Clean system integration** - updated SceneBuilder, menu items, all using stable ragdoll
 - [x] **Comprehensive code cleanup** - updated all comments, logging, documentation
 - [x] **Agent file audit** - RagdollAgent, CubeAgent, PDJointController fully documented
 - [x] **Debug system review** - TrainArenaDebugManager cleaned up and optimized

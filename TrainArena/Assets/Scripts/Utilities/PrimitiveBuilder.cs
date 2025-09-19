@@ -2,6 +2,7 @@ using System.Linq;
 using Unity.MLAgents.Policies;
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Centralized primitive and material creation system for TrainArena.
@@ -214,18 +215,114 @@ public static class PrimitiveBuilder
     //public static ReferenceRagdollConfiguration CurrentConfig { get; set; }
 
     /// <summary>
-    /// Creates ragdoll with EXACT reference specifications from images:
-    /// 13 bones, 12 joints, full body with head, arms, torso, and legs
-    /// Uses Unity's proven ragdoll system instead of complex procedural generation
+    /// Creates ragdoll using the stable BlockmanRagdollBuilder system
+    /// This is the main entry point for ragdoll creation - delegates to BlockmanRagdollBuilder
     /// </summary>
     public static GameObject CreateRagdoll(string name = "ReferenceRagdoll", Vector3 position = default)
     {
-        TrainArenaDebugManager.Log($"🎯 CREATING SIMPLE REFERENCE RAGDOLL - Using Unity's built-in system", TrainArenaDebugManager.DebugLogLevel.Important);
-        if (CurrentConfig == null)
+        TrainArenaDebugManager.Log($"🎯 Creating ragdoll using BlockmanRagdollBuilder system", TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Use BlockmanRagdollBuilder for consistent, stable ragdoll creation
+        var ragdoll = BlockmanRagdollBuilder.Build(position, new BlockmanRagdollBuilder.Cfg());
+        ragdoll.name = name;
+        
+        // Add ML-Agents components if not already present
+        AddMLAgentsToBlockman(ragdoll);
+        
+        TrainArenaDebugManager.Log($"✅ Ragdoll created using BlockmanRagdollBuilder: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
+        return ragdoll;
+    }
+    
+    /// <summary>
+    /// Adds ML-Agents components to a blockman ragdoll if they're not already present
+    /// </summary>
+    private static void AddMLAgentsToBlockman(GameObject ragdoll)
+    {
+        var pelvis = ragdoll.transform.Find("Pelvis")?.gameObject;
+        if (pelvis == null)
         {
-            CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
+            TrainArenaDebugManager.LogError("No Pelvis found in blockman ragdoll - ML-Agents components not added");
+            return;
         }
-        return CreateSimpleRagdoll(name, position, CurrentConfig);
+        
+        // Add RagdollAgent if not present
+        if (pelvis.GetComponent<RagdollAgent>() == null)
+        {
+            var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
+            ragdollAgent.pelvis = pelvis.transform;
+            
+            // Find leg joints only for ML-Agents control (6 joints for locomotion)
+            var joints = new List<PDJointController>();
+            var configJoints = ragdoll.GetComponentsInChildren<ConfigurableJoint>();
+            
+            foreach (var configJoint in configJoints)
+            {
+                var partName = configJoint.gameObject.name.ToLower();
+                
+                // Only add PDJointController to leg joints for locomotion
+                bool isLegJoint = partName.Contains("upperleg") || partName.Contains("lowerleg") || partName.Contains("foot");
+                
+                if (isLegJoint)
+                {
+                    // Add PDJointController if not present
+                    var pdController = configJoint.GetComponent<PDJointController>();
+                    if (pdController == null)
+                    {
+                        pdController = configJoint.gameObject.AddComponent<PDJointController>();
+                        pdController.joint = configJoint;
+                        pdController.kp = 80f;
+                        pdController.kd = 8f;
+                        
+                        // Set reasonable angle limits based on body part
+                        if (partName.Contains("upperleg"))
+                        {
+                            pdController.minAngle = -45f;
+                            pdController.maxAngle = 45f;
+                        }
+                        else if (partName.Contains("lowerleg"))
+                        {
+                            pdController.minAngle = -90f;
+                            pdController.maxAngle = 90f;
+                        }
+                        else if (partName.Contains("foot"))
+                        {
+                            pdController.minAngle = -30f;
+                            pdController.maxAngle = 30f;
+                        }
+                    }
+                    
+                    joints.Add(pdController);
+                }
+            }
+            
+            ragdollAgent.joints = joints;
+            TrainArenaDebugManager.Log($"Added {joints.Count} PDJointControllers to RagdollAgent", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        // Add BehaviorParameters if not present
+        if (pelvis.GetComponent<BehaviorParameters>() == null)
+        {
+            var behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
+            behaviorParameters.BehaviorName = "RagdollAgent";
+            
+            // Use 6 continuous actions for leg joints (hips, knees, ankles)
+            behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6);
+            
+            TrainArenaDebugManager.Log($"Added BehaviorParameters with {jointCount} continuous actions", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        // Add AutoBehaviorSwitcher if not present
+        if (pelvis.GetComponent<AutoBehaviorSwitcher>() == null)
+        {
+            pelvis.AddComponent<AutoBehaviorSwitcher>();
+        }
+        
+        // Add blinking eyes to head if not already present
+        var head = ragdoll.transform.Find("Head")?.gameObject;
+        if (head != null && head.GetComponent<EyeBlinkAnimator>() == null)
+        {
+            AddBlinkingEyes(head);
+        }
     }
 
     /// <summary>
@@ -256,8 +353,42 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// Creates a simple, stable ragdoll that looks right without complex joint math
+    /// Adds a simple ConfigurableJoint with PDJointController for ML-Agents control
     /// </summary>
+    private static void AddSimpleJoint(GameObject child, GameObject parent, string jointName)
+    {
+        // Add ConfigurableJoint
+        var joint = child.AddComponent<ConfigurableJoint>();
+        joint.connectedBody = parent.GetComponent<Rigidbody>();
+        
+        // Simple joint configuration - limit to angular motion only
+        joint.xMotion = ConfigurableJointMotion.Locked;
+        joint.yMotion = ConfigurableJointMotion.Locked; 
+        joint.zMotion = ConfigurableJointMotion.Locked;
+        joint.angularXMotion = ConfigurableJointMotion.Limited;
+        joint.angularYMotion = ConfigurableJointMotion.Limited;
+        joint.angularZMotion = ConfigurableJointMotion.Limited;
+        
+        // Set reasonable joint limits (60 degrees in each direction)
+        joint.lowAngularXLimit = new SoftJointLimit { limit = -60f };
+        joint.highAngularXLimit = new SoftJointLimit { limit = 60f };
+        joint.angularYLimit = new SoftJointLimit { limit = 60f };
+        joint.angularZLimit = new SoftJointLimit { limit = 60f };
+        
+        // Add PDJointController for ML-Agents
+        var pdController = child.AddComponent<PDJointController>();
+        pdController.joint = joint;
+        pdController.kp = 80f; // Moderate stiffness
+        pdController.kd = 8f;  // Good damping
+        
+        TrainArenaDebugManager.Log($"🔗 Added joint: {jointName} ({child.name} → {parent.name})", TrainArenaDebugManager.DebugLogLevel.Verbose);
+    }
+
+    /// <summary>
+    /// LEGACY - DEPRECATED - Use BlockmanRagdollBuilder.Build() instead
+    /// This method has been replaced by the more stable BlockmanRagdollBuilder system
+    /// </summary>
+    [System.Obsolete("Use BlockmanRagdollBuilder.Build() instead", true)]
     public static GameObject CreateSimpleRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
     {
         TrainArenaDebugManager.Log($"🤖 Creating simple stable ragdoll: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -315,19 +446,45 @@ public static class PrimitiveBuilder
         var rightAnklePos = new Vector3(0, -config.lowerLegScale.y * 0.5f - config.footScale.y * 0.5f, config.footScale.z * 0.25f);
         var rightFoot = CreateSimpleBodyPart("RightFoot", rightAnklePos, config.footScale, PrimitiveType.Sphere, rightLowerLeg.transform, config.footMass, new Color(0.7f, 0.5f, 0.3f));
         
-        // Add ML-Agents components
-        root.AddComponent<RagdollAgent>();
-        var behaviorParameters = root.AddComponent<BehaviorParameters>();
-        behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(12);
+        // Add ConfigurableJoints for ML-Agents control (6 joints: hips, knees, ankles)
+        AddSimpleJoint(leftUpperLeg, pelvis, "LeftHip");
+        AddSimpleJoint(rightUpperLeg, pelvis, "RightHip"); 
+        AddSimpleJoint(leftLowerLeg, leftUpperLeg, "LeftKnee");
+        AddSimpleJoint(rightLowerLeg, rightUpperLeg, "RightKnee");
+        AddSimpleJoint(leftFoot, leftLowerLeg, "LeftAnkle");
+        AddSimpleJoint(rightFoot, rightLowerLeg, "RightAnkle");
         
-        TrainArenaDebugManager.Log($"✅ Simple ragdoll created successfully: 13 bones, stable hierarchy, no complex joints", TrainArenaDebugManager.DebugLogLevel.Important);
+        // Add ML-Agents components on the pelvis (root body part)
+        var ragdollAgent = pelvis.AddComponent<RagdollAgent>();
+        var behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
+        behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(6); // 6 joints
+        behaviorParameters.BehaviorName = "RagdollAgent";
+        
+        // Configure RagdollAgent with joint references
+        ragdollAgent.pelvis = pelvis.transform;
+        ragdollAgent.joints = new List<PDJointController>
+        {
+            leftUpperLeg.GetComponent<PDJointController>(),
+            rightUpperLeg.GetComponent<PDJointController>(),
+            leftLowerLeg.GetComponent<PDJointController>(),
+            rightLowerLeg.GetComponent<PDJointController>(),
+            leftFoot.GetComponent<PDJointController>(),
+            rightFoot.GetComponent<PDJointController>()
+        };
+        
+        // Add AutoBehaviorSwitcher for seamless training/testing mode switching
+        pelvis.AddComponent<AutoBehaviorSwitcher>();
+        
+        TrainArenaDebugManager.Log($"✅ Blockman ragdoll created: 13 bones, 6 joints, ML-Agents ready for training!", TrainArenaDebugManager.DebugLogLevel.Important);
         
         return root;
     }
 
     /// <summary>
-    /// Creates the reference exact ragdoll with 13 bones and 12 joints
+    /// LEGACY METHOD - DEPRECATED - Use BlockmanRagdollBuilder.Build() instead
+    /// This method has been replaced by the more stable BlockmanRagdollBuilder system
     /// </summary>
+    [System.Obsolete("Use BlockmanRagdollBuilder.Build() instead", true)]
     public static GameObject CreateReferenceRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
     {
         TrainArenaDebugManager.Log($"🚀 BUILDING REFERENCE EXACT RAGDOLL: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -677,8 +834,10 @@ public static class PrimitiveBuilder
     }
 
     /// <summary>
-    /// LEGACY - Creates an anatomically correct ragdoll with realistic proportions
+    /// LEGACY - DEPRECATED - Use BlockmanRagdollBuilder.Build() instead
+    /// This method has been replaced by the more stable BlockmanRagdollBuilder system
     /// </summary>
+    [System.Obsolete("Use BlockmanRagdollBuilder.Build() instead", true)]
     public static GameObject CreateAnatomicalRagdoll(string name, Vector3 position, ReferenceRagdollConfiguration config)
     {
         TrainArenaDebugManager.Log($"🚀 CREATING ANATOMICALLY CORRECT RAGDOLL: {name}", TrainArenaDebugManager.DebugLogLevel.Important);
@@ -1197,105 +1356,14 @@ public static class PrimitiveBuilder
         return material;
     }
 
-    // Unity Editor menu items for ragdoll configuration
+    // Unity Editor menu items for ragdoll creation
     #if UNITY_EDITOR
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set AI Training Preset")]
-    public static void SetAITrainingPreset()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.AITraining();
-        UnityEngine.Debug.Log("Ragdoll configuration set to AI Training preset");
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Realistic Human Preset")]
-    public static void SetRealisticHumanPreset()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.RealisticHuman();
-        UnityEngine.Debug.Log("Ragdoll configuration set to Realistic Human preset");
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Athletic Preset")]
-    public static void SetAthleticPreset()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.Athletic();
-        UnityEngine.Debug.Log("Ragdoll configuration set to Athletic preset");
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Set Reference Exact Preset")]
-    public static void SetReferenceExactPreset()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
-        UnityEngine.Debug.Log("Ragdoll configuration set to Reference Exact preset");
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Test Ragdoll (Current Config)")]
+    [UnityEditor.MenuItem("Tools/ML Hack/Create Test Ragdoll")]
     public static void CreateTestRagdoll()
     {
         var ragdoll = CreateRagdoll("TestRagdoll", Vector3.zero);
         UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🎭 Created test ragdoll with current configuration. Joints: {ragdoll.GetComponentsInChildren<PDJointController>().Length}", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Realistic Human Ragdoll")]
-    public static void CreateRealisticHumanRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.RealisticHuman();
-        var ragdoll = CreateRagdoll("RealisticHumanRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🎭 Created realistic human ragdoll - Ready for locomotion training!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Functional Walker Ragdoll")]
-    public static void CreateFunctionalWalkerRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.FunctionalWalker();
-        var ragdoll = CreateRagdoll("FunctionalWalkerRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🚶 Created functional walker ragdoll - Optimized for stable locomotion!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Inspiration Match Ragdoll")]
-    public static void CreateInspirationMatchRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.InspirationMatch();
-        var ragdoll = CreateRagdoll("InspirationMatchRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🎯 Created inspiration-matched ragdoll - Elongated human proportions like reference images!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Athletic Ragdoll")]
-    public static void CreateAthleticRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.Athletic();
-        var ragdoll = CreateRagdoll("AthleticRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🎭 Created athletic ragdoll - Enhanced performance capabilities!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create AI Training Ragdoll")]
-    public static void CreateAITrainingRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.AITraining();
-        var ragdoll = CreateRagdoll("AITrainingRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🤖 Created AI training ragdoll - Optimized for machine learning!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Anatomical Human Ragdoll")]
-    public static void CreateAnatomicalHumanRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.AnatomicalHuman();
-        var ragdoll = CreateRagdoll("AnatomicalHumanRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"🧬 Created anatomically correct human ragdoll - Real human proportions!", TrainArenaDebugManager.DebugLogLevel.Important);
-    }
-
-    [UnityEditor.MenuItem("TrainArena/Ragdoll Config/Create Reference Exact Ragdoll")]
-    public static void CreateReferenceExactRagdoll()
-    {
-        CurrentConfig = ReferenceRagdollConfiguration.ReferenceExact();
-        var ragdoll = CreateRagdoll("ReferenceExactRagdoll", Vector3.zero);
-        UnityEditor.Selection.activeGameObject = ragdoll;
-        TrainArenaDebugManager.Log($"📐 Created reference exact ragdoll - Precise reference specifications!", TrainArenaDebugManager.DebugLogLevel.Important);
+        TrainArenaDebugManager.Log($"🎭 Created test ragdoll using BlockmanRagdollBuilder system. Joints: {ragdoll.GetComponentsInChildren<PDJointController>().Length}", TrainArenaDebugManager.DebugLogLevel.Important);
     }
     #endif
 }
