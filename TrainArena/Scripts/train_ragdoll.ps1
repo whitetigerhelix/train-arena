@@ -1,13 +1,13 @@
-# Ragdoll Training Script - Day 1 Sprint
+# Ragdoll Training
 # Activates Python environment and starts ragdoll training
 
 param(
-    [string]$RunId = "ragdoll_sprint_day1",
+    [string]$RunId = "ragdoll_run_$(Get-Date -Format 'yyyyMMdd_HHmmss')",
     [switch]$Resume = $false,
     [int]$TimeScale = 20
 )
 
-Write-Host "🎭 Starting Ragdoll Training (Day 1 Sprint)" -ForegroundColor Green
+Write-Host "🎭 Starting Ragdoll Training" -ForegroundColor Green
 Write-Host "Run ID: $RunId" -ForegroundColor Cyan
 Write-Host "Time Scale: ${TimeScale}x" -ForegroundColor Cyan
 
