@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using TrainArena.Core;
+using TrainArena.Configuration;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -40,6 +41,14 @@ public class RagdollAgent : BaseTrainArenaAgent
     
     [Tooltip("Weight for uprightness reward component")]
     public float uprightBonus = 0.5f;
+    
+    [Header("Heuristic Configuration")]
+    [Tooltip("Override base frequency for heuristic movements (0 = use default from config)")]
+    public float heuristicFrequencyOverride = 0f;
+    
+    [Tooltip("Global amplitude multiplier for all heuristic movements")]
+    [Range(0.1f, 2.0f)]
+    public float heuristicAmplitudeMultiplier = 1.0f;
     
     // Observation space constants (matching CubeAgent pattern)
     public const int UPRIGHTNESS_OBSERVATIONS = 1;      // Pelvis uprightness (dot product with world up)
@@ -404,51 +413,34 @@ public class RagdollAgent : BaseTrainArenaAgent
             return;
         }
         
-        // Generate more natural locomotion patterns based on joint names
-        // This creates coordinated movements that should help the ragdoll balance and eventually walk
+        // Generate coordinated locomotion patterns using centralized configuration
+        // This creates natural movements that should help the ragdoll balance and eventually walk
         float time = Time.time;
-        float baseFrequency = 0.8f; // Slower, more natural frequency
+        float baseFrequency = heuristicFrequencyOverride > 0f ? 
+            heuristicFrequencyOverride : 
+            RagdollHeuristicConfig.BaseFrequency;
         
         for (int i = 0; i < joints.Count && i < heuristicActions.Length; i++)
         {
-            if (i < joints.Count)
-            {
-                string jointName = joints[i].name;
-                float action = 0f;
-                
-                // Create coordinated movements based on joint type
-                if (jointName.Contains("UpperLeg") || jointName.Contains("Hip"))
-                {
-                    // Hip movements for balance and stepping
-                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI; // Opposite legs
-                    action = 0.8f * Mathf.Sin(time * baseFrequency + phase);
-                }
-                else if (jointName.Contains("LowerLeg") || jointName.Contains("Knee"))
-                {
-                    // Knee flexion for walking
-                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI;
-                    action = 0.6f * Mathf.Sin(time * baseFrequency * 2f + phase + Mathf.PI/4f);
-                }
-                else if (jointName.Contains("Foot") || jointName.Contains("Ankle"))
-                {
-                    // Ankle adjustments for balance
-                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI;
-                    action = 0.4f * Mathf.Sin(time * baseFrequency * 1.5f + phase + Mathf.PI/2f);
-                }
-                else
-                {
-                    // Other joints (arms, torso) - subtle movements for balance
-                    action = 0.3f * Mathf.Sin(time * baseFrequency * 0.5f + i * 0.5f);
-                }
-                
-                heuristicActions[i] = Mathf.Clamp(action, -1f, 1f);
-            }
+            string jointName = joints[i].name;
+            
+            // Get joint-specific heuristic configuration from centralized config
+            var (amplitude, frequencyMult, basePhase) = RagdollHeuristicConfig.GetJointHeuristicConfig(jointName, i);
+            
+            // Apply global amplitude multiplier from inspector
+            amplitude *= heuristicAmplitudeMultiplier;
+            
+            // Calculate coordinated movement pattern
+            float frequency = baseFrequency * frequencyMult;
+            float action = amplitude * Mathf.Sin(time * frequency + basePhase);
+            
+            heuristicActions[i] = Mathf.Clamp(action, -1f, 1f);
         }
         
         // Debug log occasionally to verify heuristic is running
-        if (Time.fixedTime % 2f < Time.fixedDeltaTime)
+        if (Time.fixedTime % RagdollHeuristicConfig.DebugLogInterval < Time.fixedDeltaTime)
         {
-            TrainArenaDebugManager.Log($"🎭 {name}: Heuristic active - generating walking pattern with {joints.Count} joints", 
+            TrainArenaDebugManager.Log($"🎭 {name}: Heuristic active - generating coordinated walking pattern with {joints.Count} joints", 
                 TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
     }

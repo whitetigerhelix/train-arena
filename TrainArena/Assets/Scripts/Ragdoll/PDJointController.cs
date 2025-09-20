@@ -1,4 +1,5 @@
 using UnityEngine;
+using TrainArena.Configuration;
 
 /// <summary>
 /// PD (Proportional-Derivative) Joint Controller for ragdoll locomotion
@@ -24,6 +25,43 @@ public class PDJointController : MonoBehaviour
     void Reset()
     {
         joint = GetComponent<ConfigurableJoint>();
+    }
+
+    void Start()
+    {
+        // Apply centralized configuration if available
+        ApplyCentralizedConfig();
+    }
+
+    /// <summary>
+    /// Apply centralized joint configuration based on joint name
+    /// </summary>
+    public void ApplyCentralizedConfig()
+    {
+        if (joint == null) return;
+
+        // Get configuration from centralized system
+        var (minAngleConfig, maxAngleConfig, kpConfig, kdConfig) = RagdollJointNames.GetJointControllerConfig(name);
+        
+        // Only apply if we have valid configuration (non-zero values)
+        if (minAngleConfig != 0f || maxAngleConfig != 0f)
+        {
+            minAngle = minAngleConfig;
+            maxAngle = maxAngleConfig;
+        }
+        
+        if (kpConfig > 0f)
+        {
+            kp = kpConfig;
+        }
+        
+        if (kdConfig > 0f)
+        {
+            kd = kdConfig;
+        }
+
+        TrainArenaDebugManager.Log($"🔧 {name}: Applied centralized config - angles:[{minAngle:F1}°, {maxAngle:F1}°], gains:[kp:{kp}, kd:{kd}]", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
 
     /// <summary>
