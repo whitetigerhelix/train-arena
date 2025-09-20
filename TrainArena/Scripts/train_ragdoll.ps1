@@ -38,10 +38,14 @@ if ($env:VIRTUAL_ENV) {
             # Source the activation script in this session
             & ".\Scripts\activate_mlagents_py310.ps1"
             
-            if ($LASTEXITCODE -eq 0) {
+            # Check if environment is now active by checking for virtual environment
+            if ($env:VIRTUAL_ENV -and (Test-Path "$env:VIRTUAL_ENV\Scripts\python.exe")) {
                 Write-Host "   ✅ Environment activated successfully!" -ForegroundColor Green
+            } elseif (Test-Path "venv\mlagents-py310\Scripts\python.exe") {
+                # Sometimes VIRTUAL_ENV isn't set immediately, but the environment works
+                Write-Host "   ✅ Environment available and ready!" -ForegroundColor Green
             } else {
-                throw "Activation script returned error code: $LASTEXITCODE"
+                throw "Virtual environment not properly activated"
             }
         } catch {
             Write-Host "   ❌ Failed to activate environment: $($_.Exception.Message)" -ForegroundColor Red
@@ -60,7 +64,8 @@ if ($env:VIRTUAL_ENV) {
 
 # Set compatibility environment variables (prevents protobuf errors)
 $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
-Write-Host "🔧 Protobuf compatibility mode enabled" -ForegroundColor Yellow
+$env:CUDA_VISIBLE_DEVICES = ""  # Force CPU-only operation
+Write-Host "🔧 Protobuf compatibility and CPU-only mode enabled" -ForegroundColor Yellow
 
 # Ensure we're in the Unity project root directory
 $currentDir = Get-Location

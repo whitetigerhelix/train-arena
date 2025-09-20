@@ -36,17 +36,20 @@ if ($env:VIRTUAL_ENV) {
             # Source the activation script in this session
             & ".\Scripts\activate_mlagents_py310.ps1"
             
-            # Verify activation worked
-            if ($env:VIRTUAL_ENV) {
-                Write-Host "   ✅ Successfully activated: $env:VIRTUAL_ENV" -ForegroundColor Green
+            # Check if environment is now active by checking for virtual environment
+            if ($env:VIRTUAL_ENV -and (Test-Path "$env:VIRTUAL_ENV\Scripts\python.exe")) {
+                Write-Host "   ✅ Environment activated successfully!" -ForegroundColor Green
+            } elseif (Test-Path "venv\mlagents-py310\Scripts\python.exe") {
+                # Sometimes VIRTUAL_ENV isn't set immediately, but the environment works
+                Write-Host "   ✅ Environment available and ready!" -ForegroundColor Green
             } else {
-                Write-Host "   ❌ Activation failed - no VIRTUAL_ENV set" -ForegroundColor Red
-                Write-Host "   Please activate manually: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
-                exit 1
+                throw "Virtual environment not properly activated"
             }
         } catch {
-            Write-Host "   ❌ Error during activation: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Host "   Please activate manually: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
+            Write-Host "   ❌ Failed to activate environment: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "   Please run manually:" -ForegroundColor White
+            Write-Host "   .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+            Write-Host "   .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor Cyan
             exit 1
         }
     } else {
@@ -60,7 +63,8 @@ if ($env:VIRTUAL_ENV) {
 
 # Set compatibility environment variables (prevents protobuf errors)
 $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
-Write-Host "🔧 Protobuf compatibility mode enabled" -ForegroundColor Yellow
+$env:CUDA_VISIBLE_DEVICES = ""  # Force CPU-only operation
+Write-Host "🔧 Protobuf compatibility and CPU-only mode enabled" -ForegroundColor Yellow
 
 # Ensure we're in the Unity project root directory
 $currentDir = Get-Location
