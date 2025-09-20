@@ -404,18 +404,52 @@ public class RagdollAgent : BaseTrainArenaAgent
             return;
         }
         
-        // Generate coordinated sinusoidal movements for walking-like behavior
-        // This provides a baseline for comparing trained behavior against
+        // Generate more natural locomotion patterns based on joint names
+        // This creates coordinated movements that should help the ragdoll balance and eventually walk
+        float time = Time.time;
+        float baseFrequency = 0.8f; // Slower, more natural frequency
+        
         for (int i = 0; i < joints.Count && i < heuristicActions.Length; i++)
         {
-            // Create phase-shifted sinusoidal patterns for different joints
-            float amplitude = 0.6f;                    // Movement strength
-            float baseFrequency = 1.0f;               // Base walking frequency
-            float jointFrequency = baseFrequency + i * 0.2f; // Stagger joint timing
-            float phaseOffset = i * Mathf.PI / 3f;    // Phase difference between joints
-            
-            // Generate coordinated joint movement
-            heuristicActions[i] = amplitude * Mathf.Sin(Time.time * jointFrequency + phaseOffset);
+            if (i < joints.Count)
+            {
+                string jointName = joints[i].name;
+                float action = 0f;
+                
+                // Create coordinated movements based on joint type
+                if (jointName.Contains("UpperLeg") || jointName.Contains("Hip"))
+                {
+                    // Hip movements for balance and stepping
+                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI; // Opposite legs
+                    action = 0.8f * Mathf.Sin(time * baseFrequency + phase);
+                }
+                else if (jointName.Contains("LowerLeg") || jointName.Contains("Knee"))
+                {
+                    // Knee flexion for walking
+                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI;
+                    action = 0.6f * Mathf.Sin(time * baseFrequency * 2f + phase + Mathf.PI/4f);
+                }
+                else if (jointName.Contains("Foot") || jointName.Contains("Ankle"))
+                {
+                    // Ankle adjustments for balance
+                    float phase = jointName.Contains("Left") ? 0f : Mathf.PI;
+                    action = 0.4f * Mathf.Sin(time * baseFrequency * 1.5f + phase + Mathf.PI/2f);
+                }
+                else
+                {
+                    // Other joints (arms, torso) - subtle movements for balance
+                    action = 0.3f * Mathf.Sin(time * baseFrequency * 0.5f + i * 0.5f);
+                }
+                
+                heuristicActions[i] = Mathf.Clamp(action, -1f, 1f);
+            }
+        }
+        
+        // Debug log occasionally to verify heuristic is running
+        if (Time.fixedTime % 2f < Time.fixedDeltaTime)
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: Heuristic active - generating walking pattern with {joints.Count} joints", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
     }
 }
