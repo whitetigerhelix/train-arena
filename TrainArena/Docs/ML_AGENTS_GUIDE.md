@@ -6,44 +6,59 @@ Complete ML-Agents training environment with automated scene building, model man
 
 ## 🚀 Quick Start
 
-### 1. Build Training Scene
+> **💡 For comprehensive training tools guide, see [Training Tools Guide](TRAINING_TOOLS_GUIDE.md)**
+
+### **Option 1: Integrated Training Dashboard** (Recommended)
 
 ```
-Tools → ML Hack → Training Dashboard
+TrainArena → Dashboard → Training Dashboard
 ```
 
-- **Scene Builder Tab**: Create cube or ragdoll training environments
-- Automatically applies post-processing, lighting, and newest models
-- Configurable arena count and camera settings
+**Complete Workflow:**
 
-### 2. Prepare Training Run
+1. **Scene Builder Tab**: Create cube or ragdoll training environments
+2. **Training Tab**: Prepare standardized training runs
+3. **Model Manager Tab**: Apply and manage trained models
+4. **Settings Tab**: Configure auto-refresh and debug options
+
+### **Option 2: Menu-Based Workflow**
+
+#### 1. Build Training Scene
 
 ```
-Tools → ML Hack → Training → Prepare [Agent] Training Run
+TrainArena → Scenes → Build [Agent] Training Scene
 ```
 
-- Creates organized folder structure in `Assets/ML-Agents/TrainingRuns/`
-- Generates ML-Agents config files with optimized hyperparameters
-- Includes training metadata and run tracking
+#### 2. Prepare Training Run
 
-### 3. Run Training
-
-```bash
-# Navigate to Unity project root in terminal
-cd /path/to/TrainArena
-
-# Train Cube Agent
-mlagents-learn Assets/ML-Agents/TrainingRuns/CubeAgent_*/config/CubeAgent_config.yaml --run-id=MyCubeRun
-
-# Train Ragdoll Agent
-mlagents-learn Assets/ML-Agents/TrainingRuns/RagdollAgent_*/config/RagdollAgent_config.yaml --run-id=MyRagdollRun
+```
+TrainArena → Training → Prepare [Agent] Training Run
 ```
 
-### 4. Apply Trained Models
+#### 3. Apply Models
 
-- Copy `.onnx` files from training results to `Assets/ML-Agents/Models/`
-- Use **Model Manager** tab to automatically apply newest models
-- Models are auto-detected and applied during scene creation
+```
+TrainArena → Models → Apply Newest [Agent] Model
+```
+
+### **Option 3: Script-Based Training** (Automated)
+
+```powershell
+# Cube training (with auto-environment activation)
+.\Scripts\train_cube.ps1
+
+# Ragdoll training (with auto-environment activation)
+.\Scripts\train_ragdoll.ps1
+```
+
+### **Option 4: Hot-Reload Development**
+
+```
+TrainArena → Models → Model Hot-Reload
+```
+
+- **Rapid Iteration**: Import newest .onnx and apply instantly
+- **Perfect for Development**: Quick testing of training progress
 
 ## 📁 Folder Structure
 

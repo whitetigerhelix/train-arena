@@ -14,7 +14,7 @@ Write-Host "Run ID: $RunId" -ForegroundColor Cyan
 Write-Host "Config: $ConfigPath" -ForegroundColor Cyan
 Write-Host "Unity Timeout: $TimeoutWait seconds" -ForegroundColor Cyan
 
-# Check if we're in a virtual environment (required for training)
+# Check if we're in a virtual environment, activate if needed
 if ($env:VIRTUAL_ENV) {
     Write-Host "✅ Using virtual environment: $env:VIRTUAL_ENV" -ForegroundColor Green
     
@@ -26,12 +26,36 @@ if ($env:VIRTUAL_ENV) {
         Write-Host "   Consider using Python 3.10: .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
     }
 } else {
-    Write-Host "❌ No virtual environment detected" -ForegroundColor Red
-    Write-Host "   Setup (if needed):" -ForegroundColor White
-    Write-Host "   .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
-    Write-Host "   Important! Activate environment before running this script:" -ForegroundColor White
-    Write-Host "   .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor Cyan
-    exit 1
+    Write-Host "🔄 No virtual environment detected - auto-activating..." -ForegroundColor Yellow
+    
+    # Try to activate the ML-Agents environment automatically
+    if (Test-Path ".\Scripts\activate_mlagents_py310.ps1") {
+        Write-Host "   🐍 Activating Python ML-Agents environment..." -ForegroundColor Yellow
+        
+        try {
+            # Source the activation script in this session
+            & ".\Scripts\activate_mlagents_py310.ps1"
+            
+            # Verify activation worked
+            if ($env:VIRTUAL_ENV) {
+                Write-Host "   ✅ Successfully activated: $env:VIRTUAL_ENV" -ForegroundColor Green
+            } else {
+                Write-Host "   ❌ Activation failed - no VIRTUAL_ENV set" -ForegroundColor Red
+                Write-Host "   Please activate manually: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
+                exit 1
+            }
+        } catch {
+            Write-Host "   ❌ Error during activation: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "   Please activate manually: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
+            exit 1
+        }
+    } else {
+        Write-Host "❌ No activation script found" -ForegroundColor Red
+        Write-Host "   Setup (if needed):" -ForegroundColor White
+        Write-Host "   .\Scripts\setup_python310.ps1" -ForegroundColor Cyan
+        Write-Host "   Then activate manually: .\Scripts\activate_mlagents_py310.ps1" -ForegroundColor White
+        exit 1
+    }
 }
 
 # Set compatibility environment variables (prevents protobuf errors)
