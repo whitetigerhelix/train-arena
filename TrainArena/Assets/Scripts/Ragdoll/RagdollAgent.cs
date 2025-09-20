@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using TrainArena.Core;
+using TrainArena.Configuration;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
@@ -40,6 +41,14 @@ public class RagdollAgent : BaseTrainArenaAgent
     
     [Tooltip("Weight for uprightness reward component")]
     public float uprightBonus = 0.5f;
+    
+    [Header("Heuristic Configuration")]
+    [Tooltip("Override base frequency for heuristic movements (0 = use default from config)")]
+    public float heuristicFrequencyOverride = 0f;
+    
+    [Tooltip("Global amplitude multiplier for all heuristic movements")]
+    [Range(0.1f, 2.0f)]
+    public float heuristicAmplitudeMultiplier = 1.0f;
     
     // Observation space constants (matching CubeAgent pattern)
     public const int UPRIGHTNESS_OBSERVATIONS = 1;      // Pelvis uprightness (dot product with world up)
@@ -404,18 +413,35 @@ public class RagdollAgent : BaseTrainArenaAgent
             return;
         }
         
-        // Generate coordinated sinusoidal movements for walking-like behavior
-        // This provides a baseline for comparing trained behavior against
+        // Generate coordinated locomotion patterns using centralized configuration
+        // This creates natural movements that should help the ragdoll balance and eventually walk
+        float time = Time.time;
+        float baseFrequency = heuristicFrequencyOverride > 0f ? 
+            heuristicFrequencyOverride : 
+            RagdollHeuristicConfig.BaseFrequency;
+        
         for (int i = 0; i < joints.Count && i < heuristicActions.Length; i++)
         {
-            // Create phase-shifted sinusoidal patterns for different joints
-            float amplitude = 0.6f;                    // Movement strength
-            float baseFrequency = 1.0f;               // Base walking frequency
-            float jointFrequency = baseFrequency + i * 0.2f; // Stagger joint timing
-            float phaseOffset = i * Mathf.PI / 3f;    // Phase difference between joints
+            string jointName = joints[i].name;
             
-            // Generate coordinated joint movement
-            heuristicActions[i] = amplitude * Mathf.Sin(Time.time * jointFrequency + phaseOffset);
+            // Get joint-specific heuristic configuration from centralized config
+            var (amplitude, frequencyMult, basePhase) = RagdollHeuristicConfig.GetJointHeuristicConfig(jointName, i);
+            
+            // Apply global amplitude multiplier from inspector
+            amplitude *= heuristicAmplitudeMultiplier;
+            
+            // Calculate coordinated movement pattern
+            float frequency = baseFrequency * frequencyMult;
+            float action = amplitude * Mathf.Sin(time * frequency + basePhase);
+            
+            heuristicActions[i] = Mathf.Clamp(action, -1f, 1f);
+        }
+        
+        // Debug log occasionally to verify heuristic is running
+        if (Time.fixedTime % RagdollHeuristicConfig.DebugLogInterval < Time.fixedDeltaTime)
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: Heuristic active - generating coordinated walking pattern with {joints.Count} joints", 
+                TrainArenaDebugManager.DebugLogLevel.Verbose);
         }
     }
 }

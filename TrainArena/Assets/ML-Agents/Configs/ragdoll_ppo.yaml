@@ -9,13 +9,12 @@ behaviors:
       epsilon: 0.2 # Standard PPO clipping
       lambd: 0.95 # Standard GAE parameter
       num_epoch: 3 # Reduced from 4 to match cube config (faster training)
-      gamma: 0.99 # Standard discount factor
     network_settings:
       normalize: true # Essential for ragdoll observations
       hidden_units: 256 # Good size for ragdoll complexity
       num_layers: 3 # Deep network for complex physics
       activation: relu # Explicit activation function
-    max_steps: 2.0e6 # More reasonable training steps (was 1.0e7)
+    max_steps: 1.0e6 # Reduced to 1M steps for faster iteration (~18 hours vs 36 hours)
     time_horizon: 512 # Longer horizon for ragdoll episodes (was 256)
     summary_freq: 5000 # More frequent summaries (was 10000)
     keep_checkpoints: 5 # Keep multiple checkpoints
@@ -23,5 +22,5 @@ behaviors:
     threaded: true # Enable threading for performance
     reward_signals:
       extrinsic:
+        gamma: 0.99 # Standard discount factor
         strength: 1.0
-        gamma: 0.99

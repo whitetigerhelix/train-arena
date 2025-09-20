@@ -153,8 +153,8 @@ try {
     Write-Host "   Installing compatible protobuf first..." -ForegroundColor White
     & $python310venv -m pip install "protobuf==3.20.3"
     
-    Write-Host "   Installing PyTorch (Windows compatible)..." -ForegroundColor White
-    & $python310venv -m pip install torch~=2.1.1 -f https://download.pytorch.org/whl/torch_stable.html
+    Write-Host "   Installing PyTorch CPU-only (compatible with ML-Agents)..." -ForegroundColor White
+    & $python310venv -m pip install torch==2.1.2+cpu torchvision==0.16.2+cpu torchaudio==2.1.2+cpu --index-url https://download.pytorch.org/whl/cpu
     
     Write-Host "   Installing ML-Agents 1.1.0 (latest)..." -ForegroundColor White
     & $python310venv -m pip install "mlagents==1.1.0"
@@ -195,6 +195,8 @@ try {
 # 6. Set up compatibility environment variables
 Write-Host "`n6. Setting up compatibility..." -ForegroundColor Yellow
 $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+$env:CUDA_VISIBLE_DEVICES = ""  # Force CPU-only operation
+Write-Host "   ✅ CPU-only PyTorch mode enforced" -ForegroundColor Green
 
 # 7. Test mlagents-learn command
 Write-Host "`n7. Testing mlagents-learn command..." -ForegroundColor Yellow
@@ -227,6 +229,7 @@ if (-not (Test-Path "venv\$VenvName")) {
 try {
     & "venv\$VenvName\Scripts\Activate.ps1"
     `$env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+    `$env:CUDA_VISIBLE_DEVICES = ""  # Force CPU-only operation
     
     Write-Host "✅ Python 3.10 environment activated!" -ForegroundColor Green
     Write-Host "✅ ML-Agents 1.1.0 ready for training" -ForegroundColor Green

@@ -12,6 +12,7 @@ if (-not (Test-Path "venv\mlagents-py310")) {
 try {
     & "venv\mlagents-py310\Scripts\Activate.ps1"
     $env:PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION = "python"
+    $env:CUDA_VISIBLE_DEVICES = ""  # Force CPU-only operation
     
     Write-Host "✅ Python 3.10 environment activated!" -ForegroundColor Green
     Write-Host "✅ ML-Agents 0.30.0 ready for training" -ForegroundColor Green

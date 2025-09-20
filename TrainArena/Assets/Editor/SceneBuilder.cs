@@ -234,6 +234,16 @@ public static class SceneBuilder
             behaviorParams.TeamId = 0;
             behaviorParams.UseChildSensors = true;
             
+            // Set behavior name to match training configuration
+            if (agentType == AgentType.Cube)
+            {
+                behaviorParams.BehaviorName = AgentConfiguration.CubeAgent.BehaviorName;  // "CubeAgent"
+            }
+            else
+            {
+                behaviorParams.BehaviorName = AgentConfiguration.RagdollAgent.BehaviorName;  // "RagdollAgent"
+            }
+            
             // Configure observation space dynamically based on agent configuration
             int totalObservations = agent.GetTotalObservationCount();
             if (behaviorParams.BrainParameters.VectorObservationSize != totalObservations)

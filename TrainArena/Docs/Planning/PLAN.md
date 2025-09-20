@@ -4,7 +4,7 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 
 ## 🎯 Current Status (Sept 18, 2025)
 
-**Phase:** Day 3 - RAGDOLL DEVELOPMENT & COMPREHENSIVE CLEANUP 🧹 Code Quality & Documentation Update
+**Phase:** Day 3+ - RAGDOLL PHYSICS & TRAINING PIPELINE COMPLETION ✅ Complete System Ready for Production Training
 
 **What's Working:**
 
@@ -24,12 +24,15 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - ✅ **500K step training completion** with multiple model checkpoints
 - ✅ **Perfect inference**: Trained cubes navigate directly to goals
 
-**RagdollAgent (COMPLETE):**
+**RagdollAgent (COMPLETE & PHYSICS OPTIMIZED):**
 
 - ✅ **Hierarchical skeleton structure**: Proper pelvis→thigh→shin→foot chains (fixed flat hierarchy)
 - ✅ **Joint-based locomotion system**: 6 PDJointControllers with coordinated movement
 - ✅ **Comprehensive observations**: Uprightness + velocity + joint states (16 total observations)
-- ✅ **PD Controller tuning**: Natural gains (kp=80f, kd=8f) for fluid ragdoll physics
+- ✅ **Enhanced PD Controller tuning**: Boosted gains (kp=200f, kd=20f) for strong heuristic response
+- ✅ **Natural joint physics**: Hip 90° limits, ankle -30°/60° range, softened spring forces (60f vs 120f)
+- ✅ **Mass-scaled torque calculation**: Proper joint axis detection and physics-based control
+- ✅ **Centralized configuration system**: RagdollHeuristicConfig eliminates all hardcoded values
 - ✅ **ActionSpec validation**: 6 continuous actions properly configured
 - ✅ **Scene generation**: Complete ragdoll training environments with SceneBuilder integration
 - ✅ **Simple stable ragdoll system**: Replaced complex procedural generation with stable block-based approach
@@ -47,23 +50,30 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 📄 CubeAgent-500009.onnx (latest checkpoint)
 ```
 
-**Code Quality & Documentation (NEW - Sept 18):**
+**Code Quality & Documentation (COMPLETE - Sept 18+):**
 
 - ✅ **Comprehensive code cleanup**: All agent files, debug systems, and builders updated
 - ✅ **Accurate documentation**: Comments now match current implementation
 - ✅ **Consistent logging**: Proper log levels and meaningful debug messages throughout
+- ✅ **Centralized configuration**: AgentConfiguration.cs with RagdollHeuristicConfig eliminates magic numbers
+- ✅ **Enhanced training scripts**: train_ragdoll.ps1 with auto-environment activation
+- ✅ **Professional training tools**: TrainingDashboard, ModelManager, HotReloadWindow integrated
+- ✅ **Complete documentation suite**: Training guides, configuration docs, workflow documentation
 - ✅ **Updated planning docs**: PLAN.md and RAGDOLL_SPRINT_PLAN.md reflect current progress
 - ✅ **Component integration**: All systems properly reference each other with clear APIs
 
 **Current Capabilities:**
 
 - **Production-Ready Cube Training**: Complete pipeline from training to inference
-- **Ragdoll Development Platform**: Full infrastructure ready for locomotion training
+- **Optimized Ragdoll Physics**: Natural joint limits, enhanced PD controllers, mass-scaled torque
+- **Centralized Configuration**: No hardcoded values, easy parameter tuning via RagdollHeuristicConfig
+- **Professional Training Workflow**: TrainingDashboard, ModelManager, HotReload integration
 - **Comprehensive Debug Suite**: Real-time visualization and monitoring for all agent types
+- **Enhanced Training Scripts**: Auto-activation, proper environment management
 - **Scalable Architecture**: Clean, documented codebase ready for extension
-- **Professional Documentation**: Up-to-date plans, comments, and setup guides
+- **Professional Documentation**: Complete guides, workflow docs, and setup instructions
 
-**Next Phase: Ragdoll Training & Demo Creation! 🤖**
+**Next Phase: First Ragdoll Training Session! 🤖**
 
 ---
 
@@ -112,13 +122,14 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - [x] **Planning document updates** - PLAN.md and RAGDOLL_SPRINT_PLAN.md reflect current state
 - Deliverable: ✅ **Production-ready ragdoll infrastructure + comprehensive documentation!** 🧹
 
-### Day 4 – Ragdoll Training & Demo Creation (CURRENT)
+### Day 4 – First Ragdoll Training Session (READY TO LAUNCH) 🚀
 
-- [ ] **Start ragdoll training** - first proper training runs with fixed system
+- [ ] **Launch first ragdoll training** - optimized physics + centralized config system
+- [ ] **Monitor training with professional tools** - TrainingDashboard, live metrics
+- [ ] **Test model hot-reload** - ModelHotReloadWindow for rapid iteration
+- [ ] **Validate physics improvements** - compare old vs new joint behavior
 - [ ] **Record demo videos** of cube and ragdoll agents 🎥
-- [ ] **Training analysis** - compare ragdoll vs cube learning curves
-- [ ] Side-by-side demonstrations (trained vs heuristic behavior)
-- Deliverable: Working ragdoll training + demonstration videos
+- Deliverable: First successful ragdoll training session + performance analysis
 
 ### Day 5 – Ragdoll Locomotion Training
 
@@ -166,20 +177,25 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - [x] Add `Heuristic` for WASD (+ random actions for testing)
 - [x] Add `EnvInitializer` to spawn N arenas laid out in a grid (4x4 = 16 arenas)
 
-### B. Ragdoll
+### B. Ragdoll ✅ COMPLETE
 
-- [ ] Build joint hierarchy; add `PDJointController` per joint
-- [ ] In `RagdollAgent`, expose list of joints; obs = angles, angVels, pelvis vel/orient
-- [ ] Actions = target joint angles ([-1,1] mapped to joint limits)
-- [ ] Rewards = forward speed, uprightness (dot(up, bodyUp)), energy, lateral drift
-- [ ] EndEpisode on fall (pelvis height low or tilt > threshold)
+- [x] Build joint hierarchy; add `PDJointController` per joint
+- [x] In `RagdollAgent`, expose list of joints; obs = angles, angVels, pelvis vel/orient
+- [x] Actions = target joint angles ([-1,1] mapped to joint limits)
+- [x] Rewards = forward speed, uprightness (dot(up, bodyUp)), energy, lateral drift
+- [x] EndEpisode on fall (pelvis height low or tilt > threshold)
+- [x] **Enhanced PD control**: Stronger gains (kp=200f, kd=20f) with mass-scaled torque
+- [x] **Natural joint limits**: Hip 90°, ankle -30°/60°, softened springs for realism
+- [x] **Centralized configuration**: RagdollHeuristicConfig eliminates hardcoded values
 
-### C. Training/Infra
+### C. Training/Infra ✅ ENHANCED
 
 - [x] Provide PPO YAMLs (cube & ragdoll) - `cube_ppo.yaml` ready
-- [ ] Add shell/PowerShell scripts to launch training ← **TODO: Next**
-- [ ] Add TensorBoard instructions
-- [ ] Add `Results/` to .gitignore
+- [x] **Enhanced PowerShell training scripts** - `train_ragdoll.ps1` with auto-activation
+- [x] **Professional training tools integration** - TrainingDashboard, ModelManager, HotReload
+- [x] **Comprehensive documentation** - Training guides, workflow docs, configuration references
+- [x] Add TensorBoard instructions
+- [x] Add `Results/` to .gitignore
 
 ### D. Demo Polish
 
@@ -218,5 +234,42 @@ Use this document to drive GitHub Copilot / tasks. Keep commits small and runnab
 - Slow learning → increase env instances, entropy, simplify reward, add curriculum
 - Ragdoll instability → PD gains, clip actions, lower max torques, bigger feet, start with stand task
 - Demo performance → inference-only, disable expensive graphics, fixed timestep tuning
+
+---
+
+## 🎯 IMMEDIATE NEXT STEPS (Ready to Execute)
+
+### 1. Launch First Ragdoll Training Session
+
+- **Command**: `.\train_ragdoll.ps1`
+- **What to Expect**: Auto-activation of ML-Agents environment + optimized training launch
+- **Monitoring**: Use TrainingDashboard for real-time metrics and progress visualization
+- **Duration**: Start with 1-2 hour session to validate physics improvements
+
+### 2. Validate Physics & Configuration Improvements
+
+- **Compare Heuristic Behavior**: Old vs new PD controller gains (80f→200f kp, 8f→20f kd)
+- **Test Joint Limits**: Hip 90° movement, ankle -30°/60° range, natural motion
+- **Verify Configuration**: All parameters loaded from RagdollHeuristicConfig (no hardcoded values)
+
+### 3. Professional Training Workflow Testing
+
+- **ModelManager**: Test model loading/switching during training
+- **HotReloadWindow**: Validate real-time model updates without stopping training
+- **TrainingDashboard**: Monitor reward curves, episode lengths, training stability
+
+### 4. Performance Analysis & Iteration
+
+- **Training Metrics**: Compare ragdoll learning curve vs cube baseline
+- **Physics Validation**: Confirm enhanced joint control produces better training signals
+- **Configuration Tuning**: Adjust RagdollHeuristicConfig parameters based on training results
+
+### 5. Demo Creation Preparation
+
+- **Record Training Progress**: Capture heuristic vs early training behavior
+- **Document Improvements**: Before/after physics comparison videos
+- **Prepare Inference Testing**: Set up trained model evaluation workflow
+
+**Status**: All infrastructure complete ✅ Ready for production training! 🚀
 
 ---

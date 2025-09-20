@@ -31,20 +31,20 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         public float mULeg = 11.0f, mLLeg = 4.4f;       // each
         public float mFoot = 1.1f;                      // each
 
-        // joint limits (deg)
+        // joint limits (deg) - More natural ranges for better ragdoll physics
         public float kneeFlex = 130f;
         public float elbowFlex = 135f;
-        public float ankleLow = -15f, ankleHigh = 30f;
-        public float hipSwing = 45f;
-        public float shoulderSwing = 60f;
-        public float neckSwing = 25f;
-        public float spineBend = 15f;
+        public float ankleLow = -30f, ankleHigh = 60f;  // Increased ankle range for better foot placement
+        public float hipSwing = 90f;                    // Increased hip range for natural leg movement
+        public float shoulderSwing = 90f;               // Increased shoulder range
+        public float neckSwing = 45f;                   // Increased neck range
+        public float spineBend = 30f;                   // Increased spine bend for natural posture
 
-        // drives
-        public float spring = 120f, damper = 0.6f, maxForce = 3.4e38f;
+        // drives - Softer springs with higher damping for more natural physics
+        public float spring = 60f, damper = 2.0f, maxForce = 3.4e38f;
 
-        // damping & collision
-        public float linDamp = 0.05f, angDamp = 0.05f;
+        // damping & collision - Increased damping for more stable physics
+        public float linDamp = 0.1f, angDamp = 0.15f;
         public float separation = 0.004f; // small gap to avoid initial penetration
     }
 

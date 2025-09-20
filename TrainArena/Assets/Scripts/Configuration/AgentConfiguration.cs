@@ -118,23 +118,125 @@ namespace TrainArena.Configuration
         /// </summary>
         public static (float minAngle, float maxAngle, float kp, float kd) GetJointControllerConfig(string jointName)
         {
+            // Use updated values that match our improved PD controller settings
             switch (jointName)
             {
                 case LeftUpperLeg:
                 case RightUpperLeg:
-                    return (-45f, 45f, 80f, 8f);  // Hip joints
+                    return (-90f, 90f, 200f, 20f);  // Hip joints - increased range and gains
                     
                 case LeftLowerLeg:
                 case RightLowerLeg:
-                    return (-90f, 90f, 80f, 8f);  // Knee joints
+                    return (-130f, 10f, 180f, 18f);  // Knee joints - natural flexion range
                     
                 case LeftFoot:
                 case RightFoot:
-                    return (-30f, 30f, 80f, 8f);  // Ankle joints
+                    return (-60f, 30f, 150f, 15f);  // Ankle joints - dorsiflexion/plantarflexion
+                    
+                case LeftUpperArm:
+                case RightUpperArm:
+                    return (-90f, 90f, 120f, 12f);  // Shoulder joints
+                    
+                case LeftLowerArm:
+                case RightLowerArm:
+                    return (-135f, 0f, 100f, 10f);  // Elbow joints - natural flexion
+                    
+                case Head:
+                    return (-45f, 45f, 80f, 8f);   // Neck joint
+                    
+                case Chest:
+                    return (-30f, 30f, 100f, 10f); // Spine joint
                     
                 default:
-                    return (0f, 0f, 80f, 8f);     // Default values
+                    return (-90f, 90f, 200f, 20f); // Default to hip-like values for unknown joints
             }
+        }
+        
+        /// <summary>
+        /// Check if a joint name contains any of the specified patterns
+        /// </summary>
+        public static bool JointNameContains(string jointName, params string[] patterns)
+        {
+            foreach (var pattern in patterns)
+            {
+                if (jointName.Contains(pattern))
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Configuration for ragdoll heuristic behavior patterns
+    /// </summary>
+    [System.Serializable]
+    public static class RagdollHeuristicConfig
+    {
+        // Base timing configuration
+        public const float BaseFrequency = 0.8f;      // Base movement frequency for natural timing
+        public const float DebugLogInterval = 2f;      // How often to log heuristic debug info
+        
+        // Joint-specific movement amplitudes and timing
+        public static class HipJoints
+        {
+            public const float Amplitude = 0.8f;
+            public const float FrequencyMultiplier = 1.0f;
+            public const float PhaseOffset = 0f; // Left hip base phase
+            public const float OppositePhaseOffset = Mathf.PI; // Right hip phase
+        }
+        
+        public static class KneeJoints  
+        {
+            public const float Amplitude = 0.6f;
+            public const float FrequencyMultiplier = 2.0f;
+            public const float PhaseOffset = Mathf.PI / 4f;
+        }
+        
+        public static class AnkleJoints
+        {
+            public const float Amplitude = 0.4f;
+            public const float FrequencyMultiplier = 1.5f;
+            public const float PhaseOffset = Mathf.PI / 2f;
+        }
+        
+        public static class OtherJoints
+        {
+            public const float Amplitude = 0.3f;
+            public const float FrequencyMultiplier = 0.5f;
+            public const float PhaseMultiplier = 0.5f; // Phase spread per joint index
+        }
+        
+        /// <summary>
+        /// Get heuristic movement parameters for a specific joint
+        /// </summary>
+        public static (float amplitude, float frequencyMult, float basePhase) GetJointHeuristicConfig(string jointName, int jointIndex)
+        {
+            // Check for hip/upper leg joints
+            if (RagdollJointNames.JointNameContains(jointName, "UpperLeg", "Hip"))
+            {
+                float phase = RagdollJointNames.JointNameContains(jointName, "Left") ? 
+                    HipJoints.PhaseOffset : HipJoints.OppositePhaseOffset;
+                return (HipJoints.Amplitude, HipJoints.FrequencyMultiplier, phase);
+            }
+            
+            // Check for knee/lower leg joints
+            if (RagdollJointNames.JointNameContains(jointName, "LowerLeg", "Knee"))
+            {
+                float phase = RagdollJointNames.JointNameContains(jointName, "Left") ? 
+                    KneeJoints.PhaseOffset : (KneeJoints.PhaseOffset + Mathf.PI);
+                return (KneeJoints.Amplitude, KneeJoints.FrequencyMultiplier, phase);
+            }
+            
+            // Check for ankle/foot joints
+            if (RagdollJointNames.JointNameContains(jointName, "Foot", "Ankle"))
+            {
+                float phase = RagdollJointNames.JointNameContains(jointName, "Left") ? 
+                    AnkleJoints.PhaseOffset : (AnkleJoints.PhaseOffset + Mathf.PI);
+                return (AnkleJoints.Amplitude, AnkleJoints.FrequencyMultiplier, phase);
+            }
+            
+            // Default for other joints (arms, torso, etc.)
+            return (OtherJoints.Amplitude, OtherJoints.FrequencyMultiplier, jointIndex * OtherJoints.PhaseMultiplier);
         }
     }
 
