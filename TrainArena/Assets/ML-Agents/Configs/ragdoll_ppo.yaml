@@ -9,7 +9,6 @@ behaviors:
       epsilon: 0.2 # Standard PPO clipping
       lambd: 0.95 # Standard GAE parameter
       num_epoch: 3 # Reduced from 4 to match cube config (faster training)
-      gamma: 0.99 # Standard discount factor
     network_settings:
       normalize: true # Essential for ragdoll observations
       hidden_units: 256 # Good size for ragdoll complexity
@@ -23,4 +22,5 @@ behaviors:
     threaded: true # Enable threading for performance
     reward_signals:
       extrinsic:
+        gamma: 0.99 # Standard discount factor
         strength: 1.0
