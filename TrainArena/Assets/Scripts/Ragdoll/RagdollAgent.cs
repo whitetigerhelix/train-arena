@@ -36,19 +36,19 @@ public class RagdollAgent : BaseTrainArenaAgent
     public Transform pelvis;
     
     [Header("Locomotion Parameters")]
-    [Tooltip("Target forward velocity for reward calculation")]
-    public float targetSpeed = 1.0f;
+    [Tooltip("Target forward velocity for reward calculation (0 = use config default)")]
+    public float targetSpeed = 0f;
     
-    [Tooltip("Weight for uprightness reward component")]
-    public float uprightBonus = 0.5f;
+    [Tooltip("Weight for uprightness reward component (0 = use config default)")]
+    public float uprightBonus = 0f;
     
     [Header("Heuristic Configuration")]
     [Tooltip("Override base frequency for heuristic movements (0 = use default from config)")]
     public float heuristicFrequencyOverride = 0f;
     
-    [Tooltip("Global amplitude multiplier for all heuristic movements")]
-    [Range(0.1f, 2.0f)]
-    public float heuristicAmplitudeMultiplier = 1.0f;
+    [Tooltip("Global amplitude multiplier for all heuristic movements (0 = use config default)")]
+    [Range(0f, 2.0f)]
+    public float heuristicAmplitudeMultiplier = 0f;
     
     // Observation space constants (matching CubeAgent pattern)
     public const int UPRIGHTNESS_OBSERVATIONS = 1;      // Pelvis uprightness (dot product with world up)
@@ -58,17 +58,17 @@ public class RagdollAgent : BaseTrainArenaAgent
     
     // Episode management
     [Header("Episode Management")]
-    [Tooltip("Minimum time before episode can end (learning grace period)")]
-    public float episodeGracePeriod = 8.0f;
+    [Tooltip("Minimum time before episode can end (0 = use config default)")]
+    public float episodeGracePeriod = 0f;
     
-    [Tooltip("Maximum episode duration before auto-reset")]
-    public float maxEpisodeDuration = 30.0f;
+    [Tooltip("Maximum episode duration before auto-reset (0 = use config default)")]
+    public float maxEpisodeDuration = 0f;
     
-    [Tooltip("Minimum uprightness to avoid termination")]
-    public float minUprightness = 0.1f;  // Very lenient during learning
+    [Tooltip("Minimum uprightness to avoid termination (0 = use config default)")]
+    public float minUprightness = 0f;
     
-    [Tooltip("Minimum height before episode termination")]
-    public float minHeight = -0.5f;  // Allow falling below ground briefly
+    [Tooltip("Minimum height before episode termination (0 = use config default)")]
+    public float minHeight = 0f;
     
     // Episode reset state
     private Vector3 startPosition;
@@ -361,15 +361,17 @@ public class RagdollAgent : BaseTrainArenaAgent
         // Apply T-pose specific rotations for natural positioning
         ApplyTPoseRotation(joint);
         
-        // Configure joint drives for stability during reset using centralized configuration
+        // Configure joint drives for natural movement using joint-specific settings
+        var (springForce, dampingForce) = RagdollTPoseConfig.GetJointDriveSettings(joint.name);
+        
         var angularXDrive = joint.angularXDrive;
-        angularXDrive.positionSpring = RagdollTPoseConfig.TPoseSpringForce;
-        angularXDrive.positionDamper = RagdollTPoseConfig.TPoseDampingForce;
+        angularXDrive.positionSpring = springForce;
+        angularXDrive.positionDamper = dampingForce;
         joint.angularXDrive = angularXDrive;
         
         var angularYZDrive = joint.angularYZDrive;
-        angularYZDrive.positionSpring = RagdollTPoseConfig.TPoseSpringForce;
-        angularYZDrive.positionDamper = RagdollTPoseConfig.TPoseDampingForce;
+        angularYZDrive.positionSpring = springForce;
+        angularYZDrive.positionDamper = dampingForce;
         joint.angularYZDrive = angularYZDrive;
         
         // If it has a rigidbody, reset velocities and ensure it's active
@@ -494,7 +496,9 @@ public class RagdollAgent : BaseTrainArenaAgent
         ResetRagdollToTPose();
         
         // Enhanced episode start logging with detailed diagnostics
-        TrainArenaDebugManager.Log($"🎭 {name}: Episode {CompletedEpisodes} started - Grace={episodeGracePeriod:F1}s, Timeout={maxEpisodeDuration:F1}s", 
+        float effectiveGracePeriod = episodeGracePeriod > 0 ? episodeGracePeriod : RewardConfig.EpisodeGracePeriod;
+        float effectiveMaxDuration = maxEpisodeDuration > 0 ? maxEpisodeDuration : RewardConfig.MaxEpisodeDuration;
+        TrainArenaDebugManager.Log($"🎭 {name}: Episode {CompletedEpisodes} started - Grace={effectiveGracePeriod:F1}s, Timeout={effectiveMaxDuration:F1}s", 
             TrainArenaDebugManager.DebugLogLevel.Important);
         TrainArenaDebugManager.Log($"🎭 {name}: Ragdoll State - {joints.Count} joints, pelvis Y={pelvis.position.y:F2}, Uprightness={Uprightness:F2}", 
             TrainArenaDebugManager.DebugLogLevel.Verbose);
@@ -587,20 +591,23 @@ public class RagdollAgent : BaseTrainArenaAgent
         var pelvisRigidbody = pelvis.GetComponent<Rigidbody>();
         float forwardVelocity = Vector3.Dot(pelvisRigidbody.linearVelocity, transform.forward);
         
-        // Primary reward: Forward movement within target speed range
-        float normalizedVelocity = Mathf.Clamp(forwardVelocity, -targetSpeed, targetSpeed) / targetSpeed;
-        AddReward(normalizedVelocity * 0.03f);
+        // Use configuration values (with fallbacks if inspector values are 0)
+        float effectiveTargetSpeed = targetSpeed > 0 ? targetSpeed : RewardConfig.TargetSpeed;
         
-        // Balance reward: Encourage staying upright (threshold at 0.8 for stability)
-        AddReward((Uprightness - 0.8f) * 0.02f);
+        // Primary reward: Forward movement within target speed range
+        float normalizedVelocity = Mathf.Clamp(forwardVelocity, -effectiveTargetSpeed, effectiveTargetSpeed) / effectiveTargetSpeed;
+        AddReward(normalizedVelocity * RewardConfig.VelocityRewardCoeff);
+        
+        // Balance reward: Encourage staying upright
+        AddReward((Uprightness - RewardConfig.UprightThreshold) * RewardConfig.UprightRewardCoeff);
         
         // Energy efficiency: Penalize excessive joint movements
         float energyUsage = CalculateEnergyUsage();
-        AddReward(-energyUsage * 0.001f);
+        AddReward(-energyUsage * RewardConfig.EnergyPenaltyCoeff);
         
         // Stability reward: Discourage chaotic spinning
         float angularVelocityMagnitude = pelvisRigidbody.angularVelocity.magnitude;
-        AddReward(-angularVelocityMagnitude * 0.001f);
+        AddReward(-angularVelocityMagnitude * RewardConfig.AngularVelocityPenaltyCoeff);
         
         // Performance logging (sample periodically to avoid log spam)
         if (Time.fixedTime % 5f < Time.fixedDeltaTime)
@@ -637,14 +644,20 @@ public class RagdollAgent : BaseTrainArenaAgent
         float episodeTime = Time.time - episodeStartTime;
         float height = pelvis.position.y;
         
+        // Use configuration values (with fallbacks if inspector values are 0)
+        float effectiveGracePeriod = episodeGracePeriod > 0 ? episodeGracePeriod : RewardConfig.EpisodeGracePeriod;
+        float effectiveMaxDuration = maxEpisodeDuration > 0 ? maxEpisodeDuration : RewardConfig.MaxEpisodeDuration;
+        float effectiveMinUprightness = minUprightness > 0 ? minUprightness : RewardConfig.MinUprightness;
+        float effectiveMinHeight = minHeight != 0 ? minHeight : RewardConfig.MinHeight;
+        
         // Grace period: Allow ragdoll to fall and learn during initial seconds
-        if (episodeTime < episodeGracePeriod)
+        if (episodeTime < effectiveGracePeriod)
         {
             return; // No termination during grace period
         }
         
         // Episode timeout: Prevent episodes from running indefinitely
-        if (episodeTime > maxEpisodeDuration)
+        if (episodeTime > effectiveMaxDuration)
         {
             TrainArenaDebugManager.Log($"🎭 {name}: Episode timeout after {episodeTime:F1}s - Uprightness={Uprightness:F2}, Height={height:F2}m", 
                 TrainArenaDebugManager.DebugLogLevel.Important);
@@ -653,12 +666,12 @@ public class RagdollAgent : BaseTrainArenaAgent
         }
         
         // Failure conditions: Only terminate if ragdoll is severely compromised
-        bool severelyFallen = Uprightness < minUprightness;
-        bool belowGround = height < minHeight;
+        bool severelyFallen = Uprightness < effectiveMinUprightness;
+        bool belowGround = height < effectiveMinHeight;
         
         if (severelyFallen || belowGround)
         {
-            string reason = severelyFallen ? $"severe fall (Uprightness={Uprightness:F2} < {minUprightness})" : $"below ground (height={height:F2}m < {minHeight}m)";
+            string reason = severelyFallen ? $"severe fall (Uprightness={Uprightness:F2} < {effectiveMinUprightness})" : $"below ground (height={height:F2}m < {effectiveMinHeight}m)";
             TrainArenaDebugManager.Log($"🎭 {name}: Episode terminated after {episodeTime:F1}s - {reason}", 
                 TrainArenaDebugManager.DebugLogLevel.Important);
             EndEpisode();
@@ -666,7 +679,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         else
         {
             // Periodic status logging during training (every 5 seconds)
-            if (episodeTime % 5.0f < Time.fixedDeltaTime && episodeTime > episodeGracePeriod)
+            if (episodeTime % 5.0f < Time.fixedDeltaTime && episodeTime > effectiveGracePeriod)
             {
                 TrainArenaDebugManager.Log($"🎭 {name}: Episode progress - Time={episodeTime:F1}s, Uprightness={Uprightness:F2}, Height={height:F2}m", 
                     TrainArenaDebugManager.DebugLogLevel.Verbose);
@@ -721,8 +734,9 @@ public class RagdollAgent : BaseTrainArenaAgent
             // Get joint-specific heuristic configuration from centralized config
             var (amplitude, frequencyMult, basePhase) = RagdollHeuristicConfig.GetJointHeuristicConfig(jointName, i);
             
-            // Apply global amplitude multiplier from inspector
-            amplitude *= heuristicAmplitudeMultiplier;
+            // Apply global amplitude multiplier (with config fallback)
+            float effectiveAmplitudeMultiplier = heuristicAmplitudeMultiplier > 0 ? heuristicAmplitudeMultiplier : RewardConfig.HeuristicAmplitudeDefault;
+            amplitude *= effectiveAmplitudeMultiplier;
             
             // Calculate coordinated movement pattern
             float frequency = baseFrequency * frequencyMult;

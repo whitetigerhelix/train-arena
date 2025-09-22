@@ -1,8 +1,9 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 namespace TrainArena.Configuration
 {
+    //TODO: We need to roll the actual configuration classes into this AgentConfiguration file
+
     /// <summary>
     /// Centralized configuration for ML-Agent types and their specifications
     /// </summary>
@@ -239,6 +240,34 @@ namespace TrainArena.Configuration
             return (OtherJoints.Amplitude, OtherJoints.FrequencyMultiplier, jointIndex * OtherJoints.PhaseMultiplier);
         }
     }
+        
+    /// <summary>
+    /// Configuration for reward calculation coefficients and thresholds
+    /// </summary>
+    [System.Serializable]
+    public static class RewardConfig
+    {
+        // Reward coefficients
+        public const float VelocityRewardCoeff = 0.03f;      // Reward for moving toward target
+        public const float UprightRewardCoeff = 0.02f;      // Reward for staying upright
+        public const float EnergyPenaltyCoeff = 0.001f;     // Penalty for excessive energy use
+        public const float AngularVelocityPenaltyCoeff = 0.001f; // Penalty for excessive rotation
+            
+        // Reward thresholds
+        public const float UprightThreshold = 0.8f;         // Uprightness threshold for balance reward
+        public const float UprightBonus = 0.5f;             // Bonus for maintaining uprightness
+        public const float TargetSpeed = 1.0f;              // Default target speed for movement
+            
+        // Episode configuration
+        public const float EpisodeGracePeriod = 8.0f;       // Grace period before termination checks
+        public const float MaxEpisodeDuration = 30.0f;      // Maximum episode length
+        public const float MinUprightness = 0.1f;           // Minimum uprightness before termination
+        public const float MinHeight = -0.5f;               // Minimum height before termination
+            
+        // Heuristic movement configuration
+        public const float HeuristicFrequencyDefault = 0f;  // Default heuristic frequency (0 = use config default)
+        public const float HeuristicAmplitudeDefault = 1.0f; // Default heuristic amplitude multiplier
+    }
 
     /// <summary>
     /// Configuration for ragdoll T-pose and joint reset behavior
@@ -246,32 +275,81 @@ namespace TrainArena.Configuration
     [System.Serializable]
     public static class RagdollTPoseConfig
     {
-        // Joint drive settings for T-pose reset
-        public const float TPoseSpringForce = 100f;      // Spring force for joint drives during reset
-        public const float TPoseDampingForce = 10f;      // Damping force for joint drives during reset
-        public const float MinimumRigidbodyMass = 1f;    // Minimum mass for joint rigidbodies
+        // Joint drive settings for natural movement (differentiated by joint type)
+        // Default values from reference (natural body movement)
+        public const float DefaultSpringForce = 125f;       // Default spring force for joint drives
+        public const float DefaultDampingForce = 0.5f;      // Default damping force for joint drives
+        
+        // Head-specific settings (higher damping to prevent vibration)
+        public const float HeadSpringForce = 125f;          // Spring force for head joint
+        public const float HeadDampingForce = 2.0f;         // Higher damping to prevent rapid vibration
+        
+        // Arm-specific settings (lower spring for natural extension)
+        public const float ArmSpringForce = 100f;           // Spring force for arm joints
+        public const float ArmDampingForce = 0.8f;          // Moderate damping for natural arm movement
+        
+        // Leg-specific settings (stronger for locomotion)
+        public const float LegSpringForce = 150f;           // Higher spring force for weight-bearing legs
+        public const float LegDampingForce = 1.0f;          // Balanced damping for locomotion
+        
+        // Physics settings
+        public const float MinimumRigidbodyMass = 1f;       // Minimum mass for joint rigidbodies
         
         // Episode reset positioning
-        public const float SpawnElevationOffset = 0f;  // Elevation offset to prevent ground clipping during spawn
+        public const float SpawnElevationOffset = 0f;       // Elevation offset to prevent ground clipping during spawn
         
         /// <summary>
-        /// Get T-pose target rotation for a specific joint
+        /// Get joint-specific spring and damping values for natural movement
+        /// </summary>
+        public static (float spring, float damping) GetJointDriveSettings(string jointName)
+        {
+            // Head joints need higher damping to prevent vibration
+            if (jointName == RagdollJointNames.Head)
+            {
+                return (HeadSpringForce, HeadDampingForce);
+            }
+            // Arm joints need moderate settings for natural extension
+            else if (jointName == RagdollJointNames.LeftUpperArm || jointName == RagdollJointNames.RightUpperArm ||
+                     jointName == RagdollJointNames.LeftLowerArm || jointName == RagdollJointNames.RightLowerArm)
+            {
+                return (ArmSpringForce, ArmDampingForce);
+            }
+            // Leg joints need stronger settings for locomotion
+            else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||
+                     jointName == RagdollJointNames.LeftLowerLeg || jointName == RagdollJointNames.RightLowerLeg ||
+                     jointName == RagdollJointNames.LeftFoot || jointName == RagdollJointNames.RightFoot)
+            {
+                return (LegSpringForce, LegDampingForce);
+            }
+            // Default settings for chest and other joints
+            else
+            {
+                return (DefaultSpringForce, DefaultDampingForce);
+            }
+        }
+        
+        /// <summary>
+        /// Get T-pose target rotation for a specific joint (adjusted for natural arm extension)
         /// </summary>
         public static Quaternion GetTPoseRotation(string jointName)
         {
-            // Arms should be horizontal (T-pose)
+            // Upper arms should extend outward horizontally (T-pose)
             if (jointName == RagdollJointNames.LeftUpperArm)
             {
-                return Quaternion.Euler(0, 0, 90); // Left arm horizontal
+                return Quaternion.Euler(0, -20, 80); // Left arm slightly forward and horizontal
             }
             else if (jointName == RagdollJointNames.RightUpperArm)
             {
-                return Quaternion.Euler(0, 0, -90); // Right arm horizontal
+                return Quaternion.Euler(0, 20, -80); // Right arm slightly forward and horizontal
             }
-            // Lower arms should be straight down from upper arms
-            else if (jointName == RagdollJointNames.LeftLowerArm || jointName == RagdollJointNames.RightLowerArm)
+            // Lower arms should extend outward from upper arms (not folded inward)
+            else if (jointName == RagdollJointNames.LeftLowerArm)
             {
-                return Quaternion.identity; // Straight extension
+                return Quaternion.Euler(0, 0, -10); // Slight outward extension
+            }
+            else if (jointName == RagdollJointNames.RightLowerArm)
+            {
+                return Quaternion.Euler(0, 0, 10); // Slight outward extension
             }
             // Legs should be straight down
             else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||
