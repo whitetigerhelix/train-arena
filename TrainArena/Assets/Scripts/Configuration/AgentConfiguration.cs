@@ -30,7 +30,7 @@ namespace TrainArena.Configuration
         {
             public const string BehaviorName = "RagdollAgent";
             
-            // Joint categories for locomotion control
+            // Joint categories for locomotion control (legs only)
             public static readonly string[] LocomotionJointNames = 
             {
                 "LeftUpperLeg", "RightUpperLeg",   // Hip joints
@@ -42,6 +42,12 @@ namespace TrainArena.Configuration
             /// Expected number of locomotion joints (hips + knees + ankles)
             /// </summary>
             public const int ExpectedLocomotionJointCount = 6;
+
+            /// <summary>
+            /// Expected total number of joints for full-body ragdoll control
+            /// Includes: spine(1) + head(1) + shoulders(2) + elbows(2) + hips(2) + knees(2) + ankles(2) = 12
+            /// </summary>
+            public const int ExpectedTotalJointCount = 12;
             
             /// <summary>
             /// Check if a joint name is part of the locomotion system

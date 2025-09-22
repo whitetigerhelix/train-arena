@@ -262,7 +262,7 @@ public static class PrimitiveBuilder
             }
         }
         
-        int legJointCount = 0;
+        int jointCount = 0;
         foreach (var configJoint in configJoints)
         {
             if (configJoint == null)
@@ -274,9 +274,8 @@ public static class PrimitiveBuilder
             var partName = configJoint.gameObject.name;
             
             // Use centralized configuration for joint detection
-            bool isLegJoint = RagdollJointNames.IsLocomotionJoint(partName);
-            
-            if (isLegJoint)
+            //bool isLegJoint = RagdollJointNames.IsLocomotionJoint(partName);
+            //if (isLegJoint)
             {
                 try
                 {
@@ -295,7 +294,7 @@ public static class PrimitiveBuilder
                         pdController.kd = kd;
                         
                         TrainArenaDebugManager.Log($"✅ Added PDJointController to '{configJoint.gameObject.name}'", TrainArenaDebugManager.DebugLogLevel.Verbose);
-                        legJointCount++;
+                        jointCount++;
                     }
                     else
                     {
@@ -318,10 +317,10 @@ public static class PrimitiveBuilder
             }
         }
         
-        // Validate we found appropriate leg joints
+        // Validate we found appropriate joints
         if (joints.Count == 0)
         {
-            TrainArenaDebugManager.LogError($"❌ CRITICAL: No locomotion joints found in ragdoll '{ragdoll.name}'! Expected joints: {string.Join(", ", RagdollJointNames.LocomotionJoints)}");
+            TrainArenaDebugManager.LogError($"❌ CRITICAL: No joints found in ragdoll '{ragdoll.name}'! Expected joints: {string.Join(", ", RagdollJointNames.AllJoints)}");
             TrainArenaDebugManager.Log("Available joint names:", TrainArenaDebugManager.DebugLogLevel.Important);
             foreach (var joint in configJoints)
             {
@@ -337,7 +336,7 @@ public static class PrimitiveBuilder
         try
         {
             ragdollAgent.joints = joints;
-            TrainArenaDebugManager.Log($"✅ Configured RagdollAgent with {joints.Count} leg joints ({legJointCount} newly added)", TrainArenaDebugManager.DebugLogLevel.Important);
+            TrainArenaDebugManager.Log($"✅ Configured RagdollAgent with {joints.Count} joints ({jointCount} newly added)", TrainArenaDebugManager.DebugLogLevel.Important);
         }
         catch (System.Exception e)
         {
@@ -355,12 +354,13 @@ public static class PrimitiveBuilder
                 behaviorParameters = pelvis.AddComponent<BehaviorParameters>();
                 behaviorParameters.BehaviorName = AgentConfiguration.RagdollAgent.BehaviorName;
 
-                // Use actual joint count for continuous actions (should match expected locomotion joint count)
+                // Use actual joint count for continuous actions (should match expected total joint count)
                 int actionCount = ragdollAgent.joints.Count;
-                if (actionCount != AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount)
+                if (actionCount != AgentConfiguration.RagdollAgent.ExpectedTotalJointCount)
                 {
-                    TrainArenaDebugManager.LogWarning($"⚠️ Joint count mismatch: found {actionCount}, expected {AgentConfiguration.RagdollAgent.ExpectedLocomotionJointCount}");
+                    TrainArenaDebugManager.LogWarning($"⚠️ Joint count mismatch: found {actionCount}, expected {AgentConfiguration.RagdollAgent.ExpectedTotalJointCount}");
                 }
+                TrainArenaDebugManager.LogWarning($"⚠️ MakeContinuous: {actionCount}, expected {AgentConfiguration.RagdollAgent.ExpectedTotalJointCount}");
                 behaviorParameters.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(actionCount);
 
                 // Configure observation space using RagdollAgent's calculation
