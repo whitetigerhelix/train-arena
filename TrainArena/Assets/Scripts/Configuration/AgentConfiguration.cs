@@ -281,12 +281,12 @@ namespace TrainArena.Configuration
         public const float DefaultDampingForce = 0.5f;      // Default damping force for joint drives
         
         // Head-specific settings (higher damping to prevent vibration)
-        public const float HeadSpringForce = 125f;          // Spring force for head joint
-        public const float HeadDampingForce = 2.0f;         // Higher damping to prevent rapid vibration
+        public const float HeadSpringForce = 100f;          // Lower spring force for head joint
+        public const float HeadDampingForce = 5.0f;         // Much higher damping to prevent rapid vibration
         
-        // Arm-specific settings (lower spring for natural extension)
-        public const float ArmSpringForce = 100f;           // Spring force for arm joints
-        public const float ArmDampingForce = 0.8f;          // Moderate damping for natural arm movement
+        // Arm-specific settings (softer springs for natural movement)
+        public const float ArmSpringForce = 80f;            // Softer spring force for more natural arm movement
+        public const float ArmDampingForce = 1.2f;          // Higher damping to prevent excessive flailing
         
         // Leg-specific settings (stronger for locomotion)
         public const float LegSpringForce = 150f;           // Higher spring force for weight-bearing legs
@@ -333,23 +333,23 @@ namespace TrainArena.Configuration
         /// </summary>
         public static Quaternion GetTPoseRotation(string jointName)
         {
-            // Upper arms should extend outward horizontally (T-pose)
+            // Upper arms should extend outward horizontally (T-pose) - more conservative approach
             if (jointName == RagdollJointNames.LeftUpperArm)
             {
-                return Quaternion.Euler(0, -20, 80); // Left arm slightly forward and horizontal
+                return Quaternion.Euler(0, 0, 90); // Left arm horizontal (simple)
             }
             else if (jointName == RagdollJointNames.RightUpperArm)
             {
-                return Quaternion.Euler(0, 20, -80); // Right arm slightly forward and horizontal
+                return Quaternion.Euler(0, 0, -90); // Right arm horizontal (simple)
             }
-            // Lower arms should extend outward from upper arms (not folded inward)
+            // Lower arms should extend outward to prevent folding
             else if (jointName == RagdollJointNames.LeftLowerArm)
             {
-                return Quaternion.Euler(0, 0, -10); // Slight outward extension
+                return Quaternion.Euler(0, 0, -30); // Extend outward from left upper arm
             }
             else if (jointName == RagdollJointNames.RightLowerArm)
             {
-                return Quaternion.Euler(0, 0, 10); // Slight outward extension
+                return Quaternion.Euler(0, 0, 30); // Extend outward from right upper arm
             }
             // Legs should be straight down
             else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||
