@@ -14,11 +14,11 @@ behaviors:
       hidden_units: 128 # Reduced to match cube config for faster training
       num_layers: 2 # Reduced to match cube config to prevent timeouts
       activation: relu # Explicit activation function
-    max_steps: 500000 # Reduced to match cube config for faster iteration
-    time_horizon: 500 # Shorter horizon to match cube config and prevent timeouts
-    summary_freq: 1000 # Much more frequent summaries like cube config
-    keep_checkpoints: 5 # Keep multiple checkpoints
-    checkpoint_interval: 50000 # Much more frequent checkpoints like cube config
+    max_steps: 300000 # Further reduced to prevent timeouts
+    time_horizon: 256 # Much shorter episodes to prevent Unity hangs
+    summary_freq: 500 # Very frequent summaries for quick feedback
+    keep_checkpoints: 10 # Keep more checkpoints for safety
+    checkpoint_interval: 25000 # Very frequent checkpoints to prevent loss
     threaded: true # Enable threading for performance
     reward_signals:
       extrinsic:

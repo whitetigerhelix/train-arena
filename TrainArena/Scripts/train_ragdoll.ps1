@@ -7,7 +7,7 @@ param(
     [switch]$Resume,
     [switch]$SkipTensorBoard,
     [int]$TimeoutWait = 300,  # Longer timeout for complex ragdoll initialization
-    [int]$TimeScale = 20
+    [int]$TimeScale = 50
 )
 
 Write-Host "🎭 Starting ML-Agents Ragdoll Training" -ForegroundColor Green
@@ -123,6 +123,8 @@ $TrainArgs += "--time-scale=$TimeScale"
 
 # Add additional parameters to prevent timeouts and improve stability
 $TrainArgs += "--num-envs=1"  # Force single environment to reduce complexity
+$TrainArgs += "--width=640"   # Reduce render resolution for better performance
+$TrainArgs += "--height=480"  # Reduce render resolution for better performance
 
 if ($Resume) {
     $TrainArgs += "--resume"

@@ -84,7 +84,21 @@ public class RagdollAgent : BaseTrainArenaAgent
     public override int GetTotalObservationCount()
     {
         // Calculate total observations: uprightness + velocity + joint states
-        return UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT);
+        int numObservations = UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT);
+        
+        // Only log during initialization, not every frame
+        if (Application.isPlaying && Time.time < 5f)
+        {
+            TrainArenaDebugManager.Log($"🎭 {name}: Total observations = {UPRIGHTNESS_OBSERVATIONS} (uprightness) + {VELOCITY_OBSERVATIONS} (velocity) + {joints.Count} joints × {JOINT_STATE_OBSERVATIONS_PER_JOINT} = {numObservations}", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+            
+            if (numObservations > 30)
+            {
+                TrainArenaDebugManager.LogError($"⚠️ {name}: {numObservations} observations may be too many! Consider reducing joints or using fewer observations per joint.");
+            }
+        }
+        
+        return numObservations;
     }
 
     protected override void InitializeAgent()
@@ -99,6 +113,12 @@ public class RagdollAgent : BaseTrainArenaAgent
             startPosition = pelvis.position;
             startRotation = pelvis.rotation;
         }
+        
+        // Auto-configure all joints if not properly set up
+        AutoConfigureRagdollJoints();
+        
+        // Update ML-Agents configuration to match joint count
+        UpdateMLAgentsConfiguration();
         
         // Log initialization success
         TrainArenaDebugManager.Log($"🎭 {name}: Initialized ragdoll with {joints.Count} joints, Activity={AgentActivity}, ObsCount={GetTotalObservationCount()}", 
@@ -128,7 +148,25 @@ public class RagdollAgent : BaseTrainArenaAgent
             return;
         }
 
+        // Debug: List all joints found in the ragdoll hierarchy
+        var allPDJoints = GetComponentsInChildren<PDJointController>();
+        TrainArenaDebugManager.Log($"🔍 {name}: Found {allPDJoints.Length} total PDJointControllers in hierarchy vs {joints.Count} in joints list", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        if (allPDJoints.Length != joints.Count)
+        {
+            TrainArenaDebugManager.LogError($"⚠️ {name}: Potential joint mismatch! Found {allPDJoints.Length} PDJointControllers but only {joints.Count} are assigned to joints list.");
+            TrainArenaDebugManager.Log($"🔍 {name}: All PDJointControllers found:", TrainArenaDebugManager.DebugLogLevel.Important);
+            for (int i = 0; i < allPDJoints.Length; i++)
+            {
+                bool isInList = joints.Contains(allPDJoints[i]);
+                TrainArenaDebugManager.Log($"  [{i}] {allPDJoints[i].name} - {(isInList ? "✅ In joints list" : "❌ NOT in joints list")}", 
+                    TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+        }
+
         // Verify each joint has required components
+        TrainArenaDebugManager.Log($"🔍 {name}: Validating {joints.Count} joints in joints list:", TrainArenaDebugManager.DebugLogLevel.Important);
         for (int i = 0; i < joints.Count; i++)
         {
             var joint = joints[i];
@@ -137,6 +175,9 @@ public class RagdollAgent : BaseTrainArenaAgent
                 TrainArenaDebugManager.LogError($"❌ {name}: Joint {i} is null!");
                 continue;
             }
+
+            TrainArenaDebugManager.Log($"  [{i}] {joint.name} - {(joint.joint != null ? "✅" : "❌")} Joint, {(joint.GetComponent<Rigidbody>() != null ? "✅" : "❌")} RB", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
 
             if (joint.joint == null)
             {
@@ -151,6 +192,178 @@ public class RagdollAgent : BaseTrainArenaAgent
 
         TrainArenaDebugManager.Log($"✅ {name}: Ragdoll configuration validated - {joints.Count} joints ready for training", 
             TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+    
+    /// <summary>
+    /// Auto-configure all joints in the ragdoll hierarchy for proper ML-Agents training
+    /// This ensures ALL joints (chest, head, arms, legs) are controlled, not just legs
+    /// </summary>
+    private void AutoConfigureRagdollJoints()
+    {
+        TrainArenaDebugManager.Log($"🔧 {name}: Auto-configuring ragdoll joints for complete body control...", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        // Find all ConfigurableJoints in the hierarchy (these define the ragdoll structure)
+        var allConfigurableJoints = GetComponentsInChildren<ConfigurableJoint>();
+        var newJointsList = new List<PDJointController>();
+        
+        TrainArenaDebugManager.Log($"🔍 {name}: Found {allConfigurableJoints.Length} ConfigurableJoints in ragdoll hierarchy", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+        
+        foreach (var configurableJoint in allConfigurableJoints)
+        {
+            // Ensure each ConfigurableJoint has a PDJointController
+            var pdController = configurableJoint.GetComponent<PDJointController>();
+            if (pdController == null)
+            {
+                // Add PDJointController component
+                pdController = configurableJoint.gameObject.AddComponent<PDJointController>();
+                TrainArenaDebugManager.Log($"✅ {name}: Added PDJointController to '{configurableJoint.name}'", 
+                    TrainArenaDebugManager.DebugLogLevel.Important);
+            }
+            
+            // Configure the PDJointController
+            if (pdController.joint == null)
+            {
+                pdController.joint = configurableJoint;
+            }
+            
+            // Apply centralized joint configuration
+            (float minAngle, float maxAngle, float kp, float kd) = RagdollJointNames.GetJointControllerConfig(configurableJoint.name);
+            pdController.SetTarget01(0f); // Neutral position (0 = center of range)
+            
+            TrainArenaDebugManager.Log($"🔧 {name}: Configured PDJointController for '{configurableJoint.name}': " +
+                     $"Limits=[{minAngle:F1}, {maxAngle:F1}], Gains=Kp{kp:F1}/Kd{kd:F1}", 
+                     TrainArenaDebugManager.DebugLogLevel.Verbose);
+            
+            // Add to our joints list
+            newJointsList.Add(pdController);
+            
+            // Reset joint to neutral pose to fix twisted spawning
+            ResetJointToNeutralPose(configurableJoint);
+        }
+        
+        // Sort joints in a logical order for training (core to extremities)
+        newJointsList.Sort((a, b) => GetJointPriority(a.name).CompareTo(GetJointPriority(b.name)));
+        
+        // Update the joints list
+        joints.Clear();
+        joints.AddRange(newJointsList);
+        
+        TrainArenaDebugManager.Log($"🎯 {name}: Auto-configured {joints.Count} joints in priority order:", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+        for (int i = 0; i < joints.Count; i++)
+        {
+            TrainArenaDebugManager.Log($"   [{i}] {joints[i].name}", TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+        
+        // Calculate and display the required Vector Observation Space Size
+        int requiredObsSize = UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT);
+        TrainArenaDebugManager.LogError($"🎯 UNITY SETUP REQUIRED: Set Vector Observation Space Size to {requiredObsSize} in the Behavior Parameters component!");
+        TrainArenaDebugManager.LogError($"   Current calculation: {UPRIGHTNESS_OBSERVATIONS} + {VELOCITY_OBSERVATIONS} + ({joints.Count} × {JOINT_STATE_OBSERVATIONS_PER_JOINT}) = {requiredObsSize}");
+    }
+
+    /// <summary>
+    /// Update ML-Agents BehaviorParameters to match the current joint configuration
+    /// This ensures action space and observation space match the dynamic joint count
+    /// </summary>
+    private void UpdateMLAgentsConfiguration()
+    {
+        var behaviorParams = GetComponent<Unity.MLAgents.Policies.BehaviorParameters>();
+        if (behaviorParams == null)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ {name}: No BehaviorParameters found - ML-Agents configuration cannot be updated");
+            return;
+        }
+
+        // Update action space to match joint count
+        int expectedActions = joints.Count;
+        int currentActions = behaviorParams.BrainParameters.ActionSpec.NumContinuousActions;
+        if (currentActions != expectedActions)
+        {
+            behaviorParams.BrainParameters.ActionSpec = Unity.MLAgents.Actuators.ActionSpec.MakeContinuous(expectedActions);
+            TrainArenaDebugManager.Log($"✅ {name}: Updated action space from {currentActions} to {expectedActions} continuous actions", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        // Update observation space to match calculated observations
+        int expectedObservations = GetTotalObservationCount();
+        int currentObservations = behaviorParams.BrainParameters.VectorObservationSize;
+        if (currentObservations != expectedObservations)
+        {
+            behaviorParams.BrainParameters.VectorObservationSize = expectedObservations;
+            TrainArenaDebugManager.Log($"✅ {name}: Updated observation space from {currentObservations} to {expectedObservations} observations", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        // Ensure behavior name matches centralized configuration
+        if (behaviorParams.BehaviorName != AgentConfiguration.RagdollAgent.BehaviorName)
+        {
+            behaviorParams.BehaviorName = AgentConfiguration.RagdollAgent.BehaviorName;
+            TrainArenaDebugManager.Log($"✅ {name}: Set behavior name to '{AgentConfiguration.RagdollAgent.BehaviorName}'", 
+                TrainArenaDebugManager.DebugLogLevel.Important);
+        }
+
+        // Check for incompatible model and clear it if necessary
+        if (behaviorParams.Model != null)
+        {
+            TrainArenaDebugManager.LogWarning($"⚠️ {name}: Clearing loaded model due to configuration changes - will use heuristic behavior");
+            TrainArenaDebugManager.LogWarning($"   Model expects different observation space than current configuration ({expectedObservations} observations)");
+            behaviorParams.Model = null;
+            
+            // Force heuristic mode for development
+            behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+        }
+
+        TrainArenaDebugManager.Log($"🎭 {name}: ML-Agents configuration - {expectedActions} actions, {expectedObservations} observations", 
+            TrainArenaDebugManager.DebugLogLevel.Important);
+    }
+    
+    /// <summary>
+    /// Get joint priority for sorting using centralized configuration
+    /// Core stability joints come first, then extremities
+    /// </summary>
+    private int GetJointPriority(string jointName)
+    {
+        // Use centralized joint name constants instead of hardcoded strings
+        
+        // Core stability (highest priority)
+        if (jointName == RagdollJointNames.Chest) return 10;
+        if (jointName == RagdollJointNames.Head) return 20;
+        
+        // Upper body balance (arms for balancing)
+        if (jointName == RagdollJointNames.LeftUpperArm || jointName == RagdollJointNames.RightUpperArm) return 30;
+        if (jointName == RagdollJointNames.LeftLowerArm || jointName == RagdollJointNames.RightLowerArm) return 35;
+        
+        // Lower body locomotion (legs for walking)
+        if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg) return 40;
+        if (jointName == RagdollJointNames.LeftLowerLeg || jointName == RagdollJointNames.RightLowerLeg) return 45;
+        if (jointName == RagdollJointNames.LeftFoot || jointName == RagdollJointNames.RightFoot) return 50;
+        
+        // Check if it's a locomotion joint using the centralized method
+        if (RagdollJointNames.IsLocomotionJoint(jointName)) return 60;
+        
+        // Default priority for unrecognized joints
+        return 100;
+    }
+    
+    /// <summary>
+    /// Reset joint to neutral pose to prevent twisted spawning
+    /// </summary>
+    private void ResetJointToNeutralPose(ConfigurableJoint joint)
+    {
+        if (joint == null) return;
+        
+        // Reset the joint's target rotation to neutral
+        joint.targetRotation = Quaternion.identity;
+        
+        // If it has a rigidbody, reset velocities
+        var rb = joint.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
     }
     
     /// <summary>
@@ -197,6 +410,15 @@ public class RagdollAgent : BaseTrainArenaAgent
         {
             rigidbody.linearVelocity = Vector3.zero;
             rigidbody.angularVelocity = Vector3.zero;
+        }
+        
+        // Reset all joints to neutral pose to prevent twisted spawning
+        foreach (var joint in joints)
+        {
+            if (joint != null && joint.joint != null)
+            {
+                joint.joint.targetRotation = Quaternion.identity;
+            }
         }
         
         // Enhanced episode start logging with detailed diagnostics
