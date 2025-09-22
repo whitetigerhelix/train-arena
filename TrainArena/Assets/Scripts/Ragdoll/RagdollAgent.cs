@@ -349,21 +349,99 @@ public class RagdollAgent : BaseTrainArenaAgent
     
     /// <summary>
     /// Reset joint to neutral pose to prevent twisted spawning
+    /// Properly configures ConfigurableJoint drives and targets for T-pose
     /// </summary>
     private void ResetJointToNeutralPose(ConfigurableJoint joint)
     {
         if (joint == null) return;
         
-        // Reset the joint's target rotation to neutral
+        // Reset the joint's target rotation to neutral (T-pose)
         joint.targetRotation = Quaternion.identity;
         
-        // If it has a rigidbody, reset velocities
+        // Apply T-pose specific rotations for natural positioning
+        ApplyTPoseRotation(joint);
+        
+        // Configure joint drives for stability during reset using centralized configuration
+        var angularXDrive = joint.angularXDrive;
+        angularXDrive.positionSpring = RagdollTPoseConfig.TPoseSpringForce;
+        angularXDrive.positionDamper = RagdollTPoseConfig.TPoseDampingForce;
+        joint.angularXDrive = angularXDrive;
+        
+        var angularYZDrive = joint.angularYZDrive;
+        angularYZDrive.positionSpring = RagdollTPoseConfig.TPoseSpringForce;
+        angularYZDrive.positionDamper = RagdollTPoseConfig.TPoseDampingForce;
+        joint.angularYZDrive = angularYZDrive;
+        
+        // If it has a rigidbody, reset velocities and ensure it's active
         var rb = joint.GetComponent<Rigidbody>();
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+            
+            // Ensure proper mass for joint stability using centralized configuration
+            if (rb.mass < RagdollTPoseConfig.MinimumRigidbodyMass) 
+                rb.mass = RagdollTPoseConfig.MinimumRigidbodyMass;
         }
+        
+        // Force the joint to update its configuration
+        joint.configuredInWorldSpace = false;
+        
+        TrainArenaDebugManager.Log($"🔄 Reset joint '{joint.name}' to T-pose neutral position", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
+    }
+
+    /// <summary>
+    /// Reset the entire ragdoll to T-pose neutral positions
+    /// Ensures consistent spawning without twisted limbs
+    /// </summary>
+    private void ResetRagdollToTPose()
+    {
+        TrainArenaDebugManager.Log($"🔄 {name}: Resetting ragdoll to T-pose", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
+
+        // Reset all joints to neutral positions
+        foreach (var joint in joints)
+        {
+            if (joint != null && joint.joint != null)
+            {
+                ResetJointToNeutralPose(joint.joint);
+                
+                // Also reset the PD controller target
+                joint.SetTarget01(0f); // Neutral position (center of range)
+            }
+        }
+
+        // Wait one physics frame for joints to settle
+        StartCoroutine(WaitForJointSettling());
+    }
+
+    /// <summary>
+    /// Wait for joints to settle after T-pose reset
+    /// </summary>
+    private System.Collections.IEnumerator WaitForJointSettling()
+    {
+        yield return new WaitForFixedUpdate();
+        
+        TrainArenaDebugManager.Log($"✅ {name}: T-pose reset complete", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
+    }
+
+    /// <summary>
+    /// Apply T-pose specific rotations for natural ragdoll positioning using centralized configuration
+    /// Prevents twisted limbs by setting appropriate starting rotations
+    /// </summary>
+    private void ApplyTPoseRotation(ConfigurableJoint joint)
+    {
+        if (joint == null) return;
+        
+        string jointName = joint.name;
+        
+        // Use centralized T-pose configuration
+        joint.targetRotation = RagdollTPoseConfig.GetTPoseRotation(jointName);
+        
+        TrainArenaDebugManager.Log($"🎯 Applied T-pose rotation to '{jointName}': {joint.targetRotation.eulerAngles}", 
+            TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
     
     /// <summary>
@@ -401,7 +479,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         // Reset ragdoll to initial pose with slight elevation to prevent ground clipping
         if (pelvis != null)
         {
-            pelvis.position = startPosition + Vector3.up * 0.2f;
+            pelvis.position = startPosition + Vector3.up * RagdollTPoseConfig.SpawnElevationOffset;
             pelvis.rotation = startRotation;
         }
         
@@ -413,13 +491,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         }
         
         // Reset all joints to neutral pose to prevent twisted spawning
-        foreach (var joint in joints)
-        {
-            if (joint != null && joint.joint != null)
-            {
-                joint.joint.targetRotation = Quaternion.identity;
-            }
-        }
+        ResetRagdollToTPose();
         
         // Enhanced episode start logging with detailed diagnostics
         TrainArenaDebugManager.Log($"🎭 {name}: Episode {CompletedEpisodes} started - Grace={episodeGracePeriod:F1}s, Timeout={maxEpisodeDuration:F1}s", 

@@ -241,6 +241,61 @@ namespace TrainArena.Configuration
     }
 
     /// <summary>
+    /// Configuration for ragdoll T-pose and joint reset behavior
+    /// </summary>
+    [System.Serializable]
+    public static class RagdollTPoseConfig
+    {
+        // Joint drive settings for T-pose reset
+        public const float TPoseSpringForce = 100f;      // Spring force for joint drives during reset
+        public const float TPoseDampingForce = 10f;      // Damping force for joint drives during reset
+        public const float MinimumRigidbodyMass = 1f;    // Minimum mass for joint rigidbodies
+        
+        // Episode reset positioning
+        public const float SpawnElevationOffset = 0f;  // Elevation offset to prevent ground clipping during spawn
+        
+        /// <summary>
+        /// Get T-pose target rotation for a specific joint
+        /// </summary>
+        public static Quaternion GetTPoseRotation(string jointName)
+        {
+            // Arms should be horizontal (T-pose)
+            if (jointName == RagdollJointNames.LeftUpperArm)
+            {
+                return Quaternion.Euler(0, 0, 90); // Left arm horizontal
+            }
+            else if (jointName == RagdollJointNames.RightUpperArm)
+            {
+                return Quaternion.Euler(0, 0, -90); // Right arm horizontal
+            }
+            // Lower arms should be straight down from upper arms
+            else if (jointName == RagdollJointNames.LeftLowerArm || jointName == RagdollJointNames.RightLowerArm)
+            {
+                return Quaternion.identity; // Straight extension
+            }
+            // Legs should be straight down
+            else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||
+                     jointName == RagdollJointNames.LeftLowerLeg || jointName == RagdollJointNames.RightLowerLeg)
+            {
+                return Quaternion.identity; // Straight down
+            }
+            // Feet should be level
+            else if (jointName == RagdollJointNames.LeftFoot || jointName == RagdollJointNames.RightFoot)
+            {
+                return Quaternion.Euler(-90, 0, 0); // Feet flat/level
+            }
+            // Head and chest upright
+            else if (jointName == RagdollJointNames.Head || jointName == RagdollJointNames.Chest)
+            {
+                return Quaternion.identity; // Upright
+            }
+            
+            // Default to neutral rotation
+            return Quaternion.identity;
+        }
+    }
+
+    /// <summary>
     /// Configuration for agent visual components and features
     /// </summary>
     [System.Serializable]
