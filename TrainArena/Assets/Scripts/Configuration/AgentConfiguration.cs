@@ -136,11 +136,11 @@ namespace TrainArena.Configuration
                     
                 case LeftUpperArm:
                 case RightUpperArm:
-                    return (-90f, 90f, 120f, 12f);  // Shoulder joints
+                    return (-120f, 120f, 120f, 12f);  // Shoulder joints - increased range for T-pose
                     
                 case LeftLowerArm:
                 case RightLowerArm:
-                    return (-135f, 0f, 100f, 10f);  // Elbow joints - natural flexion
+                    return (-135f, 135f, 100f, 10f);  // Elbow joints - allow both flexion AND extension
                     
                 case Head:
                     return (-45f, 45f, 80f, 8f);   // Neck joint
@@ -275,22 +275,14 @@ namespace TrainArena.Configuration
     [System.Serializable]
     public static class RagdollTPoseConfig
     {
-        // Joint drive settings for natural movement (differentiated by joint type)
-        // Default values from reference (natural body movement)
+        // Joint drive settings for natural movement
+        // Based on reference values from screenshot (spring 125, damper 0.5)
         public const float DefaultSpringForce = 125f;       // Default spring force for joint drives
         public const float DefaultDampingForce = 0.5f;      // Default damping force for joint drives
         
-        // Head-specific settings (higher damping to prevent vibration)
-        public const float HeadSpringForce = 100f;          // Lower spring force for head joint
-        public const float HeadDampingForce = 5.0f;         // Much higher damping to prevent rapid vibration
-        
-        // Arm-specific settings (softer springs for natural movement)
-        public const float ArmSpringForce = 80f;            // Softer spring force for more natural arm movement
-        public const float ArmDampingForce = 1.2f;          // Higher damping to prevent excessive flailing
-        
-        // Leg-specific settings (stronger for locomotion)
-        public const float LegSpringForce = 150f;           // Higher spring force for weight-bearing legs
-        public const float LegDampingForce = 1.0f;          // Balanced damping for locomotion
+        // Head needs higher damping to prevent vibration
+        public const float HeadSpringForce = 125f;          // Same spring as others
+        public const float HeadDampingForce = 2.0f;         // Higher damping for stability
         
         // Physics settings
         public const float MinimumRigidbodyMass = 1f;       // Minimum mass for joint rigidbodies
@@ -303,53 +295,37 @@ namespace TrainArena.Configuration
         /// </summary>
         public static (float spring, float damping) GetJointDriveSettings(string jointName)
         {
-            // Head joints need higher damping to prevent vibration
+            // Only special case the head to prevent vibration
             if (jointName == RagdollJointNames.Head)
             {
                 return (HeadSpringForce, HeadDampingForce);
             }
-            // Arm joints need moderate settings for natural extension
-            else if (jointName == RagdollJointNames.LeftUpperArm || jointName == RagdollJointNames.RightUpperArm ||
-                     jointName == RagdollJointNames.LeftLowerArm || jointName == RagdollJointNames.RightLowerArm)
-            {
-                return (ArmSpringForce, ArmDampingForce);
-            }
-            // Leg joints need stronger settings for locomotion
-            else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||
-                     jointName == RagdollJointNames.LeftLowerLeg || jointName == RagdollJointNames.RightLowerLeg ||
-                     jointName == RagdollJointNames.LeftFoot || jointName == RagdollJointNames.RightFoot)
-            {
-                return (LegSpringForce, LegDampingForce);
-            }
-            // Default settings for chest and other joints
-            else
-            {
-                return (DefaultSpringForce, DefaultDampingForce);
-            }
+            
+            // All other joints use the same reference values
+            return (DefaultSpringForce, DefaultDampingForce);
         }
         
         /// <summary>
-        /// Get T-pose target rotation for a specific joint (adjusted for natural arm extension)
+        /// Get T-pose target rotation for a specific joint
         /// </summary>
         public static Quaternion GetTPoseRotation(string jointName)
         {
-            // Upper arms should extend outward horizontally (T-pose) - more conservative approach
+            // Standard T-pose: arms horizontal, legs straight down, body upright
             if (jointName == RagdollJointNames.LeftUpperArm)
             {
-                return Quaternion.Euler(0, 0, 90); // Left arm horizontal (simple)
+                return Quaternion.Euler(0, 0, 90); // Left arm horizontal
             }
             else if (jointName == RagdollJointNames.RightUpperArm)
             {
-                return Quaternion.Euler(0, 0, -90); // Right arm horizontal (simple)
+                return Quaternion.Euler(0, 0, -90); // Right arm horizontal
             }
-            // Lower arms should extend outward to prevent folding
             else if (jointName == RagdollJointNames.LeftLowerArm)
             {
-                return Quaternion.Euler(0, 0, -30); // Extend outward from left upper arm
+                return Quaternion.identity; //Euler(0, 0, -90); // Right arm horizontal
             }
             else if (jointName == RagdollJointNames.RightLowerArm)
             {
-                return Quaternion.Euler(0, 0, 30); // Extend outward from right upper arm
+                return Quaternion.identity; //Euler(0, 0, 90); // Left arm horizontal
             }
             // Legs should be straight down
             else if (jointName == RagdollJointNames.LeftUpperLeg || jointName == RagdollJointNames.RightUpperLeg ||

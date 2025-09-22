@@ -259,8 +259,7 @@ public class RagdollAgent : BaseTrainArenaAgent
         
         // Calculate and display the required Vector Observation Space Size
         int requiredObsSize = UPRIGHTNESS_OBSERVATIONS + VELOCITY_OBSERVATIONS + (joints.Count * JOINT_STATE_OBSERVATIONS_PER_JOINT);
-        TrainArenaDebugManager.LogError($"🎯 UNITY SETUP REQUIRED: Set Vector Observation Space Size to {requiredObsSize} in the Behavior Parameters component!");
-        TrainArenaDebugManager.LogError($"   Current calculation: {UPRIGHTNESS_OBSERVATIONS} + {VELOCITY_OBSERVATIONS} + ({joints.Count} × {JOINT_STATE_OBSERVATIONS_PER_JOINT}) = {requiredObsSize}");
+        TrainArenaDebugManager.Log($"Observations: Current calculation: {UPRIGHTNESS_OBSERVATIONS} + {VELOCITY_OBSERVATIONS} + ({joints.Count} × {JOINT_STATE_OBSERVATIONS_PER_JOINT}) = {requiredObsSize}");
     }
 
     /// <summary>
@@ -305,15 +304,14 @@ public class RagdollAgent : BaseTrainArenaAgent
         }
 
         // Check for incompatible model and clear it if necessary
-        if (behaviorParams.Model != null)
+        /*if (behaviorParams.Model != null)
         {
             TrainArenaDebugManager.LogWarning($"⚠️ {name}: Clearing loaded model due to configuration changes - will use heuristic behavior");
-            TrainArenaDebugManager.LogWarning($"   Model expects different observation space than current configuration ({expectedObservations} observations)");
             behaviorParams.Model = null;
             
             // Force heuristic mode for development
             behaviorParams.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
-        }
+        }*/
 
         TrainArenaDebugManager.Log($"🎭 {name}: ML-Agents configuration - {expectedActions} actions, {expectedObservations} observations", 
             TrainArenaDebugManager.DebugLogLevel.Important);
@@ -355,24 +353,25 @@ public class RagdollAgent : BaseTrainArenaAgent
     {
         if (joint == null) return;
         
-        // Reset the joint's target rotation to neutral (T-pose)
-        joint.targetRotation = Quaternion.identity;
+        // PRESERVE the natural T-pose rotation that BlockmanRagdollBuilder created
+        // Don't override it - the ragdoll already spawns in perfect T-pose!
+        // joint.targetRotation should match the current local rotation for T-pose hold
+        //joint.targetRotation = joint.transform.localRotation;
         
         // Apply T-pose specific rotations for natural positioning
         ApplyTPoseRotation(joint);
         
-        // Configure joint drives with weaker forces initially for T-pose setup, then strengthen later
+        // Configure joint drives using centralized configuration
         var (springForce, dampingForce) = RagdollTPoseConfig.GetJointDriveSettings(joint.name);
         
-        // Use much weaker drives initially to allow T-pose positioning
         var angularXDrive = joint.angularXDrive;
-        angularXDrive.positionSpring = springForce * 0.1f;  // 10% strength for T-pose setup
-        angularXDrive.positionDamper = dampingForce * 0.5f;  // 50% damping for T-pose setup
+        angularXDrive.positionSpring = springForce;
+        angularXDrive.positionDamper = dampingForce;
         joint.angularXDrive = angularXDrive;
         
         var angularYZDrive = joint.angularYZDrive;
-        angularYZDrive.positionSpring = springForce * 0.1f;  // 10% strength for T-pose setup
-        angularYZDrive.positionDamper = dampingForce * 0.5f;  // 50% damping for T-pose setup
+        angularYZDrive.positionSpring = springForce;
+        angularYZDrive.positionDamper = dampingForce;
         joint.angularYZDrive = angularYZDrive;
         
         // If it has a rigidbody, reset velocities and ensure it's active
@@ -403,20 +402,20 @@ public class RagdollAgent : BaseTrainArenaAgent
         TrainArenaDebugManager.Log($"🔄 {name}: Resetting ragdoll to T-pose", 
             TrainArenaDebugManager.DebugLogLevel.Verbose);
 
-        // Reset all joints to T-pose positions with special sequence for proper arm positioning
+        // Reset all joints to T-pose positions using clean configuration
         foreach (var joint in joints)
         {
             if (joint != null && joint.joint != null)
             {
                 ResetJointToNeutralPose(joint.joint);
                 
-                // Set PD controller to neutral position for now
+                // Set PD controller to neutral position
                 joint.SetTarget01(0f);
             }
         }
 
-        // Wait for T-pose to settle, then strengthen joint drives
-        StartCoroutine(StrengthenJointDrivesAfterTPose());
+        // Wait one physics frame for joints to settle
+        StartCoroutine(WaitForJointSettling());
     }
 
     /// <summary>
@@ -430,38 +429,7 @@ public class RagdollAgent : BaseTrainArenaAgent
             TrainArenaDebugManager.DebugLogLevel.Verbose);
     }
     
-    /// <summary>
-    /// Strengthen joint drives after T-pose has settled
-    /// </summary>
-    private System.Collections.IEnumerator StrengthenJointDrivesAfterTPose()
-    {
-        // Wait for T-pose to settle (multiple physics frames)
-        yield return new WaitForFixedUpdate();
-        yield return new WaitForFixedUpdate();
-        yield return new WaitForFixedUpdate();
-        
-        // Now strengthen the joint drives to full power for natural movement
-        foreach (var joint in joints)
-        {
-            if (joint != null && joint.joint != null)
-            {
-                var (springForce, dampingForce) = RagdollTPoseConfig.GetJointDriveSettings(joint.joint.name);
-                
-                var angularXDrive = joint.joint.angularXDrive;
-                angularXDrive.positionSpring = springForce;     // Full strength now
-                angularXDrive.positionDamper = dampingForce;    // Full damping now
-                joint.joint.angularXDrive = angularXDrive;
-                
-                var angularYZDrive = joint.joint.angularYZDrive;
-                angularYZDrive.positionSpring = springForce;    // Full strength now
-                angularYZDrive.positionDamper = dampingForce;   // Full damping now
-                joint.joint.angularYZDrive = angularYZDrive;
-            }
-        }
-        
-        TrainArenaDebugManager.Log($"✅ {name}: Joint drives strengthened after T-pose settling", 
-            TrainArenaDebugManager.DebugLogLevel.Verbose);
-    }
+
 
     /// <summary>
     /// Apply T-pose specific rotations for natural ragdoll positioning using centralized configuration

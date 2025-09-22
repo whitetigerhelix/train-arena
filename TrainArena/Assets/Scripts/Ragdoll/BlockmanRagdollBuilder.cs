@@ -12,6 +12,8 @@ using TrainArena.Configuration;
 
 public class BlockmanRagdollBuilder : MonoBehaviour
 {
+    //TODO: We don't have joint limits and stuff set up for arms (and above pelvis) - it's gotten a little out of whack - AgentConfiguration has some values that need to be resolved with this correct reference values.
+
     [System.Serializable]
     public class Cfg
     {
@@ -155,11 +157,17 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         Spherical(chest, pelvis, WorldBottom(chest), WorldTop(pelvis), cfg.spineBend, cfg);
         Spherical(head, chest, WorldBottom(head), WorldTop(chest), cfg.neckSwing, cfg);
 
-        Spherical(lUArm, chest, WorldInnerX(lUArm, +1), WorldOuterX(chest, -1), cfg.shoulderSwing, cfg);
-        Spherical(rUArm, chest, WorldInnerX(rUArm, -1), WorldOuterX(chest, +1), cfg.shoulderSwing, cfg);
+        //TODO: Shoulder joints need to be re-evaluated for better arm movement/anchor positioning
+        var cj = Spherical(lUArm, chest, WorldInnerX(lUArm, +1), WorldOuterX(chest, -1), cfg.shoulderSwing, cfg);
+        //cj.autoConfigureConnectedAnchor = true; //HACK for upper arms
+        cj = Spherical(rUArm, chest, WorldInnerX(rUArm, -1), WorldOuterX(chest, +1), cfg.shoulderSwing, cfg);
+        //cj.autoConfigureConnectedAnchor = true; //HACK for upper arms
 
-        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends �down�
-        HingeZ(rLArm, rUArm, WorldInnerX(rLArm, -1), WorldOuterX(rUArm, +1), 0f, cfg.elbowFlex, cfg);
+        //TODO: Lower arm joints are a bit flakey - need to revisit limits and axes
+        cj = HingeX(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), -45f, 135f, cfg);  // elbow extends and bends
+        cj.autoConfigureConnectedAnchor = true; //HACK for lower arms
+        cj = HingeX(rLArm, rUArm, WorldInnerX(rLArm, -1), WorldOuterX(rUArm, +1), -45f, 135f, cfg);  // elbow extends and bends
+        cj.autoConfigureConnectedAnchor = true; //HACK for lower arms
 
         Spherical(lULeg, pelvis, WorldTop(lULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
         Spherical(rULeg, pelvis, WorldTop(rULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
@@ -218,7 +226,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         j.connectedAnchor = j.connectedBody.transform.InverseTransformPoint(worldOnParent);
     }
 
-    static void Spherical(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent, float limitDeg, Cfg c)
+    static ConfigurableJoint Spherical(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent, float limitDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
         cj.connectedBody = parent.GetComponent<Rigidbody>();
@@ -234,9 +242,11 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.Slerp;
         cj.slerpDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
 
-    static void HingeX(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
+    static ConfigurableJoint HingeX(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
                        float lowDeg, float highDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
@@ -255,9 +265,11 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.XYAndZ;
         cj.angularXDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
 
-    static void HingeZ(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
+    static ConfigurableJoint HingeZ(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
                        float lowDeg, float highDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
@@ -276,5 +288,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.Slerp;
         cj.slerpDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
 }
