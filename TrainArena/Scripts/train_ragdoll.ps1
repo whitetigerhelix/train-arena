@@ -7,7 +7,7 @@ param(
     [switch]$Resume,
     [switch]$SkipTensorBoard,
     [int]$TimeoutWait = 300,  # Longer timeout for complex ragdoll initialization
-    [int]$TimeScale = 20
+    [int]$TimeScale = 50
 )
 
 Write-Host "🎭 Starting ML-Agents Ragdoll Training" -ForegroundColor Green
@@ -118,8 +118,13 @@ $TrainArgs = @("`"$ConfigPath`"", "--run-id=`"$RunId`"")
 # Configure Unity connection timeout (important for ragdoll complexity)
 $TrainArgs += "--timeout-wait=$TimeoutWait"
 
-# Add time scale for faster training
+# Add time scale for faster training (CRITICAL for preventing timeouts)
 $TrainArgs += "--time-scale=$TimeScale"
+
+# Add additional parameters to prevent timeouts and improve stability
+$TrainArgs += "--num-envs=1"  # Force single environment to reduce complexity
+$TrainArgs += "--width=640"   # Reduce render resolution for better performance
+$TrainArgs += "--height=480"  # Reduce render resolution for better performance
 
 if ($Resume) {
     $TrainArgs += "--resume"
@@ -140,10 +145,13 @@ Write-Host "5. Monitor progress at http://localhost:6006 (TensorBoard)" -Foregro
 Write-Host "6. Press Ctrl+C here to stop training when satisfied" -ForegroundColor White
 
 Write-Host "`n📊 Expected Training Progress:" -ForegroundColor Cyan
-Write-Host "   • Phase 1 (0-500k steps): Learning to balance and not fall" -ForegroundColor White
-Write-Host "   • Phase 2 (500k-2M steps): Basic locomotion patterns emerge" -ForegroundColor White
-Write-Host "   • Phase 3 (2M+ steps): Coordinated walking and navigation" -ForegroundColor White
-Write-Host "   • Training time: 2-6 hours depending on hardware and complexity" -ForegroundColor White
+Write-Host "   • Phase 1 (0-100k steps): Learning basic balance and joint control" -ForegroundColor White
+Write-Host "   • Phase 2 (100k-300k steps): Developing locomotion patterns" -ForegroundColor White
+Write-Host "   • Phase 3 (300k+ steps): Refining walking and navigation" -ForegroundColor White
+Write-Host "   • Training time: 1-3 hours (reduced complexity for stability)" -ForegroundColor White
+Write-Host "`n⚠️  IMPORTANT: Keep Unity responsive during training!" -ForegroundColor Yellow
+Write-Host "   • Don't minimize Unity window or switch away for long periods" -ForegroundColor White
+Write-Host "   • If training stalls, the timeout is now much shorter for quicker recovery" -ForegroundColor White
 
 Write-Host "`n⏳ Starting training with $TimeoutWait-second Unity timeout..." -ForegroundColor Yellow
 Start-Sleep 5

@@ -121,7 +121,7 @@ public static class SceneBuilder
             {
                 init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTestingX;
                 init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTestingZ;
-                init.ArenaHelper.AgentSpawnHeight = 1.0f; // Ragdolls are taller than cubes
+                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
             }
             init.ObstaclesPerArena = 6;
         }
@@ -137,7 +137,7 @@ public static class SceneBuilder
             {
                 init.EnvCountX = SceneConfiguration.Layout.GridDimensions.RagdollTrainingX;
                 init.EnvCountZ = SceneConfiguration.Layout.GridDimensions.RagdollTrainingZ;
-                init.ArenaHelper.AgentSpawnHeight = 1.0f; // Ragdolls are taller than cubes
+                init.ArenaHelper.AgentSpawnHeight = 1.5f; // Ragdolls are taller than cubes
             }
         }
 

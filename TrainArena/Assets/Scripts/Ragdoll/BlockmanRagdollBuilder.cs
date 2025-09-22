@@ -12,6 +12,8 @@ using TrainArena.Configuration;
 
 public class BlockmanRagdollBuilder : MonoBehaviour
 {
+    // FIXED: Joint limits and axes corrected for arms - shoulder and elbow joints now properly configured for natural movement
+
     [System.Serializable]
     public class Cfg
     {
@@ -124,7 +126,9 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         var head = SphereBone(RagdollJointNames.Head, chest.transform, cfg.headRadius, cfg.mHead,
                              new Vector3(0, cfg.chest.y * 0.5f + cfg.headRadius + cfg.separation, 0));
 
-        float shoulderY = cfg.chest.y * 0.25f;
+        // Position shoulders higher up on chest for realistic anatomy
+        float shoulderY = cfg.chest.y * 0.4f; // Higher up the chest
+        // Position upper arms so their inner end connects to chest outer surface
         float shoulderX = cfg.chest.x * 0.5f + cfg.upperArm.x * 0.5f + cfg.separation;
 
         var lUArm = BoxBone(RagdollJointNames.LeftUpperArm, chest.transform, cfg.upperArm, cfg.mUArm, new Vector3(-shoulderX, shoulderY, 0));
@@ -155,11 +159,17 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         Spherical(chest, pelvis, WorldBottom(chest), WorldTop(pelvis), cfg.spineBend, cfg);
         Spherical(head, chest, WorldBottom(head), WorldTop(chest), cfg.neckSwing, cfg);
 
-        Spherical(lUArm, chest, WorldInnerX(lUArm, +1), WorldOuterX(chest, -1), cfg.shoulderSwing, cfg);
-        Spherical(rUArm, chest, WorldInnerX(rUArm, -1), WorldOuterX(chest, +1), cfg.shoulderSwing, cfg);
+        // Shoulder joints: Connect upper arm inner surface to chest outer surface
+        // Use direct surface calculations for proper anchor positioning
+        Spherical(lUArm, chest, Surface(lUArm, Vector3.right), Surface(chest, Vector3.left), cfg.shoulderSwing, cfg);
+        Spherical(rUArm, chest, Surface(rUArm, Vector3.left), Surface(chest, Vector3.right), cfg.shoulderSwing, cfg);
 
-        HingeZ(lLArm, lUArm, WorldInnerX(lLArm, +1), WorldOuterX(lUArm, -1), 0f, cfg.elbowFlex, cfg);  // bends �down�
-        HingeZ(rLArm, rUArm, WorldInnerX(rLArm, -1), WorldOuterX(rUArm, +1), 0f, cfg.elbowFlex, cfg);
+        // Elbow joints: Connect the correct ends to avoid anchor sign issues
+        // For left arm: +X end of lower arm connects to -X end of upper arm
+        // For right arm: -X end of lower arm connects to +X end of upper arm  
+        // Spherically hinge for (semi-)natural elbow bending motion (arms bend up/down around vertical axis)
+        Spherical(lLArm, lUArm, Surface(lLArm, Vector3.right), Surface(lUArm, Vector3.left), cfg.elbowFlex, cfg);
+        Spherical(rLArm, rUArm, Surface(rLArm, Vector3.left), Surface(rUArm, Vector3.right), cfg.elbowFlex, cfg);
 
         Spherical(lULeg, pelvis, WorldTop(lULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
         Spherical(rULeg, pelvis, WorldTop(rULeg), WorldBottom(pelvis), cfg.hipSwing, cfg);
@@ -184,7 +194,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         var t = go.transform;
         if (go.TryGetComponent(out BoxCollider box))
         {
-            // convert the world direction to the bone�s local space to pick the correct face
+            // convert the world direction to the bone's local space to pick the correct face
             Vector3 dL = t.InverseTransformDirection(worldDir.normalized);
             Vector3 half = box.size * 0.5f;
             Vector3 local = new Vector3(
@@ -197,7 +207,7 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         if (go.TryGetComponent(out SphereCollider sph))
         {
             float r = sph.radius;
-            // move a bit outside so anchors aren�t inside the collider
+            // move a bit outside so anchors aren't inside the collider
             return t.position + worldDir.normalized * (r + 0.0005f);
         }
         return t.position;
@@ -212,13 +222,14 @@ public class BlockmanRagdollBuilder : MonoBehaviour
         j.projectionDistance = 0.02f;
         j.projectionAngle = 10f;
     }
+
     static void SetAnchors(ConfigurableJoint j, Vector3 worldOnChild, Vector3 worldOnParent)
     {
         j.anchor = j.transform.InverseTransformPoint(worldOnChild);
         j.connectedAnchor = j.connectedBody.transform.InverseTransformPoint(worldOnParent);
     }
 
-    static void Spherical(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent, float limitDeg, Cfg c)
+    static ConfigurableJoint Spherical(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent, float limitDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
         cj.connectedBody = parent.GetComponent<Rigidbody>();
@@ -234,9 +245,11 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.Slerp;
         cj.slerpDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
 
-    static void HingeX(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
+    static ConfigurableJoint HingeX(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
                        float lowDeg, float highDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
@@ -255,14 +268,17 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.XYAndZ;
         cj.angularXDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
 
-    static void HingeZ(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
+    static ConfigurableJoint HingeZ(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
                        float lowDeg, float highDeg, Cfg c)
     {
         var cj = child.AddComponent<ConfigurableJoint>();
         cj.connectedBody = parent.GetComponent<Rigidbody>();
-        CommonJointTuning(cj); SetAnchors(cj, wChild, wParent);
+        CommonJointTuning(cj);
+        SetAnchors(cj, wChild, wParent);
 
         cj.axis = Vector3.forward; cj.secondaryAxis = Vector3.up;
 
@@ -276,5 +292,33 @@ public class BlockmanRagdollBuilder : MonoBehaviour
 
         cj.rotationDriveMode = RotationDriveMode.Slerp;
         cj.slerpDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
     }
+
+    static ConfigurableJoint HingeY(GameObject child, GameObject parent, Vector3 wChild, Vector3 wParent,
+                       float lowDeg, float highDeg, Cfg c)
+    {
+        var cj = child.AddComponent<ConfigurableJoint>();
+        cj.connectedBody = parent.GetComponent<Rigidbody>();
+        CommonJointTuning(cj);
+        SetAnchors(cj, wChild, wParent);
+
+        cj.axis = Vector3.up; cj.secondaryAxis = Vector3.right;
+
+        cj.xMotion = cj.yMotion = cj.zMotion = ConfigurableJointMotion.Locked;
+        cj.angularXMotion = ConfigurableJointMotion.Locked;
+        cj.angularYMotion = ConfigurableJointMotion.Limited;
+        cj.angularZMotion = ConfigurableJointMotion.Locked;
+
+        // For Y-axis rotation, use the symmetric angularYLimit
+        cj.angularYLimit = new SoftJointLimit { limit = Mathf.Max(Mathf.Abs(lowDeg), Mathf.Abs(highDeg)) };
+
+        cj.rotationDriveMode = RotationDriveMode.XYAndZ;
+        cj.angularYZDrive = new JointDrive { positionSpring = c.spring, positionDamper = c.damper, maximumForce = c.maxForce };
+
+        return cj;
+    }
+
+
 }
