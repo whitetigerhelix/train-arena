@@ -17,10 +17,15 @@ public class EyeBlinker : MonoBehaviour
     private Vector3[] originalEyeScales;
     private Coroutine blinkCoroutine;
 
-    void Start()
+    void OnEnable()
     {
         FindEyes();
         StartBlinking();
+    }
+
+    private void OnDisable()
+    {
+        SetBlinkingEnabled(false);
     }
 
     void FindEyes()
@@ -33,6 +38,7 @@ public class EyeBlinker : MonoBehaviour
         {
             if (child != transform && child.name.Contains("Eye"))
             {
+                Debug.Log($"EyeBlinker on {gameObject.name}: Found eye object '{child.name}'");
                 eyeList.Add(child);
                 originalScales.Add(child.localScale);
             }
@@ -57,10 +63,12 @@ public class EyeBlinker : MonoBehaviour
 
     IEnumerator BlinkLoop()
     {
+        Debug.Log($"EyeBlinker on {gameObject.name}: Starting blink loop with {eyeTransforms.Length} eyes.");
         while (true)
         {
             // Wait for random interval between blinks
             float waitTime = Random.Range(minBlinkInterval, maxBlinkInterval);
+            //Debug.Log($"EyeBlinker on {gameObject.name}: Waiting {waitTime:F2} seconds before next blink.");
             yield return new WaitForSeconds(waitTime);
 
             // Perform blink
@@ -70,6 +78,8 @@ public class EyeBlinker : MonoBehaviour
 
     IEnumerator PerformBlink()
     {
+        //Debug.Log($"EyeBlinker on {gameObject.name}: Performing blink.");
+
         float elapsedTime = 0f;
 
         while (elapsedTime < blinkDuration)
@@ -122,6 +132,8 @@ public class EyeBlinker : MonoBehaviour
     // Method to temporarily stop/start blinking
     public void SetBlinkingEnabled(bool enabled)
     {
+        Debug.Log($"EyeBlinker on {gameObject.name}: SetBlinkingEnabled({enabled}) called.");
+
         if (blinkCoroutine != null)
         {
             StopCoroutine(blinkCoroutine);
